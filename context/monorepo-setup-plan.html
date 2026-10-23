@@ -1,0 +1,3493 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Monorepo Setup — AI Trading System</title>
+<meta name="description" content="Step-by-step implementation plan for the AI Trading System monorepo: pnpm workspaces, Nx, Next.js, NestJS, shared packages, Drizzle, Docker and tests." />
+<style>
+  :root{
+    color-scheme: dark;
+    --sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    --bg:#06090d;
+    --bg-soft:#0a0f16;
+    --panel:#0d141d;
+    --panel-2:#111a25;
+    --line:#1b2836;
+    --line-2:#273a4d;
+    --text:#dce8f5;
+    --text-2:#a8bacd;
+    --muted:#71869c;
+    --green:#35e0a1;
+    --green-2:#0ea472;
+    --cyan:#38d9f5;
+    --amber:#f5c451;
+    --red:#ff7b7b;
+    --violet:#b79cff;
+    --code:#05080c;
+    --radius:16px;
+    --shadow:0 24px 60px rgba(0,0,0,.45);
+  }
+  *,*::before,*::after{box-sizing:border-box}
+  html{scroll-behavior:smooth;scroll-padding-top:32px}
+  body{
+    margin:0;
+    font-family:var(--sans);
+    font-size:15px;
+    line-height:1.65;
+    color:var(--text);
+    background:
+      radial-gradient(1100px 620px at 12% -8%, rgba(53,224,161,.13), transparent 58%),
+      radial-gradient(900px 540px at 92% 2%, rgba(56,217,245,.10), transparent 55%),
+      radial-gradient(800px 700px at 50% 112%, rgba(183,156,255,.06), transparent 60%),
+      var(--bg);
+    -webkit-font-smoothing:antialiased;
+  }
+  body::before{
+    content:"";
+    position:fixed;
+    inset:0;
+    z-index:0;
+    pointer-events:none;
+    background-image:
+      linear-gradient(rgba(255,255,255,.028) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.028) 1px, transparent 1px);
+    background-size:64px 64px;
+    mask-image:radial-gradient(circle at 50% 18%, #000 0%, transparent 74%);
+    opacity:.38;
+  }
+  ::selection{background:rgba(53,224,161,.28);color:#fff}
+  a{color:var(--cyan)}
+  a:hover{color:#9beeff}
+  .skip{
+    position:fixed;left:12px;top:-60px;z-index:100;
+    padding:10px 14px;border-radius:8px;background:var(--green);color:#04110c;
+    font-weight:700;text-decoration:none;transition:top .2s;
+  }
+  .skip:focus{top:12px}
+  .progress{
+    position:fixed;top:0;left:0;height:2px;width:0;z-index:60;
+    background:linear-gradient(90deg,var(--green),var(--cyan));
+    box-shadow:0 0 16px rgba(53,224,161,.55);
+  }
+
+  /* ---------- Sidebar ---------- */
+  .sidebar{
+    position:fixed;inset:0 auto 0 0;width:296px;z-index:30;
+    display:flex;flex-direction:column;gap:20px;
+    padding:26px 18px 22px;
+    background:rgba(6,10,14,.84);
+    border-right:1px solid var(--line);
+    backdrop-filter:blur(18px);
+    overflow-y:auto;
+  }
+  .brand{display:flex;align-items:center;gap:12px;text-decoration:none;color:inherit}
+  .logo{
+    width:40px;height:40px;flex:0 0 auto;border-radius:12px;display:grid;place-items:center;
+    background:linear-gradient(145deg,rgba(53,224,161,.22),rgba(56,217,245,.08));
+    border:1px solid rgba(53,224,161,.36);
+    box-shadow:0 0 28px rgba(53,224,161,.14), inset 0 1px 0 rgba(255,255,255,.08);
+  }
+  .brand strong{display:block;font-size:13px;line-height:1.3;letter-spacing:.01em}
+  .brand span{display:block;font-size:10.5px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-top:2px}
+  .side-label{
+    margin:6px 0 -6px;font:600 9.5px/1 var(--mono);letter-spacing:.18em;
+    text-transform:uppercase;color:var(--muted);
+  }
+  .toc{display:flex;flex-direction:column;gap:1px}
+  .toc a{
+    display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:8px;
+    color:var(--text-2);text-decoration:none;font-size:12.2px;line-height:1.35;
+    border-left:2px solid transparent;transition:background .15s,color .15s,border-color .15s;
+  }
+  .toc a:hover{background:rgba(255,255,255,.04);color:var(--text)}
+  .toc a.active{color:var(--green);background:rgba(53,224,161,.075);border-left-color:var(--green)}
+  .toc .n{font:10px/1 var(--mono);color:var(--muted);width:17px;flex:0 0 auto}
+  .toc a.active .n{color:var(--green)}
+  .side-status{
+    margin-top:auto;padding-top:16px;border-top:1px solid var(--line);
+    font-size:10.5px;color:var(--muted);line-height:1.5;
+  }
+  .side-status b{display:block;color:var(--text-2);font-weight:600;margin-bottom:7px}
+  .side-bar{height:3px;background:var(--line);border-radius:99px;overflow:hidden;margin-top:8px}
+  .side-bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--green),var(--cyan))}
+  .side-meta{display:flex;justify-content:space-between;margin-top:7px;font:10px/1 var(--mono);color:var(--muted)}
+
+  /* ---------- Main ---------- */
+  main{
+    position:relative;z-index:1;
+    margin-left:296px;
+    padding:64px clamp(22px,5vw,82px) 120px;
+    max-width:1280px;
+  }
+  .hero{margin-top:0;padding:10px 0 4px;max-width:1000px}
+  .hero-top{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px}
+  .hero h1{
+    margin:0 0 20px;
+    font-size:clamp(2.6rem,5.4vw,4.5rem);
+    line-height:1.02;letter-spacing:-.048em;font-weight:760;
+  }
+  .grad{
+    background:linear-gradient(100deg,#f2f8ff 0%,#9ff5d3 42%,#65e2f5 100%);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  .lede{font-size:17px;line-height:1.7;color:var(--text-2);max-width:780px;margin:0 0 24px}
+  .meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:28px}
+  .meta span{
+    font:11px/1 var(--mono);color:var(--text-2);
+    border:1px solid var(--line);background:rgba(255,255,255,.028);
+    padding:7px 10px;border-radius:99px;
+  }
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:26px}
+  .stat{
+    padding:16px;border:1px solid var(--line);border-radius:14px;
+    background:linear-gradient(180deg,rgba(255,255,255,.032),rgba(255,255,255,.008));
+  }
+  .stat b{display:block;font-size:24px;line-height:1.1;letter-spacing:-.03em;color:var(--text)}
+  .stat span{display:block;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.12em;margin-top:7px}
+
+  section{margin-top:70px;scroll-margin-top:34px}
+  .section-head{display:flex;align-items:flex-start;gap:15px;margin-bottom:18px}
+  .num{
+    flex:0 0 auto;display:grid;place-items:center;width:42px;height:42px;border-radius:12px;
+    font:600 12px/1 var(--mono);color:var(--green);
+    background:rgba(53,224,161,.08);border:1px solid rgba(53,224,161,.27);
+  }
+  .kicker{
+    margin:0 0 4px;font:600 10px/1 var(--mono);letter-spacing:.17em;
+    text-transform:uppercase;color:var(--muted);
+  }
+  h2{margin:0;font-size:clamp(1.5rem,2.6vw,2.05rem);line-height:1.2;letter-spacing:-.032em}
+  h3{margin:28px 0 10px;font-size:16px;letter-spacing:-.012em;color:var(--text)}
+  h4{margin:20px 0 8px;font-size:13.5px;color:var(--text)}
+  p{margin:0 0 12px}
+  ul,ol{margin:10px 0 14px;padding-left:22px}
+  li{margin:5px 0;color:var(--text-2)}
+  li strong{color:var(--text)}
+  .muted{color:var(--muted)}
+  .small{font-size:12.5px}
+  .nowrap{white-space:nowrap}
+
+  .card{
+    background:linear-gradient(180deg,rgba(255,255,255,.032),rgba(255,255,255,.008));
+    border:1px solid var(--line);border-radius:16px;padding:22px;
+  }
+  .grid-2{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+  .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  .card h3{margin-top:0}
+  .card p:last-child{margin-bottom:0}
+
+  .step{
+    display:grid;grid-template-columns:38px 1fr;gap:16px;
+    padding:20px 0;border-top:1px solid var(--line);
+  }
+  .step:first-of-type{border-top:0;padding-top:4px}
+  .step:last-of-type{padding-bottom:0}
+  .step-n{
+    width:30px;height:30px;border-radius:9px;display:grid;place-items:center;
+    font:600 11px/1 var(--mono);color:var(--cyan);
+    background:rgba(56,217,245,.07);border:1px solid rgba(56,217,245,.24);
+  }
+  .step h3{margin:2px 0 8px;font-size:14.5px}
+  .step p:last-child{margin-bottom:0}
+
+  .callout{
+    display:grid;grid-template-columns:22px 1fr;gap:12px;
+    border:1px solid var(--line);border-left:3px solid var(--cyan);
+    border-radius:12px;padding:14px 16px;margin:16px 0;
+    background:linear-gradient(90deg,rgba(56,217,245,.065),transparent 72%);
+    font-size:13px;color:var(--text-2);
+  }
+  .callout strong{color:var(--text)}
+  .callout .ico{font-size:14px;line-height:1.5;color:var(--cyan)}
+  .callout.warn{border-left-color:var(--amber);background:linear-gradient(90deg,rgba(245,196,81,.075),transparent 72%)}
+  .callout.warn .ico{color:var(--amber)}
+  .callout.ok{border-left-color:var(--green);background:linear-gradient(90deg,rgba(53,224,161,.075),transparent 72%)}
+  .callout.ok .ico{color:var(--green)}
+  .callout.danger{border-left-color:var(--red);background:linear-gradient(90deg,rgba(255,123,123,.075),transparent 72%)}
+  .callout.danger .ico{color:var(--red)}
+
+  .table-wrap{
+    overflow-x:auto;border:1px solid var(--line);border-radius:14px;margin:16px 0;
+    background:rgba(255,255,255,.012);
+  }
+  table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:660px}
+  th{
+    text-align:left;padding:11px 14px;white-space:nowrap;
+    font:600 9.5px/1.3 var(--mono);letter-spacing:.11em;text-transform:uppercase;
+    color:var(--muted);background:rgba(255,255,255,.026);
+    border-bottom:1px solid var(--line);
+  }
+  td{padding:11px 14px;border-bottom:1px solid rgba(27,40,54,.72);color:var(--text-2);vertical-align:top}
+  tr:last-child td{border-bottom:0}
+  tr:hover td{background:rgba(255,255,255,.018)}
+  td strong{color:var(--text);font-weight:600}
+  td code{white-space:nowrap}
+
+  .pill{
+    display:inline-flex;align-items:center;gap:6px;
+    padding:5px 9px;border-radius:99px;border:1px solid var(--line);
+    background:rgba(255,255,255,.03);
+    font:600 9.5px/1 var(--mono);letter-spacing:.07em;text-transform:uppercase;color:var(--text-2);
+  }
+  .pill.green{border-color:rgba(53,224,161,.3);background:rgba(53,224,161,.085);color:#8df2ca}
+  .pill.cyan{border-color:rgba(56,217,245,.3);background:rgba(56,217,245,.075);color:#9beeff}
+  .pill.amber{border-color:rgba(245,196,81,.3);background:rgba(245,196,81,.075);color:#ffe09a}
+  .pill.red{border-color:rgba(255,123,123,.3);background:rgba(255,123,123,.075);color:#ffb0b0}
+  .pill.violet{border-color:rgba(183,156,255,.3);background:rgba(183,156,255,.075);color:#d3c4ff}
+
+  .code{
+    margin:14px 0;border:1px solid var(--line);border-radius:12px;overflow:hidden;
+    background:var(--code);box-shadow:0 14px 34px rgba(0,0,0,.24);
+  }
+  .code-head{
+    display:flex;align-items:center;justify-content:space-between;gap:12px;
+    padding:8px 12px;background:rgba(255,255,255,.026);
+    border-bottom:1px solid var(--line);
+  }
+  .code-lang{
+    font:600 9.5px/1 var(--mono);letter-spacing:.15em;text-transform:uppercase;color:var(--muted);
+  }
+  .copy{
+    appearance:none;cursor:pointer;border:1px solid var(--line);
+    background:rgba(255,255,255,.03);color:var(--text-2);
+    font:600 9.5px/1 var(--mono);letter-spacing:.06em;padding:6px 9px;border-radius:7px;
+    transition:color .15s,border-color .15s,background .15s;
+  }
+  .copy:hover,.copy:focus-visible{color:var(--green);border-color:rgba(53,224,161,.36);background:rgba(53,224,161,.075);outline:none}
+  .copy.done{color:var(--green);border-color:rgba(53,224,161,.45)}
+  pre{
+    margin:0;padding:16px 18px;overflow:auto;
+    font:12px/1.72 var(--mono);color:#c9dcee;tab-size:2;
+  }
+  pre code{font-family:inherit;font-size:inherit;background:none;padding:0;border:0;color:inherit}
+  :not(pre)>code{
+    font:12px/1.5 var(--mono);color:#a7f3d0;background:rgba(53,224,161,.085);
+    border:1px solid rgba(53,224,161,.16);padding:2px 5px;border-radius:5px;
+  }
+
+  .tree{
+    font:12px/1.78 var(--mono);color:#b7c9da;white-space:pre;padding:20px;
+  }
+  .tree .d{color:#7fe7c3}
+  .tree .f{color:#d7e5f3}
+  .tree .c{color:#f5c451}
+  .tree .m{color:#5f7488}
+  .tree .tag{color:#b79cff}
+
+  .arch{display:grid;gap:12px;margin:18px 0}
+  .arch-row{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  .arch-row.four{grid-template-columns:repeat(4,1fr)}
+  .arch-row.two{grid-template-columns:repeat(2,1fr)}
+  .node{
+    border:1px solid var(--line);border-radius:12px;padding:14px;
+    background:rgba(255,255,255,.022);
+  }
+  .node b{display:block;font-size:12.5px;margin-bottom:3px;color:var(--text)}
+  .node span{display:block;font-size:10.5px;color:var(--muted);line-height:1.5}
+  .node.app{border-color:rgba(53,224,161,.31);background:linear-gradient(180deg,rgba(53,224,161,.07),rgba(255,255,255,.01))}
+  .node.lib{border-color:rgba(56,217,245,.25);background:linear-gradient(180deg,rgba(56,217,245,.045),rgba(255,255,255,.01))}
+  .node.data{border-color:rgba(183,156,255,.25);background:linear-gradient(180deg,rgba(183,156,255,.045),rgba(255,255,255,.01))}
+  .arch-label{
+    font:600 9px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;
+    color:var(--muted);margin:4px 0 -4px;
+  }
+
+  ul.check{list-style:none;padding:0;display:grid;gap:8px;margin:14px 0}
+  ul.check li{position:relative;padding-left:28px;margin:0;color:var(--text-2)}
+  ul.check li::before{
+    content:"";position:absolute;left:0;top:3px;width:16px;height:16px;border-radius:5px;
+    border:1px solid var(--line-2);background:rgba(255,255,255,.02);
+  }
+  ul.check li::after{
+    content:"✓";position:absolute;left:3px;top:-1px;font-size:11px;font-weight:700;color:var(--green);
+  }
+
+  details{
+    border:1px solid var(--line);border-radius:12px;
+    background:rgba(255,255,255,.018);margin:12px 0;overflow:hidden;
+  }
+  summary{
+    cursor:pointer;padding:13px 16px;font-size:12.5px;font-weight:600;color:var(--text);
+    display:flex;align-items:center;gap:8px;
+  }
+  summary::marker{color:var(--green)}
+  details[open] summary{border-bottom:1px solid var(--line);background:rgba(255,255,255,.02)}
+  .details-body{padding:16px}
+  .details-body>*:last-child{margin-bottom:0}
+
+  .to-top{
+    position:fixed;right:22px;bottom:22px;z-index:50;
+    width:40px;height:40px;border-radius:11px;display:grid;place-items:center;
+    border:1px solid var(--line-2);background:rgba(13,20,29,.9);color:var(--text-2);
+    cursor:pointer;backdrop-filter:blur(10px);
+    opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;
+  }
+  .to-top.show{opacity:1;pointer-events:auto}
+  .to-top:hover{color:var(--green);border-color:rgba(53,224,161,.35);transform:translateY(-2px)}
+
+  .mobile-bar,.mobile-menu{display:none}
+
+  footer{
+    margin-top:80px;padding-top:24px;border-top:1px solid var(--line);
+    display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;
+    font-size:11px;color:var(--muted);
+  }
+
+  @media(max-width:1120px){
+    .sidebar{display:none}
+    main{margin-left:0;padding:78px 20px 100px}
+    .mobile-bar{
+      display:flex;position:fixed;top:0;left:0;right:0;height:56px;z-index:45;
+      align-items:center;justify-content:space-between;padding:0 16px;
+      background:rgba(6,10,14,.92);border-bottom:1px solid var(--line);
+      backdrop-filter:blur(16px);
+    }
+    .mobile-brand{font-size:12px;font-weight:700;letter-spacing:-.01em}
+    .mobile-brand span{color:var(--muted);font-weight:500}
+    .menu-btn{
+      appearance:none;border:1px solid var(--line);background:rgba(255,255,255,.03);
+      color:var(--text-2);font:600 10px/1 var(--mono);letter-spacing:.08em;
+      text-transform:uppercase;padding:8px 10px;border-radius:8px;cursor:pointer;
+    }
+    .mobile-menu{
+      display:block;position:fixed;top:56px;left:0;right:0;bottom:0;z-index:44;
+      background:rgba(6,10,14,.985);padding:18px;overflow:auto;
+    }
+    .mobile-menu[hidden]{display:none}
+    .mobile-menu .toc a{font-size:13.5px;padding:10px}
+    .stats{grid-template-columns:repeat(2,1fr)}
+    .arch-row,.arch-row.four,.grid-2,.grid-3{grid-template-columns:1fr}
+  }
+  @media(max-width:560px){
+    .stats{grid-template-columns:1fr 1fr}
+    .step{grid-template-columns:30px 1fr;gap:12px}
+    .section-head{gap:11px}
+    .num{width:36px;height:36px;font-size:11px}
+    pre{font-size:11px;padding:14px}
+    .lede{font-size:15.5px}
+    footer{flex-direction:column}
+  }
+  @media(prefers-reduced-motion:reduce){
+    html{scroll-behavior:auto}
+    *,*::before,*::after{transition:none!important;animation:none!important}
+  }
+  @media print{
+    .sidebar,.mobile-bar,.to-top,.progress,.copy{display:none!important}
+    main{margin:0;padding:0;max-width:none}
+    body{background:#fff;color:#111}
+    .code{box-shadow:none}
+  }
+</style>
+</head>
+<body>
+<a class="skip" href="#overview">Skip to content</a>
+<div class="progress" id="progress" aria-hidden="true"></div>
+
+<aside class="sidebar" aria-label="Document navigation">
+  <a class="brand" href="#overview">
+    <span class="logo" aria-hidden="true">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none">
+        <path d="M4 18V9M9 18V5M14 18v-6M19 18V8" stroke="#35e0a1" stroke-width="2" stroke-linecap="round"/>
+        <path d="M3 20h18" stroke="#38d9f5" stroke-width="1.4" stroke-linecap="round" opacity=".75"/>
+      </svg>
+    </span>
+    <span>
+      <strong>AI Trading System</strong>
+      <span>Monorepo plan</span>
+    </span>
+  </a>
+  <p class="side-label">Contents</p>
+  <nav class="toc" id="toc"></nav>
+  <div class="side-status">
+    <b>Task 01 · Foundation</b>
+    Setup only. Trading logic starts in later milestones.
+    <div class="side-bar"><i id="sideBar"></i></div>
+    <div class="side-meta"><span id="sidePct">0%</span><span>~10 phases</span></div>
+  </div>
+</aside>
+
+<div class="mobile-bar">
+  <div class="mobile-brand">Monorepo Setup <span>· AI Trading</span></div>
+  <button class="menu-btn" id="menuBtn" aria-expanded="false" aria-controls="mobileMenu">Contents</button>
+</div>
+<div class="mobile-menu" id="mobileMenu" hidden>
+  <nav class="toc" id="mobileToc" aria-label="Mobile document navigation"></nav>
+</div>
+
+<main>
+<section class="hero" id="overview" data-title="Overview">
+  <div class="hero-top">
+    <span class="pill green">Task 01 · Foundation</span>
+    <span class="pill cyan">Implementation plan</span>
+    <span class="pill amber">Setup only</span>
+  </div>
+  <h1>Monorepo<br /><span class="grad">Setup Plan</span></h1>
+  <p class="lede">
+    A step-by-step build order for the AI Trading System workspace: <strong>pnpm workspaces + Nx</strong>,
+    a Next.js dashboard, NestJS API and worker, and twelve framework-agnostic domain packages.
+    Every command, config file and dependency needed to reproduce the structure is listed below.
+  </p>
+  <div class="meta">
+    <span>pnpm 12</span>
+    <span>Nx 22</span>
+    <span>Node 24 LTS</span>
+    <span>Next.js 16</span>
+    <span>NestJS 11</span>
+    <span>PostgreSQL 17</span>
+    <span>Redis 7.4</span>
+  </div>
+  <div class="stats">
+    <div class="stat"><b>3</b><span>root apps</span></div>
+    <div class="stat"><b>12</b><span>shared packages</span></div>
+    <div class="stat"><b>11</b><span>setup phases</span></div>
+    <div class="stat"><b>0</b><span>trading logic</span></div>
+  </div>
+</section>
+
+<section id="outcomes" data-title="Outcomes &amp; scope">
+  <div class="section-head">
+    <span class="num">01</span>
+    <div>
+      <p class="kicker">What this task produces</p>
+      <h2>Outcomes and scope</h2>
+    </div>
+  </div>
+
+  <p>
+    This plan creates the <strong>repository skeleton and its tooling</strong>. It does not implement strategies,
+    broker calls, risk rules or trading logic. The result is a workspace where those later milestones can be
+    added without moving folders or rewiring the build.
+  </p>
+
+  <div class="grid-2">
+    <div class="card">
+      <h3>Workspace foundation</h3>
+      <p class="small">A pnpm workspace at the repository root, orchestrated by Nx, with cached build, lint, test and typecheck targets and a visible project graph.</p>
+    </div>
+    <div class="card">
+      <h3>Three runnable apps</h3>
+      <p class="small"><code>apps/web</code>, <code>apps/api</code> and <code>apps/worker</code> live directly under the root <code>apps/</code> folder — never nested inside another app or package.</p>
+    </div>
+    <div class="card">
+      <h3>Twelve shared packages</h3>
+      <p class="small">Framework-agnostic TypeScript packages for domain contracts, engines, adapters, persistence, configuration, notifications and observability.</p>
+    </div>
+    <div class="card">
+      <h3>Local infrastructure</h3>
+      <p class="small">PostgreSQL and Redis through Docker Compose, Drizzle migrations, environment templates, test folders, docs and Azure deployment placeholders.</p>
+    </div>
+  </div>
+
+  <h3>Definition of done</h3>
+  <ul class="check">
+    <li><code>pnpm install</code> completes from a clean clone with one lockfile.</li>
+    <li><code>pnpm nx graph</code> lists <code>web</code>, <code>api</code>, <code>worker</code> and all twelve packages with dependency edges.</li>
+    <li><code>pnpm nx run-many -t typecheck</code>, <code>lint</code>, <code>build</code> and <code>test</code> pass.</li>
+    <li><code>docker compose up -d</code> starts healthy PostgreSQL and Redis containers.</li>
+    <li><code>pnpm dev</code> starts the dashboard on <code>:3000</code>, the API on <code>:4000</code>, and the worker process.</li>
+    <li><code>GET /api/v1/health</code> returns a healthy response and the worker logs a ready queue connection.</li>
+    <li><code>pnpm db:generate</code> produces a Drizzle migration without schema drift.</li>
+  </ul>
+
+  <div class="callout warn">
+    <span class="ico">▲</span>
+    <div><strong>Explicitly out of scope:</strong> strategy implementation, Upstox authentication, order placement, risk-policy logic, backtest metrics, live trading and production deployment. Those belong to R2–R8 in <code>context/deployment-order.md</code>. This task stops at a verified skeleton.</div>
+  </div>
+
+  <div class="callout">
+    <span class="ico">◆</span>
+    <div><strong>The <code>context/</code> folder is source material, not scaffolding.</strong> It already contains the architecture, strategy, risk, execution and backtesting specifications. Do not delete or reorganise it; later tasks read from it.</div>
+  </div>
+</section>
+
+<section id="decisions" data-title="Key decisions">
+  <div class="section-head">
+    <span class="num">02</span>
+    <div>
+      <p class="kicker">Locked inputs</p>
+      <h2>Key decisions</h2>
+    </div>
+  </div>
+
+  <p>The plan uses the following choices. Each one changes the commands and dependency list, so they are recorded here as implementation constraints.</p>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Area</th><th>Decision</th><th>Why</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>Package manager</strong></td><td>pnpm 12 workspaces</td><td>One lockfile, strict dependency isolation, fast installs and <code>workspace:*</code> links between apps and packages.</td></tr>
+        <tr><td><strong>Orchestration</strong></td><td>Nx 22, integrated workspace</td><td>Project graph, affected commands, local cache and a single command surface without adopting Nx generators for app code.</td></tr>
+        <tr><td><strong>App creation</strong></td><td>Official framework CLIs</td><td><code>create-next-app</code> and <code>@nestjs/cli</code> produce conventional, upgradeable scaffolds; Nx targets are added with <code>project.json</code> shims.</td></tr>
+        <tr><td><strong>Dashboard</strong></td><td>Next.js 16 App Router + TypeScript + Tailwind CSS 4 + shadcn/ui</td><td>Server-first React, file-system routing and a dark-first component system for operational screens.</td></tr>
+        <tr><td><strong>Backend API</strong></td><td>NestJS 11 modular monolith</td><td>Clear module boundaries and dependency injection without premature microservices, as required by the architecture context.</td></tr>
+        <tr><td><strong>Worker</strong></td><td>Separate NestJS application context</td><td>Long-running ingestion, strategy evaluation and backtests stay isolated from HTTP request handling.</td></tr>
+        <tr><td><strong>Shared code</strong></td><td>Framework-agnostic TypeScript packages, built with tsup</td><td>One strategy contract serves both live and backtest execution; packages emit ESM and CJS with declarations.</td></tr>
+        <tr><td><strong>Database</strong></td><td>PostgreSQL 17 + Drizzle ORM / Drizzle Kit</td><td>Typed schema, versioned SQL migrations and a single source of truth for trading records.</td></tr>
+        <tr><td><strong>Queue / cache</strong></td><td>Redis 7.4 + BullMQ</td><td>Asynchronous backtests, ingestion jobs, retries and distributed locks.</td></tr>
+        <tr><td><strong>Testing</strong></td><td>Vitest for packages and web; Jest for Nest scaffolds; Playwright for end-to-end</td><td>Keep the CLIs' native test setups while standardising package tests; browser flows covered separately.</td></tr>
+        <tr><td><strong>Containers</strong></td><td>Docker + Docker Compose v2</td><td>Reproducible local PostgreSQL/Redis and deployable app images for the Azure Linux VPS.</td></tr>
+        <tr><td><strong>Runtime</strong></td><td>Node 24 LTS, pnpm 12</td><td>Current active LTS with first-class support in Next.js 16 and NestJS 11.</td></tr>
+        <tr><td><strong>Time handling</strong></td><td>Store UTC; convert at the market boundary</td><td>NSE sessions are defined in <code>Asia/Kolkata</code>; persistence stays timezone-neutral.</td></tr>
+        <tr><td><strong>Trading mode</strong></td><td><code>offline</code> by default</td><td>No accidental live order path. Modes advance only through the release gates in the context docs.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout ok">
+    <span class="ico">✓</span>
+    <div>
+      <strong>Why pnpm + Nx instead of Nx generators alone:</strong> the official CLIs keep each app close to its framework's documented layout, while Nx supplies the task graph and cache across all projects. The <code>project.json</code> files are deliberately thin — they delegate to each app's own scripts, so upgrading Next.js or NestJS does not require rewriting Nx executors.
+    </div>
+  </div>
+</section>
+
+<section id="architecture" data-title="Architecture">
+  <div class="section-head">
+    <span class="num">03</span>
+    <div>
+      <p class="kicker">Shape of the workspace</p>
+      <h2>Architecture at a glance</h2>
+    </div>
+  </div>
+
+  <p>
+    The repository is a <strong>modular monolith with a separate worker process</strong>. The dashboard never talks to
+    the database or broker directly; it calls the API. The API and worker share domain packages but never import each
+    other. Broker and persistence details stay behind ports and adapters.
+  </p>
+
+  <div class="arch">
+    <p class="arch-label">Presentation &amp; application</p>
+    <div class="arch-row">
+      <div class="node app"><b>apps/web · :3000</b><span>Next.js App Router. Strategies, backtests, trading, risk, performance, settings.</span></div>
+      <div class="node app"><b>apps/api · :4000</b><span>NestJS HTTP API. Validates commands, coordinates workflows, exposes reports.</span></div>
+      <div class="node app"><b>apps/worker</b><span>NestJS application context. Ingestion, evaluation, backtests, reconciliation.</span></div>
+    </div>
+
+    <p class="arch-label">Domain &amp; strategy packages</p>
+    <div class="arch-row four">
+      <div class="node lib"><b>domain</b><span>Entities, value objects, events, types.</span></div>
+      <div class="node lib"><b>trading-engine</b><span>Contracts, registry, signals, indicators.</span></div>
+      <div class="node lib"><b>strategies</b><span>Opening-range breakout and future strategies.</span></div>
+      <div class="node lib"><b>risk-engine</b><span>Sizing, policies, exposure, kill switch.</span></div>
+    </div>
+
+    <p class="arch-label">Execution &amp; data packages</p>
+    <div class="arch-row four">
+      <div class="node lib"><b>execution-engine</b><span>Orders, state, positions, execution modes.</span></div>
+      <div class="node lib"><b>backtesting</b><span>Replay, simulated execution, costs, metrics.</span></div>
+      <div class="node lib"><b>market-data</b><span>Models, normalisation, validation, universe.</span></div>
+      <div class="node lib"><b>adapters</b><span>Upstox and simulated broker implementations.</span></div>
+    </div>
+
+    <p class="arch-label">Platform packages &amp; infrastructure</p>
+    <div class="arch-row four">
+      <div class="node data"><b>database</b><span>Drizzle schema, migrations, repositories.</span></div>
+      <div class="node data"><b>configuration</b><span>Validated, versioned settings by mode.</span></div>
+      <div class="node data"><b>notifications</b><span>Alerts, delivery channels, templates.</span></div>
+      <div class="node data"><b>observability</b><span>Structured logs, metrics, health signals.</span></div>
+    </div>
+
+    <p class="arch-label">Stateful services (Docker locally, managed in production)</p>
+    <div class="arch-row two">
+      <div class="node data"><b>PostgreSQL 17</b><span>Durable system, trading and analytical records. Drizzle is the only writer.</span></div>
+      <div class="node data"><b>Redis 7.4 + BullMQ</b><span>Job queues, temporary market state, locks and retries.</span></div>
+    </div>
+  </div>
+
+  <h3>Dependency rules</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Rule</th><th>Enforcement</th><th>Reason</th></tr></thead>
+      <tbody>
+        <tr><td>Apps never import other apps</td><td>Nx module-boundary tags; code review</td><td>Prevents a hidden second entry point and keeps deployment units independent.</td></tr>
+        <tr><td>Packages never import apps</td><td>Nx tags</td><td>Shared packages must run in API, worker and backtests without a web server.</td></tr>
+        <tr><td><code>domain</code> depends on nothing internal</td><td>Package manifest review</td><td>It is the vocabulary every other package can safely share.</td></tr>
+        <tr><td><code>execution-engine</code> defines broker ports; <code>adapters</code> implements them</td><td>Type-only imports in the engine; concrete imports only in adapters</td><td>Upstox can be replaced by the simulated broker without touching order logic.</td></tr>
+        <tr><td><code>strategies</code> only knows <code>domain</code> + <code>trading-engine</code></td><td>Nx tags and review</td><td>One strategy implementation must run unchanged in live and backtest modes.</td></tr>
+        <tr><td>No package imports NestJS, Next.js or React</td><td>Lint rule plus dependency review</td><td>Keeps the domain portable and testable outside a framework runtime.</td></tr>
+        <tr><td>Trading mode is read from validated configuration</td><td><code>packages/configuration</code>; API/worker bootstrap</td><td>No strategy or adapter can silently switch to live trading.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Context documents → folder decisions</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Context requirement</th><th>Structural response</th></tr></thead>
+      <tbody>
+        <tr><td>Modular monolith with clear module boundaries</td><td><code>apps/api/src/modules/*</code> plus framework-free packages; Nx tags stop cross-app imports.</td></tr>
+        <tr><td>Ports and adapters for market data and broker integration</td><td><code>packages/adapters/upstox</code> and <code>packages/adapters/simulated-broker</code> implement contracts owned by <code>market-data</code> and <code>execution-engine</code>.</td></tr>
+        <tr><td>Shared strategy contract for backtest and live</td><td><code>packages/trading-engine/contracts</code> and <code>packages/strategies/opening-range-breakout</code>, consumed by both apps and <code>packages/backtesting</code>.</td></tr>
+        <tr><td>Independent risk enforcement</td><td><code>packages/risk-engine</code> owns sizing, exposure and kill-switch logic; strategies cannot import broker adapters.</td></tr>
+        <tr><td>Event-driven processing</td><td><code>packages/domain/events</code> defines event contracts; BullMQ queues live in <code>apps/worker/src/queues</code>.</td></tr>
+        <tr><td>Versioned configuration</td><td><code>packages/configuration</code> validates and snapshots settings per session; every order record references a config version.</td></tr>
+        <tr><td>PostgreSQL + Drizzle</td><td><code>packages/database</code> holds schema, migrations and repositories; root <code>drizzle.config.ts</code> points at it.</td></tr>
+        <tr><td>Operations and monitoring</td><td><code>packages/observability</code>, API health endpoint and worker heartbeats; docs in <code>docs/operations</code>.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="tree" data-title="Target folder tree">
+  <div class="section-head">
+    <span class="num">04</span>
+    <div>
+      <p class="kicker">The medium-level structure, made concrete</p>
+      <h2>Target folder tree</h2>
+    </div>
+  </div>
+
+  <p>
+    This is the structure produced by the phases below. Folders from <code>context/folder-structure.md</code> are preserved;
+    only the configuration files needed to make them executable are added. <strong>All apps sit at the repository root
+    inside <code>apps/</code>.</strong>
+  </p>
+
+  <div class="code">
+    <div class="code-head"><span class="code-lang">tree</span><button class="copy" type="button">Copy</button></div>
+<pre class="tree"><span class="d">ai-trading-system/</span>
+├── <span class="d">apps/</span>
+│   ├── <span class="d">web/</span>                          <span class="m"># Next.js dashboard</span>
+│   │   ├── <span class="d">public/</span>
+│   │   ├── <span class="d">src/</span>
+│   │   │   ├── <span class="d">app/</span>
+│   │   │   │   ├── <span class="f">layout.tsx</span>
+│   │   │   │   ├── <span class="f">page.tsx</span>
+│   │   │   │   ├── <span class="f">globals.css</span>
+│   │   │   │   ├── <span class="d">strategies/</span><span class="f">page.tsx</span>
+│   │   │   │   ├── <span class="d">backtesting/</span><span class="f">page.tsx</span>
+│   │   │   │   ├── <span class="d">trading/</span><span class="f">page.tsx</span>
+│   │   │   │   ├── <span class="d">risk-management/</span><span class="f">page.tsx</span>
+│   │   │   │   ├── <span class="d">performance/</span><span class="f">page.tsx</span>
+│   │   │   │   └── <span class="d">system-settings/</span><span class="f">page.tsx</span>
+│   │   │   ├── <span class="d">components/</span>
+│   │   │   │   └── <span class="d">ui/</span>                  <span class="m"># shadcn/ui primitives</span>
+│   │   │   ├── <span class="d">features/</span>
+│   │   │   │   ├── <span class="d">strategies/</span>
+│   │   │   │   ├── <span class="d">backtesting/</span>
+│   │   │   │   ├── <span class="d">trading/</span>
+│   │   │   │   ├── <span class="d">risk-management/</span>
+│   │   │   │   ├── <span class="d">performance/</span>
+│   │   │   │   └── <span class="d">system-settings/</span>
+│   │   │   ├── <span class="d">hooks/</span>
+│   │   │   └── <span class="d">lib/</span>
+│   │   ├── <span class="c">components.json</span>
+│   │   ├── <span class="c">next.config.ts</span>
+│   │   ├── <span class="c">package.json</span>
+│   │   └── <span class="c">tsconfig.json</span>
+│   │
+│   ├── <span class="d">api/</span>                          <span class="m"># NestJS HTTP API</span>
+│   │   ├── <span class="d">src/</span>
+│   │   │   ├── <span class="d">modules/</span>
+│   │   │   │   ├── <span class="d">strategies/</span>
+│   │   │   │   ├── <span class="d">backtests/</span>
+│   │   │   │   ├── <span class="d">market-data/</span>
+│   │   │   │   ├── <span class="d">trading/</span>
+│   │   │   │   ├── <span class="d">orders/</span>
+│   │   │   │   ├── <span class="d">risk/</span>
+│   │   │   │   ├── <span class="d">positions/</span>
+│   │   │   │   ├── <span class="d">reports/</span>
+│   │   │   │   ├── <span class="d">notifications/</span>
+│   │   │   │   └── <span class="d">system-control/</span>
+│   │   │   ├── <span class="d">common/</span>
+│   │   │   │   ├── <span class="d">decorators/</span>
+│   │   │   │   ├── <span class="d">filters/</span>
+│   │   │   │   ├── <span class="d">guards/</span>
+│   │   │   │   ├── <span class="d">interceptors/</span>
+│   │   │   │   └── <span class="d">pipes/</span>
+│   │   │   ├── <span class="f">app.module.ts</span>
+│   │   │   └── <span class="f">main.ts</span>
+│   │   ├── <span class="c">nest-cli.json</span>
+│   │   ├── <span class="c">package.json</span>
+│   │   └── <span class="c">tsconfig.json</span>
+│   │
+│   └── <span class="d">worker/</span>                      <span class="m"># NestJS background workers</span>
+│       ├── <span class="d">src/</span>
+│       │   ├── <span class="d">workers/</span>
+│       │   │   ├── <span class="d">historical-data/</span>
+│       │   │   ├── <span class="d">live-market-data/</span>
+│       │   │   ├── <span class="d">strategy-evaluation/</span>
+│       │   │   ├── <span class="d">backtest-execution/</span>
+│       │   │   ├── <span class="d">order-reconciliation/</span>
+│       │   │   ├── <span class="d">post-trade-analytics/</span>
+│       │   │   └── <span class="d">end-of-day-square-off/</span>
+│       │   ├── <span class="d">queues/</span>
+│       │   ├── <span class="d">schedulers/</span>
+│       │   ├── <span class="f">app.module.ts</span>
+│       │   └── <span class="f">main.ts</span>
+│       ├── <span class="c">nest-cli.json</span>
+│       ├── <span class="c">package.json</span>
+│       └── <span class="c">tsconfig.json</span>
+│
+├── <span class="d">packages/</span>
+│   ├── <span class="d">domain/</span>
+│   │   ├── <span class="d">entities/</span>
+│   │   ├── <span class="d">value-objects/</span>
+│   │   ├── <span class="d">events/</span>
+│   │   ├── <span class="d">types/</span>
+│   │   └── <span class="f">index.ts</span>
+│   ├── <span class="d">trading-engine/</span>
+│   │   ├── <span class="d">contracts/</span>
+│   │   ├── <span class="d">registry/</span>
+│   │   ├── <span class="d">signal-processing/</span>
+│   │   ├── <span class="d">indicators/</span>
+│   │   └── <span class="f">index.ts</span>
+│   ├── <span class="d">strategies/</span>
+│   │   ├── <span class="d">opening-range-breakout/</span>
+│   │   │   ├── <span class="f">config.ts</span>
+│   │   │   ├── <span class="f">rules.ts</span>
+│   │   │   └── <span class="f">strategy.ts</span>
+│   │   └── <span class="f">index.ts</span>                <span class="m"># future strategies added as sibling folders</span>
+│   ├── <span class="d">risk-engine/</span>
+│   │   ├── <span class="d">position-sizing/</span>
+│   │   ├── <span class="d">risk-policies/</span>
+│   │   ├── <span class="d">exposure-controls/</span>
+│   │   ├── <span class="d">kill-switch/</span>
+│   │   └── <span class="f">index.ts</span>
+│   ├── <span class="d">execution-engine/</span>
+│   │   ├── <span class="d">order-management/</span>
+│   │   ├── <span class="d">order-state/</span>
+│   │   ├── <span class="d">position-management/</span>
+│   │   ├── <span class="d">execution-modes/</span>
+│   │   └── <span class="f">index.ts</span>
+│   ├── <span class="d">backtesting/</span>
+│   │   ├── <span class="d">historical-replay/</span>
+│   │   ├── <span class="d">simulated-execution/</span>
+│   │   ├── <span class="d">cost-models/</span>
+│   │   ├── <span class="d">slippage-models/</span>
+│   │   ├── <span class="d">performance-metrics/</span>
+│   │   └── <span class="f">index.ts</span>
+│   ├── <span class="d">market-data/</span>
+│   │   ├── <span class="d">models/</span>
+│   │   ├── <span class="d">normalization/</span>
+│   │   ├── <span class="d">validation/</span>
+│   │   ├── <span class="d">instrument-universe/</span>
+│   │   └── <span class="f">index.ts</span>
+│   ├── <span class="d">adapters/</span>
+│   │   ├── <span class="d">upstox/</span>
+│   │   │   ├── <span class="d">market-data/</span>
+│   │   │   ├── <span class="d">order-execution/</span>
+│   │   │   ├── <span class="d">order-updates/</span>
+│   │   │   └── <span class="d">sandbox/</span>
+│   │   ├── <span class="d">simulated-broker/</span>
+│   │   └── <span class="f">index.ts</span>
+│   ├── <span class="d">database/</span>
+│   │   ├── <span class="d">schema/</span>
+│   │   ├── <span class="d">migrations/</span>
+│   │   ├── <span class="d">repositories/</span>
+│   │   ├── <span class="f">client.ts</span>
+│   │   └── <span class="f">index.ts</span>
+│   ├── <span class="d">configuration/</span>
+│   │   ├── <span class="d">strategies/</span>
+│   │   ├── <span class="d">risk/</span>
+│   │   ├── <span class="d">trading-modes/</span>
+│   │   └── <span class="f">index.ts</span>
+│   ├── <span class="d">notifications/</span>
+│   │   └── <span class="f">index.ts</span>
+│   └── <span class="d">observability/</span>
+│       └── <span class="f">index.ts</span>
+│
+├── <span class="d">tests/</span>
+│   ├── <span class="d">integration/</span>
+│   ├── <span class="d">end-to-end/</span>
+│   ├── <span class="d">broker-contracts/</span>
+│   ├── <span class="d">fixtures/</span>
+│   └── <span class="c">package.json</span>
+│
+├── <span class="d">infra/</span>
+│   ├── <span class="d">docker/</span>                    <span class="m"># web/api/worker Dockerfiles</span>
+│   ├── <span class="d">compose/</span>                   <span class="m"># app + observability compose files</span>
+│   └── <span class="d">azure/</span>                     <span class="m"># VM, static IP and deploy notes</span>
+│
+├── <span class="d">docs/</span>
+│   ├── <span class="d">architecture/</span>
+│   ├── <span class="d">strategies/</span>
+│   └── <span class="d">operations/</span>
+│
+├── <span class="c">.editorconfig</span>
+├── <span class="c">.env.example</span>
+├── <span class="c">.gitignore</span>
+├── <span class="c">.npmrc</span>
+├── <span class="c">.nvmrc</span>
+├── <span class="c">.prettierrc</span>
+├── <span class="c">drizzle.config.ts</span>
+├── <span class="c">nx.json</span>
+├── <span class="c">package.json</span>
+├── <span class="c">pnpm-workspace.yaml</span>
+├── <span class="c">pnpm-lock.yaml</span>
+├── <span class="c">tsconfig.base.json</span>
+├── <span class="c">eslint.config.mjs</span>
+├── <span class="c">docker-compose.yml</span>
+└── <span class="c">README.md</span></pre>
+  </div>
+
+  <div class="callout">
+    <span class="ico">◆</span>
+    <div><strong>Package layout rule:</strong> packages do not use a <code>src/</code> folder. Their public entry is <code>index.ts</code> at the package root, with feature folders beside it. Apps do use <code>src/</code> because that is the convention of Next.js and NestJS. This keeps the tree close to the supplied medium-level structure.</div>
+  </div>
+</section>
+
+<section id="prerequisites" data-title="Prerequisites">
+  <div class="section-head">
+    <span class="num">05</span>
+    <div>
+      <p class="kicker">Before the first command</p>
+      <h2>Prerequisites</h2>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Tool</th><th>Version</th><th>Needed for</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Node.js</strong></td><td>24 LTS</td><td>Next.js 16, NestJS 11, Nx and all build tooling.</td></tr>
+        <tr><td><strong>pnpm</strong></td><td>10.x</td><td>Workspace installs, filtering and the single lockfile.</td></tr>
+        <tr><td><strong>Nx</strong></td><td>22.x (installed by <code>nx init</code>)</td><td>Task graph, cache and affected commands.</td></tr>
+        <tr><td><strong>Git</strong></td><td>2.40+</td><td>Repository, Nx affected base and the first checkpoint commits.</td></tr>
+        <tr><td><strong>Docker Desktop</strong></td><td>4.x, Compose v2</td><td>Local PostgreSQL and Redis.</td></tr>
+        <tr><td><strong>Azure CLI</strong> (optional)</td><td>2.60+</td><td>Only needed when preparing the VPS in R6; not for local setup.</td></tr>
+        <tr><td><strong>Upstox credentials</strong></td><td>—</td><td>Not needed in this task. The adapter folders are placeholders.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Install the toolchain on macOS</h3>
+  <div class="code">
+    <div class="code-head"><span class="code-lang">bash</span><button class="copy" type="button">Copy</button></div>
+<pre><code># Xcode command line tools (git, make, compilers)
+xcode-select -p || xcode-select --install
+
+# Node version manager + Docker + git
+brew install fnm git
+brew install --cask docker
+
+# Node 24 LTS
+fnm install 24
+fnm use 24
+node -v                     # v24.x
+
+# pnpm through Corepack (writes the packageManager field later)
+corepack enable
+corepack prepare pnpm@latest --activate
+pnpm -v                     # 12.x
+
+# Start Docker Desktop once, then verify Compose
+docker --version
+docker compose version</code></pre>
+  </div>
+
+  <div class="callout warn">
+    <span class="ico">▲</span>
+    <div>If <code>corepack</code> is unavailable in your Node distribution, install pnpm directly with <code>npm install -g pnpm@12</code>. Do not mix Corepack and a global pnpm in the same shell session; pick one and keep <code>packageManager</code> in sync.</div>
+  </div>
+
+  <h3>Baseline checks</h3>
+  <div class="code">
+    <div class="code-head"><span class="code-lang">bash</span><button class="copy" type="button">Copy</button></div>
+<pre><code>node -v
+pnpm -v
+git --version
+docker --version
+docker compose version
+curl --version</code></pre>
+  </div>
+
+  <p class="small muted">On Linux or the Azure VPS, install Node 24 with <code>fnm</code> or NodeSource, pnpm with Corepack, and Docker Engine + the Compose plugin from Docker's official repository. The rest of this plan is macOS/Linux compatible.</p>
+</section>
+
+<section id="phase-0" data-title="Phase 0 · Bootstrap">
+  <div class="section-head">
+    <span class="num">06</span>
+    <div>
+      <p class="kicker">Phase 0</p>
+      <h2>Repository bootstrap</h2>
+    </div>
+  </div>
+
+  <p>Create the git repository, pin the runtime, and write the root manifest and ignore rules. The existing <code>context/</code> folder stays exactly where it is.</p>
+
+  <div class="step">
+    <span class="step-n">1</span>
+    <div>
+      <h3>Initialise git and pin Node</h3>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">bash</span><button class="copy" type="button">Copy</button></div>
+<pre><code>cd /Users/sankettalaviya/Desktop/Projects/ai-trading-system
+git init -b main
+printf '24\n' &gt; .nvmrc
+printf '24\n' &gt; .node-version
+git add context
+git commit -m "chore: capture project context"</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="step">
+    <span class="step-n">2</span>
+    <div>
+      <h3>Create the root package manifest</h3>
+      <p class="small">Run <code>pnpm init</code>, then replace the generated <code>package.json</code> with the version below. The <code>packageManager</code> value is a placeholder — <code>corepack use pnpm@latest</code> will rewrite it to the exact installed version.</p>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">bash</span><button class="copy" type="button">Copy</button></div>
+<pre><code>pnpm init</code></pre>
+      </div>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">json · package.json</span><button class="copy" type="button">Copy</button></div>
+<pre><code>{
+  "name": "ai-trading-system",
+  "version": "0.0.0",
+  "private": true,
+  "packageManager": "pnpm@12.0.0",
+  "engines": {
+    "node": "&gt;=24.0.0",
+    "pnpm": "&gt;=12.0.0"
+  },
+  "scripts": {
+    "dev": "nx run-many -t build --exclude=web,api,worker,tests &amp;&amp; nx run-many -t dev --parallel=8",
+    "build": "nx run-many -t build",
+    "typecheck": "nx run-many -t typecheck",
+    "lint": "nx run-many -t lint",
+    "test": "nx run-many -t test",
+    "affected:build": "nx affected -t build",
+    "affected:test": "nx affected -t test",
+    "affected:lint": "nx affected -t lint",
+    "graph": "nx graph",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "dependencies": {
+    "dotenv": "^17.0.0",
+    "drizzle-orm": "^0.44.0",
+    "postgres": "^3.4.0"
+  },
+  "devDependencies": {
+    "@nx/eslint-plugin": "^22.0.0",
+    "@types/node": "catalog:",
+    "drizzle-kit": "^0.31.0",
+    "eslint": "catalog:",
+    "eslint-config-prettier": "^10.0.0",
+    "nx": "^22.0.0",
+    "prettier": "catalog:",
+    "prettier-plugin-tailwindcss": "^0.6.0",
+    "tsup": "catalog:",
+    "typescript": "catalog:",
+    "typescript-eslint": "^8.0.0",
+    "vitest": "catalog:"
+  }
+}</code></pre>
+      </div>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">bash</span><button class="copy" type="button">Copy</button></div>
+<pre><code># Pin the exact pnpm version in package.json
+corepack use pnpm@latest
+pnpm -v</code></pre>
+      </div>
+      <div class="callout">
+        <span class="ico">◆</span>
+        <div>The <code>catalog:</code> versions are defined once in <code>pnpm-workspace.yaml</code> in Phase 1. Keep the manifest valid JSON: no comments, no trailing commas.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="step">
+    <span class="step-n">3</span>
+    <div>
+      <h3>Write the root dotfiles</h3>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">ini · .npmrc</span><button class="copy" type="button">Copy</button></div>
+<pre><code># pnpm 12 reads only auth and registry settings from .npmrc.
+# Workspace resolution settings live in pnpm-workspace.yaml.
+# Add scoped registry credentials here when a private registry is introduced.</code></pre>
+      </div>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">gitignore · .gitignore</span><button class="copy" type="button">Copy</button></div>
+<pre><code># dependencies
+node_modules/
+.pnpm-store/
+
+# builds
+dist/
+.next/
+out/
+coverage/
+*.tsbuildinfo
+
+# tooling
+.nx/
+tmp/
+.vscode/
+.idea/
+.DS_Store
+*.log
+
+# local environment
+.env
+.env.*
+!.env.example
+
+# playwright
+test-results/
+playwright-report/</code></pre>
+      </div>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">json · .prettierrc</span><button class="copy" type="button">Copy</button></div>
+<pre><code>{
+  "singleQuote": true,
+  "semi": true,
+  "trailingComma": "all",
+  "printWidth": 100,
+  "tabWidth": 2,
+  "plugins": ["prettier-plugin-tailwindcss"]
+}</code></pre>
+      </div>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">ini · .editorconfig</span><button class="copy" type="button">Copy</button></div>
+<pre><code>root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+indent_style = space
+indent_size = 2
+trim_trailing_whitespace = true
+
+[*.md]
+trim_trailing_whitespace = false</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="step">
+    <span class="step-n">4</span>
+    <div>
+      <h3>Create the top-level folders</h3>
+      <p class="small">These are the shell-created roots. Files inside them are added by the phase that owns them.</p>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">bash</span><button class="copy" type="button">Copy</button></div>
+<pre><code>mkdir -p apps packages
+mkdir -p tests/integration tests/end-to-end tests/broker-contracts tests/fixtures
+mkdir -p infra/docker infra/compose infra/azure
+mkdir -p docs/architecture docs/strategies docs/operations
+
+# keep intentionally empty folders in git
+find tests infra docs -type d -empty -exec touch {}/.gitkeep \;</code></pre>
+      </div>
+      <div class="callout ok">
+        <span class="ico">✓</span>
+        <div><strong>Checkpoint:</strong> <code>git status</code> should show <code>apps/</code>, <code>packages/</code>, <code>tests/</code>, <code>infra/</code>, <code>docs/</code>, the root dotfiles, and the untouched <code>context/</code> folder.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="step">
+    <span class="step-n">5</span>
+    <div>
+      <h3>Commit the bootstrap</h3>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">bash</span><button class="copy" type="button">Copy</button></div>
+<pre><code>git add .
+git commit -m "chore: bootstrap repository and tooling"</code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="phase-1" data-title="Phase 1 · pnpm + Nx">
+  <div class="section-head">
+    <span class="num">07</span>
+    <div>
+      <p class="kicker">Phase 1</p>
+      <h2>Wire pnpm workspaces and Nx</h2>
+    </div>
+  </div>
+
+  <p>
+    Nx is added to the existing repository with <code>nx init</code> rather than <code>create-nx-workspace</code>, because the
+    repository already contains <code>context/</code>. This keeps the history and the source material in place.
+  </p>
+
+  <div class="step">
+    <span class="step-n">1</span>
+    <div>
+      <h3>Declare the pnpm workspace and shared catalogs</h3>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">yaml · pnpm-workspace.yaml</span><button class="copy" type="button">Copy</button></div>
+<pre><code>packages:
+  - "apps/*"
+  - "packages/*"
+  - "tests"
+
+catalog:
+  "@types/node": ^24.0.0
+  "@vitest/coverage-v8": ^3.0.0
+  eslint: ^9.0.0
+  prettier: ^3.0.0
+  tsup: ^8.0.0
+  typescript: ^5.0.0
+  vitest: ^3.0.0
+
+autoInstallPeers: true
+strictPeerDependencies: false
+preferWorkspacePackages: true
+linkWorkspacePackages: true
+sharedWorkspaceLockfile: true
+
+allowBuilds:
+  "@nestjs/core": true
+  "@swc/core": true
+  esbuild: true
+  nx: true
+  sharp: true
+  unrs-resolver: true</code></pre>
+      </div>
+      <p class="small muted">The explicit <code>tests</code> entry makes the root test suite a workspace package. pnpm 12 keeps workspace settings in <code>pnpm-workspace.yaml</code>, and <code>allowBuilds</code> is the reviewed allow-list for packages that legitimately run install scripts. Add new entries deliberately; never enable all builds.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <span class="step-n">2</span>
+    <div>
+      <h3>Initialise Nx without cloud or AI-agent configuration</h3>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">bash</span><button class="copy" type="button">Copy</button></div>
+<pre><code>pnpm dlx nx@latest init \
+  --interactive=false \
+  --plugins=skip \
+  --nxCloud=false \
+  --aiAgents=none \
+  --cacheable=build,lint,test,typecheck
+
+pnpm nx --version</code></pre>
+      </div>
+      <p class="small muted"><code>--plugins=skip</code> prevents Nx from guessing framework plugins. The workspace uses thin <code>nx:run-commands</code> targets instead, so the official CLIs remain the source of truth for app builds.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <span class="step-n">3</span>
+    <div>
+      <h3>Replace <code>nx.json</code> with the workspace policy</h3>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">json · nx.json</span><button class="copy" type="button">Copy</button></div>
+<pre><code>{
+  "$schema": "./node_modules/nx/schemas/nx-schema.json",
+  "defaultBase": "main",
+  "namedInputs": {
+    "default": ["{projectRoot}/**/*", "sharedGlobals"],
+    "production": [
+      "default",
+      "!{projectRoot}/**/*.spec.ts",
+      "!{projectRoot}/**/*.test.ts",
+      "!{projectRoot}/tsconfig.spec.json",
+      "!{projectRoot}/vitest.config.*",
+      "!{projectRoot}/jest.config.*"
+    ],
+    "sharedGlobals": [
+      "{workspaceRoot}/tsconfig.base.json",
+      "{workspaceRoot}/.env",
+      "{workspaceRoot}/pnpm-lock.yaml"
+    ]
+  },
+  "targetDefaults": {
+    "build": {
+      "dependsOn": ["^build"],
+      "cache": true,
+      "inputs": ["production", "^production"]
+    },
+    "typecheck": {
+      "dependsOn": ["^build"],
+      "cache": true,
+      "inputs": ["production", "^production"]
+    },
+    "lint": {
+      "cache": true,
+      "inputs": ["default", "{workspaceRoot}/eslint.config.mjs"]
+    },
+    "test": {
+      "cache": true,
+      "inputs": ["default", "^production"]
+    }
+  },
+  "defaultCache": true,
+  "analytics": false
+}</code></pre>
+      </div>
+      <div class="callout">
+        <span class="ico">◆</span>
+        <div><code>dependsOn: ["^build"]</code> is the critical line: before an app typechecks or builds, every workspace package it depends on is built first. That is what makes the shared-package model reliable without path aliases.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="step">
+    <span class="step-n">4</span>
+    <div>
+      <h3>Write the shared TypeScript baseline</h3>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">json · tsconfig.base.json</span><button class="copy" type="button">Copy</button></div>
+<pre><code>{
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "baseUrl": "."
+  },
+  "exclude": ["node_modules", "dist", ".next", "coverage"]
+}</code></pre>
+      </div>
+      <p class="small muted">Apps override <code>module</code> and <code>moduleResolution</code>: Next.js uses ESM/bundler resolution, NestJS uses CommonJS/node resolution. Packages are consumed through their built <code>types</code> and <code>exports</code> fields, not through tsconfig path aliases.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <span class="step-n">5</span>
+    <div>
+      <h3>Add the root linting config and verify the empty workspace</h3>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">js · eslint.config.mjs</span><button class="copy" type="button">Copy</button></div>
+<pre><code>import js from '@eslint/js';
+import prettier from 'eslint-config-prettier';
+import nx from '@nx/eslint-plugin';
+import tseslint from 'typescript-eslint';
+
+export default [
+  {
+    ignores: ['**/dist/**', '**/.next/**', '**/coverage/**', '**/node_modules/**'],
+  },
+  js.configs.recommended,
+  ...tseslint.configs.recommended,
+  ...nx.configs['flat/base'],
+  prettier,
+  {
+    files: ['**/*.ts', '**/*.tsx'],
+    rules: {
+      '@nx/enforce-module-boundaries': [
+        'error',
+        {
+          enforceBuildableLibDependency: true,
+          allow: [],
+          depConstraints: [
+            { sourceTag: 'type:app', onlyDependOnLibsWithTags: ['type:lib'] },
+            { sourceTag: 'type:lib', onlyDependOnLibsWithTags: ['type:lib'] },
+          ],
+        },
+      ],
+    },
+  },
+];</code></pre>
+      </div>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">bash</span><button class="copy" type="button">Copy</button></div>
+<pre><code>pnpm install
+pnpm nx graph --print
+pnpm nx --version
+git add .
+git commit -m "chore: add pnpm workspace and Nx orchestration"</code></pre>
+      </div>
+      <p class="small muted">At this point the project graph is empty. It will populate as apps and packages are added.</p>
+    </div>
+  </div>
+
+  <details>
+    <summary>Alternative for a brand-new repository without <code>context/</code></summary>
+    <div class="details-body">
+      <p>If the repository did not already exist, the equivalent starting point is:</p>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">bash</span><button class="copy" type="button">Copy</button></div>
+<pre><code>pnpm dlx create-nx-workspace@latest ai-trading-system \
+  --pm=pnpm \
+  --preset=apps \
+  --useProjectJson \
+  --nxCloud=skip \
+  --skipGit \
+  --interactive=false</code></pre>
+      </div>
+      <p class="small">The <code>apps</code> preset creates an integrated workspace with no projects. Then create the same <code>apps/</code>, <code>packages/</code>, <code>tests/</code>, <code>infra/</code> and <code>docs/</code> folders. The rest of this plan is unchanged.</p>
+    </div>
+  </details>
+</section>
+
+<section id="phase-2" data-title="Phase 2 · Web app">
+  <div class="section-head">
+    <span class="num">08</span>
+    <div>
+      <p class="kicker">Phase 2</p>
+      <h2>Create the Next.js dashboard</h2>
+    </div>
+  </div>
+
+  <p>
+    The web app is generated with the official CLI into <code>apps/web</code>, then adjusted to the shared workspace,
+    dark-first theme and feature layout. It never imports the database or broker packages.
+  </p>
+
+  <div class="step">
+    <span class="step-n">1</span>
+    <div>
+      <h3>Scaffold with <code>create-next-app</code></h3>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">bash</span><button class="copy" type="button">Copy</button></div>
+<pre><code>pnpm create next-app@latest apps/web \
+  --ts \
+  --eslint \
+  --tailwind \
+  --app \
+  --src-dir \
+  --import-alias "@/*" \
+  --use-pnpm \
+  --disable-git \
+  --skip-install \
+  --yes</code></pre>
+      </div>
+      <p class="small muted">
+        <code>--yes</code> accepts the documented Next.js 16 defaults. If a prompt still appears, choose TypeScript,
+        ESLint, Tailwind, App Router and <code>src/</code>; disable React Compiler for now. Cache Components is turned
+        off explicitly in <code>next.config.ts</code> below because the dashboard reads live trading state.
+      </p>
+    </div>
+  </div>
+
+  <div class="step">
+    <span class="step-n">2</span>
+    <div>
+      <h3>Rename the package and add workspace scripts</h3>
+      <p class="small">Replace the generated <code>name</code> and <code>scripts</code> block in <code>apps/web/package.json</code>. Keep the dependency versions generated by the CLI.</p>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">json · apps/web/package.json (excerpt)</span><button class="copy" type="button">Copy</button></div>
+<pre><code>{
+  "name": "@ai-trading/web",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --turbopack --port 3000",
+    "build": "next build",
+    "start": "next start --port 3000",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  }
+}</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="step">
+    <span class="step-n">3</span>
+    <div>
+      <h3>Configure Next.js and TypeScript</h3>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">ts · apps/web/next.config.ts</span><button class="copy" type="button">Copy</button></div>
+<pre><code>import type { NextConfig } from 'next';
+
+const nextConfig: NextConfig = {
+  reactStrictMode: true,
+  cacheComponents: false,
+  transpilePackages: [
+    '@ai-trading/domain',
+    '@ai-trading/configuration',
+  ],
+};
+
+export default nextConfig;</code></pre>
+      </div>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">json · apps/web/tsconfig.json</span><button class="copy" type="button">Copy</button></div>
+<pre><code>{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "target": "ES2017",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "noEmit": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "jsx": "preserve",
+    "incremental": true,
+    "plugins": [{ "name": "next" }],
+    "paths": {
+      "@/*": ["apps/web/src/*"]
+    }
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules"]
+}</code></pre>
+      </div>
+      <p class="small muted"><code>@/*</code> is resolved relative to the inherited <code>baseUrl</code> at the workspace root, hence <code>apps/web/src/*</code>. Shared packages resolve through their package names and built declarations.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <span class="step-n">4</span>
+    <div>
+      <h3>Initialise shadcn/ui and add the baseline components</h3>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">bash</span><button class="copy" type="button">Copy</button></div>
+<pre><code>pnpm dlx shadcn@latest init -c apps/web -b slate --css-variables --yes
+
+pnpm dlx shadcn@latest add -c apps/web \
+  button card badge table tabs dialog input label select separator \
+  sheet skeleton sonner tooltip dropdown-menu chart
+
+pnpm install</code></pre>
+      </div>
+      <div class="callout">
+        <span class="ico">◆</span>
+        <div>shadcn writes <code>components.json</code>, <code>src/lib/utils.ts</code> and the base primitives under <code>src/components/ui</code>. The CLI reads the <code>@/*</code> alias from the app's <code>tsconfig.json</code>; if it cannot find it, run the command from <code>apps/web</code> instead of using <code>-c</code>.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="step">
+    <span class="step-n">5</span>
+    <div>
+      <h3>Create the feature and route folders</h3>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">bash</span><button class="copy" type="button">Copy</button></div>
+<pre><code>cd apps/web
+
+# Feature slices from the folder structure
+for f in strategies backtesting trading risk-management performance system-settings; do
+  mkdir -p "src/features/$f"
+  touch "src/features/$f/.gitkeep"
+done
+
+mkdir -p src/components src/hooks src/lib
+
+# App Router placeholders
+for r in strategies backtesting trading risk-management performance system-settings; do
+  mkdir -p "src/app/$r"
+  cat &gt; "src/app/$r/page.tsx" &lt;&lt;EOF
+export default function Page() {
+  return (
+    &lt;main className="p-8"&gt;
+      &lt;h1 className="text-2xl font-semibold"&gt;$r&lt;/h1&gt;
+    &lt;/main&gt;
+  );
+}
+EOF
+done
+
+cd ../..</code></pre>
+      </div>
+      <div class="callout warn">
+        <span class="ico">▲</span>
+        <div>The loop above intentionally writes only placeholders. Replace them with real feature components in later milestones; do not start trading logic in this setup task.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="step">
+    <span class="step-n">6</span>
+    <div>
+      <h3>Make the dashboard dark-first</h3>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">css · apps/web/src/app/globals.css</span><button class="copy" type="button">Copy</button></div>
+<pre><code>@import "tailwindcss";
+
+:root {
+  color-scheme: dark;
+  --background: #070b10;
+  --foreground: #dce8f5;
+  --card: #0d141d;
+  --card-foreground: #dce8f5;
+  --border: #1b2836;
+  --muted: #71869c;
+  --muted-foreground: #a8bacd;
+  --primary: #35e0a1;
+  --primary-foreground: #04110c;
+  --destructive: #ff7b7b;
+  --ring: #38d9f5;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-border: var(--border);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-destructive: var(--destructive);
+  --color-ring: var(--ring);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}</code></pre>
+      </div>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">tsx · apps/web/src/app/layout.tsx</span><button class="copy" type="button">Copy</button></div>
+<pre><code>import type { Metadata } from 'next';
+import './globals.css';
+
+export const metadata: Metadata = {
+  title: 'AI Trading System',
+  description: 'Strategy control, backtesting, risk and trade operations.',
+};
+
+export default function RootLayout({
+  children,
+}: Readonly&lt;{ children: React.ReactNode }&gt;) {
+  return (
+    &lt;html lang="en" className="dark"&gt;
+      &lt;body className="min-h-screen bg-background text-foreground antialiased"&gt;
+        {children}
+      &lt;/body&gt;
+    &lt;/html&gt;
+  );
+}</code></pre>
+      </div>
+      <p class="small muted">shadcn may regenerate its token block in <code>globals.css</code>. Keep the dark values and the <code>className="dark"</code> on the root element; a later theme toggle can switch the class.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <span class="step-n">7</span>
+    <div>
+      <h3>Verify the web app</h3>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">bash</span><button class="copy" type="button">Copy</button></div>
+<pre><code>pnpm --filter @ai-trading/web add -D \
+  vitest@^3.0.0 jsdom @testing-library/react @testing-library/jest-dom @vitejs/plugin-react
+
+pnpm install
+pnpm --filter @ai-trading/web dev</code></pre>
+      </div>
+      <p class="small">Open <code>http://localhost:3000</code>, then visit each placeholder route. The page should render with the dark background and no module-resolution errors.</p>
+    </div>
+  </div>
+</section>
+
+<section id="phase-3" data-title="Phase 3 · API app">
+  <div class="section-head">
+    <span class="num">09</span>
+    <div>
+      <p class="kicker">Phase 3</p>
+      <h2>Create the NestJS API</h2>
+    </div>
+  </div>
+
+  <p>
+    The API is the only HTTP entry point for the dashboard. It is generated with the Nest CLI, then split into the ten
+    modules named in the folder structure. Cross-cutting concerns live in <code>src/common</code>.
+  </p>
+
+  <div class="step">
+    <span class="step-n">1</span>
+    <div>
+      <h3>Scaffold with <code>@nestjs/cli</code></h3>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">bash</span><button class="copy" type="button">Copy</button></div>
+<pre><code>pnpm dlx @nestjs/cli@latest new api \
+  --directory apps/api \
+  --package-manager pnpm \
+  --language TS \
+  --strict \
+  --skip-git \
+  --skip-install</code></pre>
+      </div>
+      <p class="small muted">The CLI creates <code>apps/api/src</code>, <code>app.module.ts</code>, <code>main.ts</code>, a Jest config and the Nest build config. Dependency installation is deferred to the workspace root.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <span class="step-n">2</span>
+    <div>
+      <h3>Rename the package and normalise scripts</h3>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">json · apps/api/package.json (excerpt)</span><button class="copy" type="button">Copy</button></div>
+<pre><code>{
+  "name": "@ai-trading/api",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "nest start --watch",
+    "build": "nest build",
+    "start": "node dist/main.js",
+    "lint": "eslint \"{src,test}/**/*.ts\"",
+    "typecheck": "tsc --noEmit",
+    "test": "jest"
+  }
+}</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="step">
+    <span class="step-n">3</span>
+    <div>
+      <h3>Set the Nest TypeScript profile</h3>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">json · apps/api/tsconfig.json</span><button class="copy" type="button">Copy</button></div>
+<pre><code>{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "target": "ES2023",
+    "outDir": "./dist",
+    "baseUrl": "./",
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "incremental": true,
+    "noEmit": false,
+    "types": ["node", "jest"]
+  },
+  "include": ["src/**/*.ts", "test/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}</code></pre>
+      </div>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">json · apps/api/nest-cli.json</span><button class="copy" type="button">Copy</button></div>
+<pre><code>{
+  "$schema": "https://json.schemastore.org/nest-cli",
+  "collection": "@nestjs/schematics",
+  "sourceRoot": "src",
+  "compilerOptions": {
+    "deleteOutDir": true,
+    "webpack": false,
+    "tsConfigPath": "tsconfig.build.json"
+  }
+}</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="step">
+    <span class="step-n">4</span>
+    <div>
+      <h3>Write the bootstrap</h3>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">ts · apps/api/src/main.ts</span><button class="copy" type="button">Copy</button></div>
+<pre><code>import 'reflect-metadata';
+import { ValidationPipe, VersioningType } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { NestFactory } from '@nestjs/core';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import helmet from 'helmet';
+import { AppModule } from './app.module';
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  const config = app.get(ConfigService);
+
+  app.use(helmet());
+  app.enableCors({
+    origin: config.getOrThrow&lt;string&gt;('WEB_URL'),
+    credentials: true,
+  });
+  app.setGlobalPrefix('api');
+  app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
+      forbidNonWhitelisted: true,
+    }),
+  );
+
+  const swagger = new DocumentBuilder()
+    .setTitle('AI Trading API')
+    .setVersion('1.0')
+    .build();
+  SwaggerModule.setup('api/docs', app, SwaggerModule.createDocument(app, swagger));
+
+  app.enableShutdownHooks();
+  await app.listen(config.get&lt;number&gt;('API_PORT', 4000));
+}
+
+void bootstrap();</code></pre>
+      </div>
+      <p class="small muted">The global prefix plus URI versioning produces <code>/api/v1/...</code>. Swagger is available at <code>/api/docs</code>.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <span class="step-n">5</span>
+    <div>
+      <h3>Generate the ten feature modules</h3>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">bash</span><button class="copy" type="button">Copy</button></div>
+<pre><code>cd apps/api
+
+for m in strategies backtests market-data trading orders risk positions reports notifications system-control; do
+  pnpm exec nest g module "modules/$m" --no-spec
+  pnpm exec nest g controller "modules/$m" --no-spec
+  pnpm exec nest g service "modules/$m" --no-spec
+done
+
+mkdir -p src/common/decorators src/common/filters src/common/guards \
+         src/common/interceptors src/common/pipes
+find src/common -type d -empty -exec touch {}/.gitkeep \;
+
+cd ../..</code></pre>
+      </div>
+      <p class="small muted">The Nest schematic updates <code>app.module.ts</code> after each module. Confirm the generated import list matches the ten folders before continuing.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <span class="step-n">6</span>
+    <div>
+      <h3>Connect configuration, queues and the module imports</h3>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">ts · apps/api/src/app.module.ts (shape)</span><button class="copy" type="button">Copy</button></div>
+<pre><code>import { BullModule } from '@nestjs/bullmq';
+import { Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { StrategiesModule } from './modules/strategies/strategies.module';
+// ...the other nine modules
+
+@Module({
+  imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: ['.env', '../../.env'],
+    }),
+    BullModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) =&gt; ({
+        connection: {
+          host: config.get&lt;string&gt;('REDIS_HOST', 'localhost'),
+          port: config.get&lt;number&gt;('REDIS_PORT', 6379),
+        },
+      }),
+    }),
+    StrategiesModule,
+    // BacktestsModule, MarketDataModule, TradingModule, OrdersModule,
+    // RiskModule, PositionsModule, ReportsModule, NotificationsModule,
+    // SystemControlModule
+  ],
+})
+export class AppModule {}</code></pre>
+      </div>
+      <div class="callout">
+        <span class="ico">◆</span>
+        <div>Phase 5 adds <code>validateEnv</code> to <code>packages/configuration</code>. Once that package builds, import it and add <code>validate: validateEnv</code> to <code>ConfigModule.forRoot</code>; keep the API bootable without it until then.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="step">
+    <span class="step-n">7</span>
+    <div>
+      <h3>Add a health endpoint under <code>system-control</code></h3>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">ts · apps/api/src/modules/system-control/health.controller.ts</span><button class="copy" type="button">Copy</button></div>
+<pre><code>import { Controller, Get } from '@nestjs/common';
+
+@Controller('health')
+export class HealthController {
+  @Get()
+  check() {
+    return {
+      status: 'ok',
+      service: 'ai-trading-api',
+      timestamp: new Date().toISOString(),
+    };
+  }
+}</code></pre>
+      </div>
+      <p class="small">Register <code>HealthController</code> in <code>SystemControlModule</code>. The operational health check expands in R5 to cover database, Redis, broker session and market-data freshness.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <span class="step-n">8</span>
+    <div>
+      <h3>Install Nest dependencies and verify</h3>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">bash</span><button class="copy" type="button">Copy</button></div>
+<pre><code>pnpm --filter @ai-trading/api add \
+  @nestjs/config @nestjs/swagger @nestjs/bullmq @nestjs/terminus \
+  bullmq ioredis class-validator class-transformer helmet zod
+
+pnpm install
+pnpm --filter @ai-trading/api build
+pnpm --filter @ai-trading/api dev</code></pre>
+      </div>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">bash</span><button class="copy" type="button">Copy</button></div>
+<pre><code>curl -s http://localhost:4000/api/v1/health</code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="phase-4" data-title="Phase 4 · Worker app">
+  <div class="section-head">
+    <span class="num">10</span>
+    <div>
+      <p class="kicker">Phase 4</p>
+      <h2>Create the background worker</h2>
+    </div>
+  </div>
+
+  <p>
+    The worker is a second NestJS application with no HTTP listener. It owns the seven processing areas from the folder
+    structure, plus the queues and schedulers that trigger them.
+  </p>
+
+  <div class="step">
+    <span class="step-n">1</span>
+    <div>
+      <h3>Scaffold with the Nest CLI</h3>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">bash</span><button class="copy" type="button">Copy</button></div>
+<pre><code>pnpm dlx @nestjs/cli@latest new worker \
+  --directory apps/worker \
+  --package-manager pnpm \
+  --language TS \
+  --strict \
+  --skip-git \
+  --skip-install</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="step">
+    <span class="step-n">2</span>
+    <div>
+      <h3>Rename the package and set its scripts</h3>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">json · apps/worker/package.json (excerpt)</span><button class="copy" type="button">Copy</button></div>
+<pre><code>{
+  "name": "@ai-trading/worker",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "nest start --watch",
+    "build": "nest build",
+    "start": "node dist/main.js",
+    "lint": "eslint \"{src,test}/**/*.ts\"",
+    "typecheck": "tsc --noEmit",
+    "test": "jest"
+  }
+}</code></pre>
+      </div>
+      <p class="small muted">Use the same <code>tsconfig.json</code> and <code>nest-cli.json</code> profile as the API, with <code>sourceRoot: "src"</code>.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <span class="step-n">3</span>
+    <div>
+      <h3>Use an application context instead of an HTTP server</h3>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">ts · apps/worker/src/main.ts</span><button class="copy" type="button">Copy</button></div>
+<pre><code>import 'reflect-metadata';
+import { Logger } from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
+import { AppModule } from './app.module';
+
+async function bootstrap() {
+  const app = await NestFactory.createApplicationContext(AppModule, {
+    bufferLogs: true,
+  });
+
+  app.enableShutdownHooks();
+  Logger.log('Worker started; waiting for BullMQ jobs.', 'Bootstrap');
+}
+
+void bootstrap();</code></pre>
+      </div>
+      <div class="callout warn">
+        <span class="ico">▲</span>
+        <div>Do not call <code>app.listen()</code> in the worker. A second HTTP port would compete with the API and bypass the single-entry-point rule. Worker liveness is reported through queue heartbeats and later a database heartbeat table.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="step">
+    <span class="step-n">4</span>
+    <div>
+      <h3>Generate the seven worker modules</h3>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">bash</span><button class="copy" type="button">Copy</button></div>
+<pre><code>cd apps/worker
+
+for w in historical-data live-market-data strategy-evaluation backtest-execution \
+         order-reconciliation post-trade-analytics end-of-day-square-off; do
+  pnpm exec nest g module "workers/$w" --no-spec
+  pnpm exec nest g service "workers/$w" --no-spec
+done
+
+mkdir -p src/queues src/schedulers
+touch src/queues/.gitkeep src/schedulers/.gitkeep
+
+cd ../..</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="step">
+    <span class="step-n">5</span>
+    <div>
+      <h3>Declare queue names in one place</h3>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">ts · apps/worker/src/queues/queue.constants.ts</span><button class="copy" type="button">Copy</button></div>
+<pre><code>export const QUEUES = {
+  historicalData: 'historical-data',
+  liveMarketData: 'live-market-data',
+  strategyEvaluation: 'strategy-evaluation',
+  backtestExecution: 'backtest-execution',
+  orderReconciliation: 'order-reconciliation',
+  postTradeAnalytics: 'post-trade-analytics',
+  endOfDaySquareOff: 'end-of-day-square-off',
+} as const;
+
+export type QueueName = (typeof QUEUES)[keyof typeof QUEUES];</code></pre>
+      </div>
+      <p class="small muted">Every processor, scheduler and API producer imports these constants. Never type a queue name as a string literal in more than one place.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <span class="step-n">6</span>
+    <div>
+      <h3>Install worker dependencies and verify startup</h3>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">bash</span><button class="copy" type="button">Copy</button></div>
+<pre><code>pnpm --filter @ai-trading/worker add \
+  @nestjs/config @nestjs/bullmq @nestjs/schedule \
+  bullmq ioredis zod
+
+pnpm install
+pnpm --filter @ai-trading/worker build
+pnpm --filter @ai-trading/worker dev</code></pre>
+      </div>
+      <p class="small">The worker should start, connect to Redis, register its queues and remain running without opening a network port.</p>
+    </div>
+  </div>
+</section>
+
+<section id="phase-5" data-title="Phase 5 · Shared packages">
+  <div class="section-head">
+    <span class="num">11</span>
+    <div>
+      <p class="kicker">Phase 5</p>
+      <h2>Create the twelve shared packages</h2>
+    </div>
+  </div>
+
+  <p>
+    Packages are framework-agnostic TypeScript libraries. Each has a public <code>index.ts</code>, a dual ESM/CJS build,
+    its own Nx targets, and an explicit dependency list. The folder names and subfolders follow
+    <code>context/folder-structure.md</code>.
+  </p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Package</th><th>Responsibility</th><th>Key folders</th><th>Internal dependencies</th></tr></thead>
+      <tbody>
+        <tr><td><strong>@ai-trading/domain</strong></td><td>Entities, value objects, domain events and shared types.</td><td><code>entities</code>, <code>value-objects</code>, <code>events</code>, <code>types</code></td><td>none</td></tr>
+        <tr><td><strong>@ai-trading/trading-engine</strong></td><td>Strategy contract, registry, signal processing and indicators.</td><td><code>contracts</code>, <code>registry</code>, <code>signal-processing</code>, <code>indicators</code></td><td><code>domain</code></td></tr>
+        <tr><td><strong>@ai-trading/strategies</strong></td><td>Independently versioned strategy implementations.</td><td><code>opening-range-breakout</code></td><td><code>domain</code>, <code>trading-engine</code></td></tr>
+        <tr><td><strong>@ai-trading/risk-engine</strong></td><td>Position sizing, risk policies, exposure controls and kill switch.</td><td><code>position-sizing</code>, <code>risk-policies</code>, <code>exposure-controls</code>, <code>kill-switch</code></td><td><code>domain</code></td></tr>
+        <tr><td><strong>@ai-trading/execution-engine</strong></td><td>Order management, order state, positions and execution modes; owns broker ports.</td><td><code>order-management</code>, <code>order-state</code>, <code>position-management</code>, <code>execution-modes</code></td><td><code>domain</code></td></tr>
+        <tr><td><strong>@ai-trading/backtesting</strong></td><td>Historical replay, simulated execution, cost/slippage models and metrics.</td><td><code>historical-replay</code>, <code>simulated-execution</code>, <code>cost-models</code>, <code>slippage-models</code>, <code>performance-metrics</code></td><td><code>domain</code>, <code>trading-engine</code>, <code>risk-engine</code>, <code>execution-engine</code></td></tr>
+        <tr><td><strong>@ai-trading/market-data</strong></td><td>Normalised bars, validation, normalisation and instrument universe.</td><td><code>models</code>, <code>normalization</code>, <code>validation</code>, <code>instrument-universe</code></td><td><code>domain</code></td></tr>
+        <tr><td><strong>@ai-trading/adapters</strong></td><td>Upstox and simulated broker implementations of the ports.</td><td><code>upstox</code>, <code>simulated-broker</code></td><td><code>domain</code>, <code>market-data</code>, <code>execution-engine</code></td></tr>
+        <tr><td><strong>@ai-trading/database</strong></td><td>Drizzle schema, migrations and repositories.</td><td><code>schema</code>, <code>migrations</code>, <code>repositories</code></td><td><code>domain</code></td></tr>
+        <tr><td><strong>@ai-trading/configuration</strong></td><td>Validated, versioned settings for strategies, risk and trading modes.</td><td><code>strategies</code>, <code>risk</code>, <code>trading-modes</code></td><td><code>domain</code></td></tr>
+        <tr><td><strong>@ai-trading/notifications</strong></td><td>Alert payloads, channels and delivery templates.</td><td>package root</td><td><code>domain</code></td></tr>
+        <tr><td><strong>@ai-trading/observability</strong></td><td>Structured logging, metrics and health primitives.</td><td>package root</td><td>none</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Scaffold every package</h3>
+  <p class="small">This script writes the manifest, TypeScript profile, Nx project and public entry for each package. It is safe to re-run before you add real code; it overwrites only those four generated files.</p>
+
+  <div class="code">
+    <div class="code-head"><span class="code-lang">bash · create packages</span><button class="copy" type="button">Copy</button></div>
+<pre><code>PACKAGES=(
+  domain
+  trading-engine
+  strategies
+  risk-engine
+  execution-engine
+  backtesting
+  market-data
+  adapters
+  database
+  configuration
+  notifications
+  observability
+)
+
+for pkg in "${PACKAGES[@]}"; do
+  mkdir -p "packages/$pkg"
+
+  cat &gt; "packages/$pkg/package.json" &lt;&lt;EOF
+{
+  "name": "@ai-trading/$pkg",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsup index.ts --format esm,cjs --dts --clean --sourcemap",
+    "dev": "tsup index.ts --format esm,cjs --dts --watch --sourcemap",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run --passWithNoTests"
+  },
+  "devDependencies": {
+    "eslint": "catalog:",
+    "tsup": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
+EOF
+
+  cat &gt; "packages/$pkg/tsconfig.json" &lt;&lt;'EOF'
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "outDir": "dist",
+    "rootDir": "."
+  },
+  "include": ["**/*.ts"],
+  "exclude": ["dist", "node_modules"]
+}
+EOF
+
+  cat &gt; "packages/$pkg/project.json" &lt;&lt;EOF
+{
+  "name": "$pkg",
+  "root": "packages/$pkg",
+  "sourceRoot": "packages/$pkg",
+  "projectType": "library",
+  "tags": ["type:lib", "scope:$pkg"],
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "outputs": ["{projectRoot}/dist"],
+      "options": { "command": "pnpm --filter @ai-trading/$pkg build" }
+    },
+    "dev": {
+      "executor": "nx:run-commands",
+      "options": { "command": "pnpm --filter @ai-trading/$pkg dev" }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": { "command": "pnpm --filter @ai-trading/$pkg typecheck" }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": { "command": "pnpm --filter @ai-trading/$pkg lint" }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": { "command": "pnpm --filter @ai-trading/$pkg test" }
+    }
+  }
+}
+EOF
+
+  cat &gt; "packages/$pkg/index.ts" &lt;&lt;EOF
+/**
+ * @ai-trading/$pkg
+ * Public entry point. Keep framework-specific code out of this package.
+ */
+export {};
+EOF
+done</code></pre>
+  </div>
+
+  <h3>Create the medium-level subfolders</h3>
+  <div class="code">
+    <div class="code-head"><span class="code-lang">bash</span><button class="copy" type="button">Copy</button></div>
+<pre><code>mkdir -p packages/domain/{entities,value-objects,events,types}
+mkdir -p packages/trading-engine/{contracts,registry,signal-processing,indicators}
+mkdir -p packages/strategies/opening-range-breakout
+mkdir -p packages/risk-engine/{position-sizing,risk-policies,exposure-controls,kill-switch}
+mkdir -p packages/execution-engine/{order-management,order-state,position-management,execution-modes}
+mkdir -p packages/backtesting/{historical-replay,simulated-execution,cost-models,slippage-models,performance-metrics}
+mkdir -p packages/market-data/{models,normalization,validation,instrument-universe}
+mkdir -p packages/adapters/upstox/{market-data,order-execution,order-updates,sandbox}
+mkdir -p packages/adapters/simulated-broker
+mkdir -p packages/database/{schema,migrations,repositories}
+mkdir -p packages/configuration/{strategies,risk,trading-modes}
+
+# Strategy placeholders
+touch packages/strategies/opening-range-breakout/{config.ts,rules.ts,strategy.ts}
+
+# Keep every empty leaf folder in git
+find packages -type d -empty -exec touch {}/.gitkeep \;</code></pre>
+  </div>
+
+  <h3>Wire the dependency edges</h3>
+  <p class="small">
+    Add dependencies with the <code>workspace:*</code> protocol so pnpm links local packages and Nx can derive the build
+    order. Add only the edges shown in the package table; anything else is a boundary violation.
+  </p>
+
+  <div class="code">
+    <div class="code-head"><span class="code-lang">bash · package edges</span><button class="copy" type="button">Copy</button></div>
+<pre><code>pnpm --filter @ai-trading/trading-engine add @ai-trading/domain@workspace:*
+
+pnpm --filter @ai-trading/strategies add \
+  @ai-trading/domain@workspace:* \
+  @ai-trading/trading-engine@workspace:*
+
+pnpm --filter @ai-trading/risk-engine add @ai-trading/domain@workspace:*
+
+pnpm --filter @ai-trading/execution-engine add @ai-trading/domain@workspace:*
+
+pnpm --filter @ai-trading/backtesting add \
+  @ai-trading/domain@workspace:* \
+  @ai-trading/trading-engine@workspace:* \
+  @ai-trading/risk-engine@workspace:* \
+  @ai-trading/execution-engine@workspace:*
+
+pnpm --filter @ai-trading/market-data add @ai-trading/domain@workspace:*
+
+pnpm --filter @ai-trading/adapters add \
+  @ai-trading/domain@workspace:* \
+  @ai-trading/market-data@workspace:* \
+  @ai-trading/execution-engine@workspace:*
+
+pnpm --filter @ai-trading/database add \
+  @ai-trading/domain@workspace:* \
+  drizzle-orm postgres
+
+pnpm --filter @ai-trading/configuration add @ai-trading/domain@workspace:* zod
+pnpm --filter @ai-trading/notifications add @ai-trading/domain@workspace:*</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head"><span class="code-lang">bash · app edges</span><button class="copy" type="button">Copy</button></div>
+<pre><code># Web only needs contracts and validated configuration. It talks to the API over HTTP.
+pnpm --filter @ai-trading/web add \
+  @ai-trading/domain@workspace:* \
+  @ai-trading/configuration@workspace:*
+
+# API: orchestration + persistence + broker-independent engines.
+pnpm --filter @ai-trading/api add \
+  @ai-trading/domain@workspace:* \
+  @ai-trading/trading-engine@workspace:* \
+  @ai-trading/strategies@workspace:* \
+  @ai-trading/risk-engine@workspace:* \
+  @ai-trading/execution-engine@workspace:* \
+  @ai-trading/market-data@workspace:* \
+  @ai-trading/adapters@workspace:* \
+  @ai-trading/database@workspace:* \
+  @ai-trading/configuration@workspace:* \
+  @ai-trading/notifications@workspace:* \
+  @ai-trading/observability@workspace:*
+
+# Worker: the same shared capabilities plus the backtesting engine.
+pnpm --filter @ai-trading/worker add \
+  @ai-trading/domain@workspace:* \
+  @ai-trading/trading-engine@workspace:* \
+  @ai-trading/strategies@workspace:* \
+  @ai-trading/risk-engine@workspace:* \
+  @ai-trading/execution-engine@workspace:* \
+  @ai-trading/backtesting@workspace:* \
+  @ai-trading/market-data@workspace:* \
+  @ai-trading/adapters@workspace:* \
+  @ai-trading/database@workspace:* \
+  @ai-trading/configuration@workspace:* \
+  @ai-trading/notifications@workspace:* \
+  @ai-trading/observability@workspace:*</code></pre>
+  </div>
+
+  <h3>Add the shared strategy contract</h3>
+  <p class="small">This is the contract that keeps backtesting and live execution aligned. It is intentionally a placeholder in this task — no entry rules, sizing or order logic are implemented here.</p>
+
+  <div class="code">
+    <div class="code-head"><span class="code-lang">ts · packages/trading-engine/contracts/strategy.ts</span><button class="copy" type="button">Copy</button></div>
+<pre><code>import type {
+  Bar,
+  Instrument,
+  PositionSnapshot,
+  Signal,
+  StrategyConfig,
+} from '@ai-trading/domain';
+
+export interface StrategyContext {
+  readonly now: Date;
+  readonly instrument: Instrument;
+  readonly bars: readonly Bar[];
+  readonly position: PositionSnapshot | null;
+  readonly config: StrategyConfig;
+}
+
+export interface Strategy {
+  readonly id: string;
+  readonly version: string;
+  evaluate(context: StrategyContext): readonly Signal[];
+}</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head"><span class="code-lang">ts · packages/strategies/opening-range-breakout/strategy.ts</span><button class="copy" type="button">Copy</button></div>
+<pre><code>import type { Strategy } from '@ai-trading/trading-engine';
+
+export const openingRangeBreakout: Strategy = {
+  id: 'opening-range-breakout',
+  version: '0.1.0',
+  evaluate() {
+    // Implemented in R3. This placeholder proves the package boundary.
+    return [];
+  },
+};</code></pre>
+  </div>
+
+  <div class="code">
+    <div class="code-head"><span class="code-lang">ts · packages/strategies/index.ts</span><button class="copy" type="button">Copy</button></div>
+<pre><code>export { openingRangeBreakout } from './opening-range-breakout/strategy';</code></pre>
+  </div>
+
+  <h3>Build and verify the packages</h3>
+  <div class="code">
+    <div class="code-head"><span class="code-lang">bash</span><button class="copy" type="button">Copy</button></div>
+<pre><code>pnpm install
+
+# Nx should build in dependency order: domain → trading-engine → strategies, etc.
+pnpm nx run-many -t build -p domain trading-engine strategies risk-engine \
+  execution-engine backtesting market-data adapters database configuration \
+  notifications observability
+
+pnpm nx run-many -t typecheck -p domain trading-engine strategies risk-engine \
+  execution-engine backtesting market-data adapters database configuration \
+  notifications observability</code></pre>
+  </div>
+
+  <div class="callout ok">
+    <span class="ico">✓</span>
+    <div><strong>Expected output:</strong> every package has a <code>dist/</code> folder containing <code>index.js</code>, <code>index.cjs</code> and <code>index.d.ts</code>. The Nx graph shows arrows from apps to packages and from <code>strategies</code> to <code>trading-engine</code> and <code>domain</code>.</div>
+  </div>
+
+  <div class="callout warn">
+    <span class="ico">▲</span>
+    <div><strong>Do not add TypeScript path aliases for package names.</strong> Runtime resolution goes through the pnpm workspace links and each package's <code>exports</code> map. Path aliases would make the editor resolve source while Node resolves <code>dist</code>, causing type/runtime drift.</div>
+  </div>
+</section>
+
+<section id="phase-6" data-title="Phase 6 · Database">
+  <div class="section-head">
+    <span class="num">12</span>
+    <div>
+      <p class="kicker">Phase 6</p>
+      <h2>PostgreSQL, Drizzle and local services</h2>
+    </div>
+  </div>
+
+  <p>
+    PostgreSQL is the durable source of truth. Local development uses Docker; staging and production use Neon. Drizzle
+    configuration lives at the repository root and points into <code>packages/database</code>.
+  </p>
+
+  <div class="step">
+    <span class="step-n">1</span>
+    <div>
+      <h3>Add the database tooling</h3>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">bash</span><button class="copy" type="button">Copy</button></div>
+<pre><code>pnpm add -w drizzle-orm postgres dotenv
+pnpm add -w -D drizzle-kit
+
+pnpm --filter @ai-trading/database add drizzle-orm postgres</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="step">
+    <span class="step-n">2</span>
+    <div>
+      <h3>Start local PostgreSQL and Redis</h3>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">yaml · docker-compose.yml</span><button class="copy" type="button">Copy</button></div>
+<pre><code>name: ai-trading-system
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: ai-trading-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ai_trading}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ai_trading}
+      POSTGRES_DB: ${POSTGRES_DB:-ai_trading}
+      TZ: ${TZ:-Asia/Kolkata}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ai_trading} -d ${POSTGRES_DB:-ai_trading}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7.4-alpine
+    container_name: ai-trading-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  postgres_data:
+  redis_data:</code></pre>
+      </div>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">bash</span><button class="copy" type="button">Copy</button></div>
+<pre><code>docker compose up -d
+docker compose ps
+docker compose exec postgres psql -U ai_trading -d ai_trading -c 'select 1;'
+docker compose exec redis redis-cli ping</code></pre>
+      </div>
+      <p class="small">Both services should report <code>healthy</code>; PostgreSQL returns a row and Redis returns <code>PONG</code>.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <span class="step-n">3</span>
+    <div>
+      <h3>Write the environment template</h3>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">bash · .env.example</span><button class="copy" type="button">Copy</button></div>
+<pre><code># Runtime
+NODE_ENV=development
+TZ=Asia/Kolkata
+MARKET_TIMEZONE=Asia/Kolkata
+LOG_LEVEL=debug
+
+# Apps
+WEB_URL=http://localhost:3000
+API_PORT=4000
+API_PREFIX=api
+TRADING_MODE=offline
+
+# PostgreSQL (local Docker)
+POSTGRES_USER=ai_trading
+POSTGRES_PASSWORD=ai_trading
+POSTGRES_DB=ai_trading
+DATABASE_URL=postgresql://ai_trading:ai_trading@localhost:5432/ai_trading
+
+# Redis / BullMQ
+REDIS_URL=redis://localhost:6379
+REDIS_HOST=localhost
+REDIS_PORT=6379
+
+# Auth (generate with: openssl rand -hex 32)
+JWT_SECRET=replace-me
+JWT_EXPIRES_IN=15m
+
+# Broker — leave blank until R2/R6
+UPSTOX_API_KEY=
+UPSTOX_API_SECRET=
+UPSTOX_REDIRECT_URI=http://localhost:4000/api/v1/broker/upstox/callback
+UPSTOX_ACCESS_TOKEN=
+UPSTOX_SANDBOX=true
+
+# Risk defaults (R5)
+RISK_EQUITY=100000
+RISK_PER_TRADE_PCT=0.5
+DAILY_LOSS_LIMIT_PCT=1</code></pre>
+      </div>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">bash</span><button class="copy" type="button">Copy</button></div>
+<pre><code>cp .env.example .env
+openssl rand -hex 32</code></pre>
+      </div>
+      <p class="small muted">Paste the generated value into <code>JWT_SECRET</code>. Never commit <code>.env</code>.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <span class="step-n">4</span>
+    <div>
+      <h3>Point Drizzle at the database package</h3>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">ts · drizzle.config.ts</span><button class="copy" type="button">Copy</button></div>
+<pre><code>import 'dotenv/config';
+import { defineConfig } from 'drizzle-kit';
+
+export default defineConfig({
+  schema: './packages/database/schema/index.ts',
+  out: './packages/database/migrations',
+  dialect: 'postgresql',
+  dbCredentials: {
+    url: process.env.DATABASE_URL!,
+  },
+  strict: true,
+  verbose: true,
+});</code></pre>
+      </div>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">ts · packages/database/client.ts</span><button class="copy" type="button">Copy</button></div>
+<pre><code>import { drizzle } from 'drizzle-orm/postgres-js';
+import postgres from 'postgres';
+import * as schema from './schema';
+
+const connectionString = process.env.DATABASE_URL;
+
+if (!connectionString) {
+  throw new Error('DATABASE_URL is not set');
+}
+
+const client = postgres(connectionString, { max: 10 });
+
+export const db = drizzle(client, { schema });
+export type Database = typeof db;</code></pre>
+      </div>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">ts · packages/database/schema/index.ts</span><button class="copy" type="button">Copy</button></div>
+<pre><code>import { pgTable, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
+
+// Minimal R1 table: proves the migration pipeline and gives the worker a
+// liveness signal until the full trading schema lands.
+export const systemHeartbeats = pgTable('system_heartbeats', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  service: varchar('service', { length: 64 }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});</code></pre>
+      </div>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">ts · packages/database/index.ts</span><button class="copy" type="button">Copy</button></div>
+<pre><code>export { db, type Database } from './client';
+export * as schema from './schema';</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="step">
+    <span class="step-n">5</span>
+    <div>
+      <h3>Generate and apply the first migration</h3>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">bash</span><button class="copy" type="button">Copy</button></div>
+<pre><code>pnpm db:generate
+pnpm db:migrate
+pnpm db:studio</code></pre>
+      </div>
+      <div class="callout">
+        <span class="ico">◆</span>
+        <div><strong>Neon:</strong> use the pooled connection string with <code>?sslmode=require</code> in <code>DATABASE_URL</code>. Keep Docker Compose for local development; do not point local migrations at the production branch.</div>
+      </div>
+      <div class="callout warn">
+        <span class="ico">▲</span>
+        <div>Generated SQL belongs in <code>packages/database/migrations</code> and must be committed. Never edit a migration that has already been applied; create a new one instead.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="phase-7" data-title="Phase 7 · Infrastructure">
+  <div class="section-head">
+    <span class="num">13</span>
+    <div>
+      <p class="kicker">Phase 7</p>
+      <h2>Docker and deployment placeholders</h2>
+    </div>
+  </div>
+
+  <p>
+    Local stateful services already run through the root compose file. This phase adds app images and the Azure folder
+    structure. Images stay intentionally simple in R1; size and layer optimisation belong to the hardening milestone.
+  </p>
+
+  <div class="step">
+    <span class="step-n">1</span>
+    <div>
+      <h3>Add one Dockerfile per app</h3>
+      <details>
+        <summary>infra/docker/web.Dockerfile</summary>
+        <div class="details-body">
+          <div class="code">
+            <div class="code-head"><span class="code-lang">dockerfile</span><button class="copy" type="button">Copy</button></div>
+<pre><code>FROM node:24-alpine
+
+RUN corepack enable
+WORKDIR /app
+
+COPY . .
+RUN pnpm install --frozen-lockfile
+RUN pnpm --filter @ai-trading/web... build
+
+EXPOSE 3000
+CMD ["pnpm", "--filter", "@ai-trading/web", "start"]</code></pre>
+          </div>
+        </div>
+      </details>
+      <details>
+        <summary>infra/docker/api.Dockerfile</summary>
+        <div class="details-body">
+          <div class="code">
+            <div class="code-head"><span class="code-lang">dockerfile</span><button class="copy" type="button">Copy</button></div>
+<pre><code>FROM node:24-alpine
+
+RUN corepack enable
+WORKDIR /app
+
+COPY . .
+RUN pnpm install --frozen-lockfile
+RUN pnpm --filter @ai-trading/api... build
+
+EXPOSE 4000
+CMD ["node", "apps/api/dist/main.js"]</code></pre>
+          </div>
+        </div>
+      </details>
+      <details>
+        <summary>infra/docker/worker.Dockerfile</summary>
+        <div class="details-body">
+          <div class="code">
+            <div class="code-head"><span class="code-lang">dockerfile</span><button class="copy" type="button">Copy</button></div>
+<pre><code>FROM node:24-alpine
+
+RUN corepack enable
+WORKDIR /app
+
+COPY . .
+RUN pnpm install --frozen-lockfile
+RUN pnpm --filter @ai-trading/worker... build
+
+CMD ["node", "apps/worker/dist/main.js"]</code></pre>
+          </div>
+        </div>
+      </details>
+      <div class="callout">
+        <span class="ico">◆</span>
+        <div>The <code>...</code> suffix in <code>pnpm --filter @ai-trading/web... build</code> includes the app and its workspace dependencies, which is required because apps consume built package output.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="step">
+    <span class="step-n">2</span>
+    <div>
+      <h3>Add the app compose file</h3>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">yaml · infra/compose/docker-compose.apps.yml</span><button class="copy" type="button">Copy</button></div>
+<pre><code>include:
+  - ../../docker-compose.yml
+
+services:
+  web:
+    build:
+      context: ../..
+      dockerfile: infra/docker/web.Dockerfile
+    env_file: ../../.env
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_started
+
+  api:
+    build:
+      context: ../..
+      dockerfile: infra/docker/api.Dockerfile
+    env_file: ../../.env
+    ports:
+      - "4000:4000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: ../..
+      dockerfile: infra/docker/worker.Dockerfile
+    env_file: ../../.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy</code></pre>
+      </div>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">bash</span><button class="copy" type="button">Copy</button></div>
+<pre><code># Start the stateful services first
+docker compose up -d
+
+# Build and run the apps against them
+docker compose -f infra/compose/docker-compose.apps.yml up --build</code></pre>
+      </div>
+      <p class="small muted">The <code>include</code> block pulls the root <code>docker-compose.yml</code> into the same Compose project, so <code>postgres</code> and <code>redis</code> are available to <code>depends_on</code> and share a network. The split keeps local development fast and production composition explicit.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <span class="step-n">3</span>
+    <div>
+      <h3>Document the Azure path without provisioning it</h3>
+      <p class="small">Create <code>infra/azure/README.md</code> with the decisions that R6 will need. Do not provision anything in this task.</p>
+      <ul>
+        <li><strong>Host:</strong> Ubuntu 24.04 LTS on an Azure Linux VPS, Docker Engine + Compose plugin.</li>
+        <li><strong>Static IP:</strong> a registered static public IP is required for Upstox API access. Attach it before R6 testing.</li>
+        <li><strong>Ingress:</strong> reverse proxy (Caddy or Nginx) on 80/443; only the proxy is public. API, worker and databases stay on the private network.</li>
+        <li><strong>Secrets:</strong> inject environment variables from the host or a secret store, never bake <code>.env</code> into images.</li>
+        <li><strong>Time:</strong> host and containers run UTC; the application converts to <code>Asia/Kolkata</code> at the market boundary.</li>
+        <li><strong>Persistence:</strong> Neon for PostgreSQL in production; Redis can be a managed instance or a dedicated container with append-only persistence.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="phase-8" data-title="Phase 8 · Tests">
+  <div class="section-head">
+    <span class="num">14</span>
+    <div>
+      <p class="kicker">Phase 8</p>
+      <h2>Test workspace</h2>
+    </div>
+  </div>
+
+  <p>
+    The root <code>tests/</code> package owns cross-cutting integration, end-to-end and broker-contract suites. Package
+    unit tests live beside their source and run through Nx.
+  </p>
+
+  <div class="step">
+    <span class="step-n">1</span>
+    <div>
+      <h3>Create the test package</h3>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">json · tests/package.json</span><button class="copy" type="button">Copy</button></div>
+<pre><code>{
+  "name": "@ai-trading/tests",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "test": "vitest run --passWithNoTests",
+    "test:integration": "vitest run integration --passWithNoTests",
+    "test:broker-contracts": "vitest run broker-contracts --passWithNoTests",
+    "test:e2e": "playwright test",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
+  }
+}</code></pre>
+      </div>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">ts · tests/vitest.config.ts</span><button class="copy" type="button">Copy</button></div>
+<pre><code>import { defineConfig } from 'vitest/config';
+
+export default defineConfig({
+  test: {
+    environment: 'node',
+    include: ['integration/**/*.test.ts', 'broker-contracts/**/*.test.ts'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'html'],
+    },
+  },
+});</code></pre>
+      </div>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">ts · tests/playwright.config.ts</span><button class="copy" type="button">Copy</button></div>
+<pre><code>import { defineConfig, devices } from '@playwright/test';
+
+export default defineConfig({
+  testDir: './end-to-end',
+  fullyParallel: true,
+  retries: process.env.CI ? 2 : 0,
+  use: {
+    baseURL: 'http://localhost:3000',
+    trace: 'on-first-retry',
+  },
+  projects: [
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+  ],
+});</code></pre>
+      </div>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">json · tests/project.json</span><button class="copy" type="button">Copy</button></div>
+<pre><code>{
+  "name": "tests",
+  "root": "tests",
+  "projectType": "library",
+  "tags": ["type:test"],
+  "targets": {
+    "test": {
+      "executor": "nx:run-commands",
+      "options": { "command": "pnpm --filter @ai-trading/tests test" }
+    },
+    "integration": {
+      "executor": "nx:run-commands",
+      "options": { "command": "pnpm --filter @ai-trading/tests test:integration" }
+    },
+    "broker-contracts": {
+      "executor": "nx:run-commands",
+      "options": { "command": "pnpm --filter @ai-trading/tests test:broker-contracts" }
+    },
+    "e2e": {
+      "executor": "nx:run-commands",
+      "options": { "command": "pnpm --filter @ai-trading/tests test:e2e" }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": { "command": "pnpm --filter @ai-trading/tests typecheck" }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": { "command": "pnpm --filter @ai-trading/tests lint" }
+    }
+  }
+}</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="step">
+    <span class="step-n">2</span>
+    <div>
+      <h3>Define what each test folder owns</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Folder</th><th>Scope</th><th>Dependencies</th></tr></thead>
+          <tbody>
+            <tr><td><code>tests/integration</code></td><td>API + database + Redis wiring, repository behaviour, migration checks.</td><td>Testcontainers, <code>@nestjs/testing</code>, workspace packages.</td></tr>
+            <tr><td><code>tests/end-to-end</code></td><td>Browser flows through the dashboard against a running API.</td><td>Playwright, seeded test data.</td></tr>
+            <tr><td><code>tests/broker-contracts</code></td><td>Adapter conformance against recorded Upstox fixtures and the simulated broker.</td><td>Fixtures only; no live orders.</td></tr>
+            <tr><td><code>tests/fixtures</code></td><td>Canonical bars, instruments, orders and fills shared by suites.</td><td>None.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="step">
+    <span class="step-n">3</span>
+    <div>
+      <h3>Install test dependencies and run the empty suite</h3>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">bash</span><button class="copy" type="button">Copy</button></div>
+<pre><code>pnpm --filter @ai-trading/tests add -D \
+  vitest @vitest/coverage-v8 testcontainers \
+  @playwright/test supertest @types/supertest @nestjs/testing
+
+pnpm --filter @ai-trading/tests exec playwright install chromium
+pnpm --filter @ai-trading/tests test
+pnpm nx run-many -t test</code></pre>
+      </div>
+      <div class="callout warn">
+        <span class="ico">▲</span>
+        <div>Vitest exits non-zero when no test files are found, so the setup scripts use <code>--passWithNoTests</code>. Remove that flag as soon as real coverage exists, and add at least one smoke test per layer: a package unit test, a repository integration test, a health-check e2e test and an adapter contract test.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="phase-9" data-title="Phase 9 · Docs &amp; README">
+  <div class="section-head">
+    <span class="num">15</span>
+    <div>
+      <p class="kicker">Phase 9</p>
+      <h2>Documentation and operating notes</h2>
+    </div>
+  </div>
+
+  <p>Documentation is part of the scaffold. Create the files now so later milestones have a known home for decisions and runbooks.</p>
+
+  <div class="code">
+    <div class="code-head"><span class="code-lang">bash</span><button class="copy" type="button">Copy</button></div>
+<pre><code>touch docs/architecture/README.md
+touch docs/architecture/adr-0001-pnpm-nx-monorepo.md
+touch docs/strategies/opening-range-breakout.md
+touch docs/operations/runbook.md
+touch infra/azure/README.md
+touch README.md</code></pre>
+  </div>
+
+  <h3>README minimum content</h3>
+  <div class="code">
+    <div class="code-head"><span class="code-lang">markdown · README.md</span><button class="copy" type="button">Copy</button></div>
+<pre><code># AI Trading System
+
+Modular monolith for NSE strategy research, backtesting, risk control and
+controlled live execution.
+
+## Workspace
+
+- `apps/web` — Next.js dashboard
+- `apps/api` — NestJS HTTP API
+- `apps/worker` — NestJS background processing
+- `packages/*` — framework-agnostic domain and platform packages
+- `tests/*` — integration, end-to-end and broker-contract suites
+- `infra/*` — Docker, Compose and Azure assets
+- `context/*` — specifications and architecture source material
+
+## Quick start
+
+```bash
+pnpm install
+cp .env.example .env
+docker compose up -d
+pnpm db:migrate
+pnpm dev
+```
+
+| Service | URL |
+| --- | --- |
+| Dashboard | http://localhost:3000 |
+| API | http://localhost:4000/api/v1 |
+| Swagger | http://localhost:4000/api/docs |
+| PostgreSQL | localhost:5432 |
+| Redis | localhost:6379 |
+
+## Guardrails
+
+- `TRADING_MODE` defaults to `offline`.
+- Live trading is gated by R6–R8 and is never enabled by a local default.
+- Never commit `.env`.
+- Strategies may not import broker adapters or send orders directly.
+- Every backtest and live trade records its strategy version and configuration snapshot.
+
+See `context/` for the architecture, strategy, risk, execution and backtesting
+specifications.</code></pre>
+  </div>
+
+  <h3>ADR seed</h3>
+  <p class="small">Record the monorepo decision in <code>docs/architecture/adr-0001-pnpm-nx-monorepo.md</code>: context, decision, alternatives considered (npm workspaces, Nx generators, Turborepo), consequences, and the rule that apps are created with official CLIs while Nx supplies orchestration.</p>
+
+  <div class="callout ok">
+    <span class="ico">✓</span>
+    <div><strong>Checkpoint:</strong> every top-level folder now has a document or a placeholder, and the README can take a new developer from clone to running services without tribal knowledge.</div>
+  </div>
+</section>
+
+<section id="phase-10" data-title="Phase 10 · Nx targets &amp; verification">
+  <div class="section-head">
+    <span class="num">16</span>
+    <div>
+      <p class="kicker">Phase 10</p>
+      <h2>Nx targets and full verification</h2>
+    </div>
+  </div>
+
+  <p>
+    The last wiring step registers each app with Nx and proves the whole workspace builds, lints, typechecks and boots.
+    The app targets delegate to the official CLI scripts, so there is no second build system to maintain.
+  </p>
+
+  <div class="step">
+    <span class="step-n">1</span>
+    <div>
+      <h3>Register the web app</h3>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">json · apps/web/project.json</span><button class="copy" type="button">Copy</button></div>
+<pre><code>{
+  "name": "web",
+  "root": "apps/web",
+  "sourceRoot": "apps/web/src",
+  "projectType": "application",
+  "tags": ["type:app", "scope:web"],
+  "targets": {
+    "dev": {
+      "executor": "nx:run-commands",
+      "options": { "command": "pnpm --filter @ai-trading/web dev" }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "outputs": ["{projectRoot}/.next"],
+      "options": { "command": "pnpm --filter @ai-trading/web build" }
+    },
+    "start": {
+      "executor": "nx:run-commands",
+      "options": { "command": "pnpm --filter @ai-trading/web start" }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": { "command": "pnpm --filter @ai-trading/web lint" }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": { "command": "pnpm --filter @ai-trading/web typecheck" }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": { "command": "pnpm --filter @ai-trading/web test" }
+    }
+  }
+}</code></pre>
+      </div>
+      <p class="small">Create the same file for <code>apps/api</code> and <code>apps/worker</code> with names <code>api</code> and <code>worker</code>, tags <code>scope:api</code> / <code>scope:worker</code>, and build outputs <code>{projectRoot}/dist</code>.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <span class="step-n">2</span>
+    <div>
+      <h3>Inspect the graph before running anything</h3>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">bash</span><button class="copy" type="button">Copy</button></div>
+<pre><code>pnpm nx graph
+pnpm nx show projects
+pnpm nx show project web
+pnpm nx show project domain</code></pre>
+      </div>
+      <p class="small">The graph should contain 16 projects: 3 apps, 12 packages and the <code>tests</code> project. If a project is missing, check its <code>project.json</code> <code>name</code> and <code>root</code>, then run <code>pnpm nx reset</code>.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <span class="step-n">3</span>
+    <div>
+      <h3>Run the workspace gates</h3>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">bash</span><button class="copy" type="button">Copy</button></div>
+<pre><code>pnpm install
+
+# Static gates
+pnpm nx run-many -t typecheck
+pnpm nx run-many -t lint
+pnpm nx run-many -t test
+
+# Builds in dependency order
+pnpm nx run-many -t build
+
+# Affected-only variants for daily work
+pnpm nx affected -t typecheck lint test</code></pre>
+      </div>
+      <div class="callout ok">
+        <span class="ico">✓</span>
+        <div><strong>Expected results:</strong> package builds emit <code>dist/index.js</code>, <code>dist/index.cjs</code> and <code>dist/index.d.ts</code>; the web build emits <code>.next</code>; the API and worker emit <code>dist/main.js</code>; no Nx boundary violation is reported.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="step">
+    <span class="step-n">4</span>
+    <div>
+      <h3>Boot the full local stack</h3>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">bash</span><button class="copy" type="button">Copy</button></div>
+<pre><code># Terminal 1 — stateful services
+docker compose up -d
+
+# Terminal 2 — web, API, worker and package watchers
+pnpm dev
+
+# Terminal 3 — smoke checks
+curl -s http://localhost:4000/api/v1/health
+curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3000
+docker compose ps</code></pre>
+      </div>
+      <p class="small">The API health response should be JSON with <code>"status":"ok"</code>, the dashboard should return <code>200</code>, and both containers should be <code>healthy</code>.</p>
+    </div>
+  </div>
+
+  <div class="step">
+    <span class="step-n">5</span>
+    <div>
+      <h3>Commit the verified workspace</h3>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">bash</span><button class="copy" type="button">Copy</button></div>
+<pre><code>pnpm format
+pnpm nx run-many -t typecheck lint test build
+
+git add .
+git commit -m "feat: scaffold monorepo apps, packages and local infrastructure"</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <h3>Troubleshooting</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Symptom</th><th>Cause</th><th>Fix</th></tr></thead>
+      <tbody>
+        <tr><td>Nx sees stale projects or targets</td><td>Daemon cache after a generator or config change.</td><td><code>pnpm nx reset</code>, then re-run <code>pnpm nx graph</code>.</td></tr>
+        <tr><td><code>Cannot find module '@ai-trading/...'</code></td><td>Package not built, or a missing <code>workspace:*</code> dependency.</td><td><code>pnpm install</code>, then <code>pnpm nx run-many -t build --exclude=web,api,worker,tests</code>.</td></tr>
+        <tr><td>Nest build fails on decorators</td><td><code>emitDecoratorMetadata</code> or <code>reflect-metadata</code> missing.</td><td>Confirm the app tsconfig and the <code>import 'reflect-metadata'</code> line in <code>main.ts</code>.</td></tr>
+        <tr><td>Next cannot resolve a workspace package</td><td>Package has no built <code>dist</code>, or it is not in <code>transpilePackages</code>.</td><td>Build the package and add it to <code>next.config.ts</code>.</td></tr>
+        <tr><td>shadcn cannot find the alias</td><td>The CLI ran from the wrong directory.</td><td><code>cd apps/web &amp;&amp; pnpm dlx shadcn@latest init</code>.</td></tr>
+        <tr><td>Drizzle cannot find <code>DATABASE_URL</code></td><td><code>.env</code> missing at the root.</td><td><code>cp .env.example .env</code>, keep <code>import 'dotenv/config'</code> in the config.</td></tr>
+        <tr><td><code>EADDRINUSE</code> on 3000/4000</td><td>Another dev server is already running.</td><td>Stop it or change <code>--port</code> / <code>API_PORT</code>.</td></tr>
+        <tr><td>Peer dependency warnings block install</td><td>Framework peer ranges differ.</td><td>Keep <code>strict-peer-dependencies=false</code> during setup; resolve the actual peer before production.</td></tr>
+        <tr><td>Redis connection refused in the worker</td><td>Compose service not started or wrong host.</td><td><code>docker compose up -d redis</code>; check <code>REDIS_URL</code>.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Acceptance checklist</h3>
+  <ul class="check">
+    <li>pnpm workspace and Nx are installed, and the lockfile is committed.</li>
+    <li>Apps live at <code>apps/web</code>, <code>apps/api</code> and <code>apps/worker</code> directly under the repository root.</li>
+    <li>All twelve packages exist with their medium-level subfolders.</li>
+    <li>Nx project tags prevent app-to-app and package-to-app imports.</li>
+    <li>PostgreSQL and Redis start healthy through Docker Compose.</li>
+    <li>Drizzle generates and applies a migration from the root config.</li>
+    <li>The dashboard, API health endpoint and worker all start from <code>pnpm dev</code>.</li>
+    <li><code>pnpm nx run-many -t typecheck lint test build</code> passes.</li>
+    <li><code>.env.example</code> documents every required variable and <code>.env</code> is ignored.</li>
+    <li>README and the architecture/operations docs are present.</li>
+  </ul>
+</section>
+
+<section id="dependencies" data-title="Dependency manifest">
+  <div class="section-head">
+    <span class="num">17</span>
+    <div>
+      <p class="kicker">Everything installed, and why</p>
+      <h2>Dependency manifest</h2>
+    </div>
+  </div>
+
+  <p>
+    Versions below are the major lines this plan targets. The lockfile is authoritative after install; use
+    <code>pnpm outdated</code> and <code>nx migrate</code> deliberately rather than floating versions in production.
+  </p>
+
+  <h3>Root tooling</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Package</th><th>Version line</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>nx</code></td><td>22.x</td><td>Task graph, cache, affected commands and project discovery.</td></tr>
+        <tr><td><code>@nx/eslint-plugin</code></td><td>22.x</td><td>Module-boundary enforcement across app and package tags.</td></tr>
+        <tr><td><code>typescript</code></td><td>5.x</td><td>Compiler used by all apps and packages.</td></tr>
+        <tr><td><code>@types/node</code></td><td>24.x</td><td>Node type definitions.</td></tr>
+        <tr><td><code>tsup</code></td><td>8.x</td><td>Dual ESM/CJS package builds with declarations.</td></tr>
+        <tr><td><code>vitest</code> + <code>@vitest/coverage-v8</code></td><td>3.x</td><td>Package and web unit tests plus coverage.</td></tr>
+        <tr><td><code>eslint</code>, <code>typescript-eslint</code>, <code>@eslint/js</code></td><td>9.x / 8.x</td><td>Linting and TypeScript rules.</td></tr>
+        <tr><td><code>eslint-config-prettier</code></td><td>10.x</td><td>Removes formatting rules that conflict with Prettier.</td></tr>
+        <tr><td><code>prettier</code>, <code>prettier-plugin-tailwindcss</code></td><td>3.x / 0.6.x</td><td>Formatting and deterministic Tailwind class order.</td></tr>
+        <tr><td><code>drizzle-kit</code></td><td>0.31.x</td><td>Schema generation, migrations and studio.</td></tr>
+        <tr><td><code>dotenv</code></td><td>17.x</td><td>Loads the root <code>.env</code> for Drizzle and scripts.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Web app</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Package</th><th>Version line</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>next</code>, <code>react</code>, <code>react-dom</code></td><td>16.x / 19.x</td><td>App Router dashboard.</td></tr>
+        <tr><td><code>tailwindcss</code>, <code>@tailwindcss/postcss</code>, <code>postcss</code></td><td>4.x</td><td>Utility styling and theme tokens.</td></tr>
+        <tr><td><code>shadcn</code> primitives + <code>class-variance-authority</code>, <code>clsx</code>, <code>tailwind-merge</code></td><td>latest</td><td>Component system and class composition.</td></tr>
+        <tr><td><code>lucide-react</code></td><td>latest</td><td>Icon set used by the dashboard shell.</td></tr>
+        <tr><td><code>@tanstack/react-query</code></td><td>5.x</td><td>Client-side data fetching and cache for API resources.</td></tr>
+        <tr><td><code>zod</code></td><td>4.x</td><td>Runtime validation of API payloads and form schemas.</td></tr>
+        <tr><td><code>react-hook-form</code>, <code>@hookform/resolvers</code></td><td>7.x / 5.x</td><td>Strategy, risk and settings forms.</td></tr>
+        <tr><td><code>recharts</code></td><td>3.x</td><td>Equity, drawdown and performance charts.</td></tr>
+        <tr><td><code>date-fns</code></td><td>4.x</td><td>Date formatting and market-session helpers.</td></tr>
+        <tr><td><code>next-themes</code></td><td>0.4.x</td><td>Dark-first theme with a future light-mode toggle.</td></tr>
+        <tr><td><code>eslint-config-next</code></td><td>16.x</td><td>Next.js lint rules.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>API app</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Package</th><th>Version line</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>@nestjs/common</code>, <code>@nestjs/core</code>, <code>@nestjs/platform-express</code></td><td>11.x</td><td>HTTP application framework.</td></tr>
+        <tr><td><code>@nestjs/config</code></td><td>4.x</td><td>Environment loading and validation.</td></tr>
+        <tr><td><code>@nestjs/swagger</code></td><td>11.x</td><td>OpenAPI documentation at <code>/api/docs</code>.</td></tr>
+        <tr><td><code>@nestjs/bullmq</code>, <code>bullmq</code>, <code>ioredis</code></td><td>11.x / 5.x / 5.x</td><td>Queue producers and Redis connectivity.</td></tr>
+        <tr><td><code>@nestjs/terminus</code></td><td>11.x</td><td>Health indicators for database, Redis and dependencies.</td></tr>
+        <tr><td><code>class-validator</code>, <code>class-transformer</code></td><td>0.14.x / 0.5.x</td><td>DTO validation and transformation.</td></tr>
+        <tr><td><code>helmet</code></td><td>8.x</td><td>HTTP security headers.</td></tr>
+        <tr><td><code>reflect-metadata</code>, <code>rxjs</code></td><td>0.2.x / 7.x</td><td>Nest runtime primitives.</td></tr>
+        <tr><td><code>zod</code></td><td>4.x</td><td>Environment and configuration schemas.</td></tr>
+        <tr><td>Nest dev tooling</td><td>11.x</td><td><code>@nestjs/cli</code>, <code>@nestjs/schematics</code>, <code>@nestjs/testing</code>, Jest, ts-jest, Supertest.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Worker app</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Package</th><th>Version line</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>@nestjs/common</code>, <code>@nestjs/core</code></td><td>11.x</td><td>Application context without HTTP.</td></tr>
+        <tr><td><code>@nestjs/config</code>, <code>zod</code></td><td>4.x / 4.x</td><td>Validated worker configuration.</td></tr>
+        <tr><td><code>@nestjs/bullmq</code>, <code>bullmq</code>, <code>ioredis</code></td><td>11.x / 5.x / 5.x</td><td>Queue processors and Redis connection.</td></tr>
+        <tr><td><code>@nestjs/schedule</code></td><td>6.x</td><td>Cron jobs for end-of-day square-off and reconciliation.</td></tr>
+        <tr><td><code>reflect-metadata</code>, <code>rxjs</code></td><td>0.2.x / 7.x</td><td>Nest runtime primitives.</td></tr>
+        <tr><td>Nest dev tooling</td><td>11.x</td><td>CLI, schematics, testing, Jest.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Shared packages</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Package</th><th>Runtime dependencies</th><th>Dev dependencies</th></tr></thead>
+      <tbody>
+        <tr><td><code>domain</code></td><td>none (pure TypeScript)</td><td><code>tsup</code>, <code>typescript</code>, <code>vitest</code></td></tr>
+        <tr><td><code>trading-engine</code></td><td><code>@ai-trading/domain</code></td><td>shared build/test tooling</td></tr>
+        <tr><td><code>strategies</code></td><td><code>domain</code>, <code>trading-engine</code></td><td>shared build/test tooling</td></tr>
+        <tr><td><code>risk-engine</code></td><td><code>domain</code></td><td>shared build/test tooling</td></tr>
+        <tr><td><code>execution-engine</code></td><td><code>domain</code></td><td>shared build/test tooling</td></tr>
+        <tr><td><code>backtesting</code></td><td><code>domain</code>, <code>trading-engine</code>, <code>risk-engine</code>, <code>execution-engine</code></td><td>shared build/test tooling</td></tr>
+        <tr><td><code>market-data</code></td><td><code>domain</code>, <code>zod</code></td><td>shared build/test tooling</td></tr>
+        <tr><td><code>adapters</code></td><td><code>domain</code>, <code>market-data</code>, <code>execution-engine</code>, <code>zod</code></td><td>shared build/test tooling</td></tr>
+        <tr><td><code>database</code></td><td><code>domain</code>, <code>drizzle-orm</code>, <code>postgres</code></td><td><code>drizzle-kit</code>, shared tooling</td></tr>
+        <tr><td><code>configuration</code></td><td><code>domain</code>, <code>zod</code></td><td>shared build/test tooling</td></tr>
+        <tr><td><code>notifications</code></td><td><code>domain</code></td><td>shared build/test tooling</td></tr>
+        <tr><td><code>observability</code></td><td><code>pino</code> (add when logging lands)</td><td><code>pino-pretty</code>, shared tooling</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Tests</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Package</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>vitest</code>, <code>@vitest/coverage-v8</code></td><td>Integration and broker-contract suites, coverage.</td></tr>
+        <tr><td><code>testcontainers</code></td><td>Throwaway PostgreSQL/Redis for integration tests.</td></tr>
+        <tr><td><code>@playwright/test</code></td><td>Browser end-to-end flows.</td></tr>
+        <tr><td><code>supertest</code>, <code>@types/supertest</code></td><td>HTTP assertions against the Nest app.</td></tr>
+        <tr><td><code>@nestjs/testing</code></td><td>Nest test modules and dependency overrides.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="environment" data-title="Environment variables">
+  <div class="section-head">
+    <span class="num">18</span>
+    <div>
+      <p class="kicker">Configuration surface</p>
+      <h2>Environment variables</h2>
+    </div>
+  </div>
+
+  <p>
+    The full template is written in Phase 6. This table explains ownership and the safe default for each group. Only
+    <code>.env.example</code> is committed; <code>.env</code> is ignored.
+  </p>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Variable</th><th>Owner</th><th>Safe default</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td><code>NODE_ENV</code></td><td>All apps</td><td><code>development</code></td><td>Use <code>production</code> only in deployed images.</td></tr>
+        <tr><td><code>TZ</code> / <code>MARKET_TIMEZONE</code></td><td>All apps</td><td><code>Asia/Kolkata</code></td><td>Persistence remains UTC; conversion happens at market boundaries.</td></tr>
+        <tr><td><code>WEB_URL</code></td><td>API CORS</td><td><code>http://localhost:3000</code></td><td>Must match the deployed dashboard origin.</td></tr>
+        <tr><td><code>API_PORT</code></td><td>API</td><td><code>4000</code></td><td>Worker has no HTTP port.</td></tr>
+        <tr><td><code>TRADING_MODE</code></td><td>Configuration package</td><td><code>offline</code></td><td>Allowed: <code>offline</code>, <code>research</code>, <code>backtesting</code>, <code>paper</code>, <code>live</code>. Live requires explicit R8 approval.</td></tr>
+        <tr><td><code>DATABASE_URL</code></td><td>Database / Drizzle</td><td>local PostgreSQL URL</td><td>Neon production URLs need <code>sslmode=require</code>.</td></tr>
+        <tr><td><code>POSTGRES_*</code></td><td>Docker Compose</td><td><code>ai_trading</code></td><td>Local only; production uses Neon credentials.</td></tr>
+        <tr><td><code>REDIS_URL</code>, <code>REDIS_HOST</code>, <code>REDIS_PORT</code></td><td>API / worker</td><td><code>redis://localhost:6379</code></td><td>Use a managed Redis URL with TLS in production.</td></tr>
+        <tr><td><code>JWT_SECRET</code></td><td>API</td><td>none — must be generated</td><td><code>openssl rand -hex 32</code>; rotate outside the repository.</td></tr>
+        <tr><td><code>UPSTOX_*</code></td><td>Adapters</td><td>blank</td><td>Not required for setup. Never commit tokens.</td></tr>
+        <tr><td><code>RISK_*</code></td><td>Risk engine</td><td>0.5% / 1%</td><td>These are defaults; each session snapshots its effective configuration.</td></tr>
+        <tr><td><code>LOG_LEVEL</code></td><td>Observability</td><td><code>debug</code></td><td>Use <code>info</code> in production and redact account identifiers.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout danger">
+    <span class="ico">■</span>
+    <div><strong>Secrets rule:</strong> no secret is ever committed, logged or embedded in a Docker image. The repository contains only <code>.env.example</code>. Rotate any credential that appears in a screenshot, log or commit.</div>
+  </div>
+</section>
+
+<section id="risks" data-title="Risks &amp; guardrails">
+  <div class="section-head">
+    <span class="num">19</span>
+    <div>
+      <p class="kicker">What could go wrong</p>
+      <h2>Risks and guardrails</h2>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Risk</th><th>Impact</th><th>Guardrail</th></tr></thead>
+      <tbody>
+        <tr><td>Official CLI scaffolds drift from Nx expectations</td><td>Projects missing from the graph or targets not cached.</td><td>Thin <code>project.json</code> shims delegate to package scripts; no custom executor logic. Verify with <code>nx show projects</code>.</td></tr>
+        <tr><td>Workspace package type/runtime mismatch</td><td>Editor resolves source while Node resolves a stale <code>dist</code>.</td><td>No tsconfig path aliases for package names; dual exports; <code>dependsOn: ["^build"]</code>.</td></tr>
+        <tr><td>Next.js 16 caching changes</td><td>Live trading state appears stale in the dashboard.</td><td>Cache Components disabled in <code>next.config.ts</code>; use explicit dynamic rendering and short-lived queries.</td></tr>
+        <tr><td>Node or framework major-version incompatibility</td><td>Install or build failures.</td><td>Pin Node 24 and pnpm 12; commit the lockfile; run <code>nx migrate</code> deliberately.</td></tr>
+        <tr><td>Broker adapter leaks into strategy code</td><td>Backtest and live behaviour diverge.</td><td><code>execution-engine</code> owns ports; strategies depend only on <code>domain</code> and <code>trading-engine</code>; Nx tags enforce it.</td></tr>
+        <tr><td>Drizzle migration drift</td><td>Schema and code disagree in production.</td><td>Generate migrations from the schema; review SQL; never edit applied migrations; run migrations before app start.</td></tr>
+        <tr><td>Redis data loss or eviction</td><td>Lost jobs and stale locks.</td><td>Append-only persistence, <code>noeviction</code>, health checks; managed Redis in production.</td></tr>
+        <tr><td>Accidental live trading</td><td>Real financial loss.</td><td><code>TRADING_MODE=offline</code> default; validated configuration; kill switch; R8 promotion gates.</td></tr>
+        <tr><td>Secrets in the repository</td><td>Unauthorised broker or database access.</td><td>Ignore <code>.env</code>, commit only the template, scan before pushing.</td></tr>
+        <tr><td>Timezone mistakes around the session</td><td>Wrong opening range, late square-off.</td><td>Store UTC, test with <code>Asia/Kolkata</code>, use NSE session constants from configuration.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Non-negotiable guardrails</h3>
+  <ul>
+    <li>No app imports another app. The API is the only HTTP surface.</li>
+    <li>No package imports NestJS, Next.js or React.</li>
+    <li>No strategy imports a broker adapter or calls the broker directly.</li>
+    <li>No live order path without risk-engine validation.</li>
+    <li>No session without a recorded strategy version and configuration snapshot.</li>
+    <li>No committed secret, and no production database pointed at by a local <code>.env</code>.</li>
+  </ul>
+</section>
+
+<section id="cheat-sheet" data-title="Command cheat sheet">
+  <div class="section-head">
+    <span class="num">20</span>
+    <div>
+      <p class="kicker">Day-to-day commands</p>
+      <h2>Command cheat sheet</h2>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <h3>Install &amp; run</h3>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">bash</span><button class="copy" type="button">Copy</button></div>
+<pre><code>pnpm install
+cp .env.example .env
+docker compose up -d
+pnpm db:migrate
+pnpm dev</code></pre>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Quality gates</h3>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">bash</span><button class="copy" type="button">Copy</button></div>
+<pre><code>pnpm nx run-many -t typecheck
+pnpm nx run-many -t lint
+pnpm nx run-many -t test
+pnpm nx run-many -t build
+pnpm nx affected -t typecheck lint test</code></pre>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Single project</h3>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">bash</span><button class="copy" type="button">Copy</button></div>
+<pre><code>pnpm nx dev web
+pnpm nx build api
+pnpm nx test domain
+pnpm nx graph
+pnpm nx show project worker</code></pre>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Database</h3>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">bash</span><button class="copy" type="button">Copy</button></div>
+<pre><code>pnpm db:generate
+pnpm db:migrate
+pnpm db:push
+pnpm db:studio
+
+docker compose exec postgres \
+  psql -U ai_trading -d ai_trading</code></pre>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Containers</h3>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">bash</span><button class="copy" type="button">Copy</button></div>
+<pre><code>docker compose up -d
+docker compose ps
+docker compose logs -f
+docker compose down
+
+docker compose -f infra/compose/docker-compose.apps.yml up --build</code></pre>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Recovery</h3>
+      <div class="code">
+        <div class="code-head"><span class="code-lang">bash</span><button class="copy" type="button">Copy</button></div>
+<pre><code>pnpm nx reset
+pnpm install --force
+rm -rf node_modules .nx apps/*/node_modules packages/*/node_modules
+pnpm install</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout ok" style="margin-top:22px">
+    <span class="ico">✓</span>
+    <div>
+      <strong>Execution order:</strong> Phase 0 → 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10. Commit after each phase so <code>nx affected</code> and rollback remain useful. Stop after Phase 1 if you want to review the pnpm/Nx wiring before the app scaffolds are added.
+    </div>
+  </div>
+
+  <div class="callout warn">
+    <span class="ico">▲</span>
+    <div>
+      <strong>Next milestone:</strong> R1 begins after this plan is approved — database schema, configuration validation, the API health surface and the dashboard shell. Strategy, broker and live-trading work remains gated by R2–R8.
+    </div>
+  </div>
+</section>
+
+<footer>
+  <span>AI Trading System · Monorepo setup plan · Task 01</span>
+  <span>Source: <code>context/folder-structure.md</code> and the surrounding context documents</span>
+</footer>
+
+</main>
+
+<button class="to-top" id="toTop" aria-label="Back to top">↑</button>
+
+<script>
+(function(){
+  const sections = Array.from(document.querySelectorAll('main section[id]'));
+  const toc = document.getElementById('toc');
+  const mobileToc = document.getElementById('mobileToc');
+
+  sections.forEach(function(section, index){
+    const title = section.dataset.title || (section.querySelector('h2') ? section.querySelector('h2').textContent : section.id);
+    const numEl = section.querySelector('.num');
+    const num = numEl ? numEl.textContent.trim() : '00';
+    const a = document.createElement('a');
+    a.href = '#' + section.id;
+    a.innerHTML = '<span class="n">' + num + '</span><span>' + title + '</span>';
+    toc.appendChild(a);
+  });
+  mobileToc.innerHTML = toc.innerHTML;
+
+  const links = Array.from(toc.querySelectorAll('a'));
+  const byId = new Map();
+  links.forEach(function(a){
+    byId.set(a.getAttribute('href').slice(1), a);
+  });
+
+  let activeId = null;
+  function setActive(id){
+    if (activeId === id) return;
+    activeId = id;
+    links.forEach(function(a){ a.classList.remove('active'); });
+    const match = byId.get(id);
+    if (match) match.classList.add('active');
+  }
+
+  const observer = new IntersectionObserver(function(entries){
+    const visible = entries.filter(function(e){ return e.isIntersecting; });
+    if (visible.length) {
+      visible.sort(function(a, b){ return a.boundingClientRect.top - b.boundingClientRect.top; });
+      setActive(visible[0].target.id);
+    }
+  }, { rootMargin: '-12% 0px -72% 0px', threshold: 0 });
+  sections.forEach(function(s){ observer.observe(s); });
+
+  const progress = document.getElementById('progress');
+  const sideBar = document.getElementById('sideBar');
+  const sidePct = document.getElementById('sidePct');
+  const toTop = document.getElementById('toTop');
+
+  function onScroll(){
+    const doc = document.documentElement;
+    const max = doc.scrollHeight - doc.clientHeight;
+    const pct = max > 0 ? Math.min(100, Math.max(0, (doc.scrollTop / max) * 100)) : 0;
+    progress.style.width = pct + '%';
+    sideBar.style.width = pct + '%';
+    sidePct.textContent = Math.round(pct) + '%';
+    toTop.classList.toggle('show', doc.scrollTop > 700);
+  }
+  window.addEventListener('scroll', onScroll, { passive: true });
+  window.addEventListener('resize', onScroll);
+  onScroll();
+
+  toTop.addEventListener('click', function(){
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+
+  document.querySelectorAll('.copy').forEach(function(btn){
+    btn.addEventListener('click', async function(){
+      const code = btn.closest('.code').querySelector('pre');
+      const text = code ? code.innerText : '';
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(text);
+        } else {
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          ta.style.position = 'fixed';
+          ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          ta.remove();
+        }
+        btn.textContent = 'Copied';
+        btn.classList.add('done');
+        setTimeout(function(){ btn.textContent = 'Copy'; btn.classList.remove('done'); }, 1400);
+      } catch (err) {
+        btn.textContent = 'Select';
+      }
+    });
+  });
+
+  const menuBtn = document.getElementById('menuBtn');
+  const mobileMenu = document.getElementById('mobileMenu');
+  function closeMenu(){
+    mobileMenu.hidden = true;
+    menuBtn.setAttribute('aria-expanded', 'false');
+  }
+  menuBtn.addEventListener('click', function(){
+    const willOpen = mobileMenu.hidden;
+    mobileMenu.hidden = !willOpen;
+    menuBtn.setAttribute('aria-expanded', String(willOpen));
+  });
+  mobileMenu.querySelectorAll('a').forEach(function(a){
+    a.addEventListener('click', closeMenu);
+  });
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape') closeMenu();
+  });
+})();
+</script>
+</body>
+</html>
