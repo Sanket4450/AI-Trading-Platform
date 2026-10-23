@@ -1,0 +1,27 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+  - "tests"
+
+catalog:
+  "@types/node": ^24.0.0
+  "@vitest/coverage-v8": ^3.0.0
+  eslint: ^9.0.0
+  prettier: ^3.0.0
+  tsup: ^8.0.0
+  typescript: ^5.0.0
+  vitest: ^3.0.0
+
+autoInstallPeers: true
+strictPeerDependencies: false
+preferWorkspacePackages: true
+linkWorkspacePackages: true
+sharedWorkspaceLockfile: true
+
+allowBuilds:
+  "@nestjs/core": true
+  "@swc/core": true
+  esbuild: true
+  nx: true
+  sharp: true
+  unrs-resolver: true

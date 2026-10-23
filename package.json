@@ -38,7 +38,7 @@
     "drizzle-kit": "^0.31.0",
     "eslint": "catalog:",
     "eslint-config-prettier": "^10.0.0",
-    "nx": "^22.0.0",
+    "nx": "22.7.12",
     "prettier": "catalog:",
     "prettier-plugin-tailwindcss": "^0.6.0",
     "tsup": "catalog:",
