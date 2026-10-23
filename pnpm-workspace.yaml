@@ -20,8 +20,10 @@ sharedWorkspaceLockfile: true
 
 allowBuilds:
   "@nestjs/core": true
+  "@scarf/scarf": false
   "@swc/core": true
   esbuild: true
+  msgpackr-extract: true
   nx: true
   sharp: true
   unrs-resolver: true
