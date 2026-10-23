@@ -1,0 +1,27 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# builds
+dist/
+.next/
+out/
+coverage/
+*.tsbuildinfo
+
+# tooling
+.nx/
+tmp/
+.vscode/
+.idea/
+.DS_Store
+*.log
+
+# local environment
+.env
+.env.*
+!.env.example
+
+# playwright
+test-results/
+playwright-report/

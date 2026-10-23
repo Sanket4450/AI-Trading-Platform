@@ -1,0 +1,49 @@
+{
+  "name": "ai-trading-system",
+  "version": "0.0.0",
+  "private": true,
+  "packageManager": "pnpm@11.28.8",
+  "engines": {
+    "node": ">=24.0.0",
+    "pnpm": ">=11.0.0"
+  },
+  "scripts": {
+    "dev": "nx run-many -t build --exclude=web,api,worker,tests && nx run-many -t dev --parallel=8",
+    "build": "nx run-many -t build",
+    "typecheck": "nx run-many -t typecheck",
+    "lint": "nx run-many -t lint",
+    "test": "nx run-many -t test",
+    "affected:build": "nx affected -t build",
+    "affected:test": "nx affected -t test",
+    "affected:lint": "nx affected -t lint",
+    "graph": "nx graph",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "dependencies": {
+    "dotenv": "^17.0.0",
+    "drizzle-orm": "^0.44.0",
+    "postgres": "^3.4.0"
+  },
+  "devDependencies": {
+    "@nx/eslint-plugin": "^22.0.0",
+    "@types/node": "catalog:",
+    "drizzle-kit": "^0.31.0",
+    "eslint": "catalog:",
+    "eslint-config-prettier": "^10.0.0",
+    "nx": "^22.0.0",
+    "prettier": "catalog:",
+    "prettier-plugin-tailwindcss": "^0.6.0",
+    "tsup": "catalog:",
+    "typescript": "catalog:",
+    "typescript-eslint": "^8.0.0",
+    "vitest": "catalog:"
+  }
+}
