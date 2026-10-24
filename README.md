@@ -24,8 +24,11 @@ Modular monolith for NSE strategy research, backtesting, risk control and contro
 ```bash
 pnpm install
 cp .env.example .env
+# Fill SEED_OPERATOR_EMAIL, SEED_OPERATOR_PASSWORD and CONFIG_ENCRYPTION_KEY.
 docker compose up -d
 pnpm db:migrate
+pnpm db:seed
+pnpm db:verify
 pnpm dev
 ```
 
@@ -45,6 +48,12 @@ pnpm dev
 pnpm ports      # inspect listeners on 3000/8000
 pnpm dev:stop   # stop stale listeners on 3000/8000
 ```
+
+## R1 dashboard
+
+The R1 cockpit has nine routes: `/`, `/accounts`, `/instruments`, `/universes`, `/strategies`,
+`/configuration`, `/data`, `/audit` and `/settings`. Sign in with the operator created by
+`pnpm db:seed`. The API and worker refuse to start outside `offline` mode.
 
 ## Guardrails
 
