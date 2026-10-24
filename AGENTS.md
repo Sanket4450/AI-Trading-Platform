@@ -1,3 +1,19 @@
+# Working agreement
+
+## Git: the user owns commits
+
+- Never create a commit by default. Do not run `git commit`, `git commit --amend`, `git rebase`, `git push`, or any other history-changing command unless the user explicitly instructs it.
+- Do not stage files with `git add` as part of normal implementation work. Leave changes in the working tree so the user can review them.
+- The user reviews and creates commits. If a commit is explicitly requested, confirm the intended scope first and commit only the reviewed files.
+- Never rewrite, squash, reset, or force-push history unless the user explicitly asks for that exact operation.
+
+## Code comments
+
+- Do not add unnecessary comments. Clear names and small functions are preferred over explanatory noise.
+- Comments should describe the high- or medium-level objective of a function, module, or non-obvious decision.
+- Do not narrate obvious code, restate names or types, or write multi-line blocks that repeat the implementation.
+- Keep comments short: usually one or two lines explaining why the code exists or what invariant it protects.
+
 <!-- nx configuration start-->
 <!-- Leave the start & end comments to automatically receive updates. -->
 
