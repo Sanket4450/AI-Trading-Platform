@@ -1,19 +1,19 @@
 import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
 import { validateEnv } from '@ai-trading/configuration';
-import { AppController } from './app.controller.js';
-import { AppService } from './app.service.js';
+import { SessionAuthGuard } from './common/auth/session-auth.guard.js';
+import { AccountsModule } from './modules/accounts/accounts.module.js';
+import { AuditModule } from './modules/audit/audit.module.js';
+import { AuthModule } from './modules/auth/auth.module.js';
+import { ConfigurationModule } from './modules/configuration/configuration.module.js';
+import { DataModule } from './modules/data/data.module.js';
+import { InstrumentsModule } from './modules/instruments/instruments.module.js';
+import { SettingsModule } from './modules/settings/settings.module.js';
 import { StrategiesModule } from './modules/strategies/strategies.module.js';
-import { BacktestsModule } from './modules/backtests/backtests.module.js';
-import { MarketDataModule } from './modules/market-data/market-data.module.js';
-import { TradingModule } from './modules/trading/trading.module.js';
-import { OrdersModule } from './modules/orders/orders.module.js';
-import { RiskModule } from './modules/risk/risk.module.js';
-import { PositionsModule } from './modules/positions/positions.module.js';
-import { ReportsModule } from './modules/reports/reports.module.js';
-import { NotificationsModule } from './modules/notifications/notifications.module.js';
 import { SystemControlModule } from './modules/system-control/system-control.module.js';
+import { UniversesModule } from './modules/universes/universes.module.js';
 
 @Module({
   imports: [
@@ -38,18 +38,22 @@ import { SystemControlModule } from './modules/system-control/system-control.mod
         };
       },
     }),
+    AuthModule,
+    AccountsModule,
+    InstrumentsModule,
+    UniversesModule,
     StrategiesModule,
-    BacktestsModule,
-    MarketDataModule,
-    TradingModule,
-    OrdersModule,
-    RiskModule,
-    PositionsModule,
-    ReportsModule,
-    NotificationsModule,
+    ConfigurationModule,
+    DataModule,
+    AuditModule,
+    SettingsModule,
     SystemControlModule,
   ],
-  controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: SessionAuthGuard,
+    },
+  ],
 })
 export class AppModule {}
