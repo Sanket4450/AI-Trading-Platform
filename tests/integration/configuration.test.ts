@@ -13,4 +13,9 @@ describe('configuration contract', () => {
   it('rejects an unknown trading mode', () => {
     expect(() => validateEnv({ TRADING_MODE: 'aggressive' })).toThrow();
   });
+
+  it('parses the sandbox flag as a real boolean', () => {
+    expect(validateEnv({ UPSTOX_SANDBOX: 'false' }).UPSTOX_SANDBOX).toBe(false);
+    expect(validateEnv({ UPSTOX_SANDBOX: 'true' }).UPSTOX_SANDBOX).toBe(true);
+  });
 });

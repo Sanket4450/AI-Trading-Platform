@@ -2,6 +2,10 @@ import { z } from 'zod';
 
 export const tradingModes = ['offline', 'research', 'backtesting', 'paper', 'live'] as const;
 
+const booleanFromEnv = z
+  .union([z.boolean(), z.enum(['true', 'false'])])
+  .transform((value) => value === true || value === 'true');
+
 export const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   TZ: z.string().default('Asia/Kolkata'),
@@ -23,7 +27,7 @@ export const envSchema = z.object({
   UPSTOX_API_SECRET: z.string().optional(),
   UPSTOX_REDIRECT_URI: z.string().url().optional(),
   UPSTOX_ACCESS_TOKEN: z.string().optional(),
-  UPSTOX_SANDBOX: z.coerce.boolean().default(true),
+  UPSTOX_SANDBOX: booleanFromEnv.default(true),
 
   RISK_EQUITY: z.coerce.number().positive().default(100000),
   RISK_PER_TRADE_PCT: z.coerce.number().positive().default(0.5),
