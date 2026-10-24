@@ -12,3 +12,7 @@ const client = postgres(connectionString, { max: 10 });
 
 export const db = drizzle(client, { schema });
 export type Database = typeof db;
+
+export async function closeDatabase(): Promise<void> {
+  await client.end({ timeout: 5 });
+}

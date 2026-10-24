@@ -8,3 +8,7 @@ export type {
   SignalSide,
   StrategyConfig,
 } from './types/trading.js';
+
+export { canonicalJson, hashPayload, sha256Hex } from './hashing.js';
+export { QUEUES, type QueueName } from './queues.js';
+export { roundToTick } from './pricing.js';
