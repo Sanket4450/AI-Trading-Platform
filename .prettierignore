@@ -5,3 +5,4 @@ coverage
 .nx
 pnpm-lock.yaml
 context/
+**/next-env.d.ts
