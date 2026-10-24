@@ -12,6 +12,13 @@ Modular monolith for NSE strategy research, backtesting, risk control and contro
 - `infra/*` — Docker, Compose and Azure assets
 - `context/*` — specifications and architecture source material
 
+## Repository policy
+
+- There is exactly **one Git repository**, at the workspace root.
+- Do not run `git init` inside `apps/`, `packages/`, `tests/` or `infra/`.
+- All ignore rules live in the root `.gitignore`; app and package folders must not add their own.
+- Line-ending policy is centralised in the root `.gitattributes`.
+
 ## Quick start
 
 ```bash
