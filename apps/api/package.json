@@ -21,6 +21,17 @@
     "test:e2e": "vitest run --config ./vitest.config.e2e.ts"
   },
   "dependencies": {
+    "@ai-trading/adapters": "workspace:*",
+    "@ai-trading/configuration": "workspace:*",
+    "@ai-trading/database": "workspace:*",
+    "@ai-trading/domain": "workspace:*",
+    "@ai-trading/execution-engine": "workspace:*",
+    "@ai-trading/market-data": "workspace:*",
+    "@ai-trading/notifications": "workspace:*",
+    "@ai-trading/observability": "workspace:*",
+    "@ai-trading/risk-engine": "workspace:*",
+    "@ai-trading/strategies": "workspace:*",
+    "@ai-trading/trading-engine": "workspace:*",
     "@nestjs/bullmq": "^12.0.0",
     "@nestjs/common": "^12.0.1",
     "@nestjs/config": "^12.0.1",

@@ -228,6 +228,9 @@ importers:
         specifier: ^3.4.0
         version: 3.4.9
     devDependencies:
+      '@eslint/js':
+        specifier: ^9.39.5
+        version: 9.39.5
       '@nx/eslint-plugin':
         specifier: ^22.0.0
         version: 22.7.12(@babel/traverse@7.29.10(supports-color@7.2.0))(@typescript-eslint/parser@8.72.0(eslint@9.39.5(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0)(typescript@5.9.3))(eslint-config-prettier@10.1.8(eslint@9.39.5(jiti@2.7.0)(supports-color@7.2.0)))(eslint@9.39.5(jiti@2.7.0)(supports-color@7.2.0))(nx@22.7.12)(supports-color@7.2.0)(typescript@5.9.3)
@@ -267,6 +270,39 @@ importers:
 
   apps/api:
     dependencies:
+      '@ai-trading/adapters':
+        specifier: workspace:*
+        version: link:../../packages/adapters
+      '@ai-trading/configuration':
+        specifier: workspace:*
+        version: link:../../packages/configuration
+      '@ai-trading/database':
+        specifier: workspace:*
+        version: link:../../packages/database
+      '@ai-trading/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
+      '@ai-trading/execution-engine':
+        specifier: workspace:*
+        version: link:../../packages/execution-engine
+      '@ai-trading/market-data':
+        specifier: workspace:*
+        version: link:../../packages/market-data
+      '@ai-trading/notifications':
+        specifier: workspace:*
+        version: link:../../packages/notifications
+      '@ai-trading/observability':
+        specifier: workspace:*
+        version: link:../../packages/observability
+      '@ai-trading/risk-engine':
+        specifier: workspace:*
+        version: link:../../packages/risk-engine
+      '@ai-trading/strategies':
+        specifier: workspace:*
+        version: link:../../packages/strategies
+      '@ai-trading/trading-engine':
+        specifier: workspace:*
+        version: link:../../packages/trading-engine
       '@nestjs/bullmq':
         specifier: ^12.0.0
         version: 12.0.0(@nestjs/common@12.2.0(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.2.0)(bullmq@6.4.0(ioredis@6.0.0(supports-color@7.2.0)))
@@ -364,6 +400,12 @@ importers:
 
   apps/web:
     dependencies:
+      '@ai-trading/configuration':
+        specifier: workspace:*
+        version: link:../../packages/configuration
+      '@ai-trading/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -440,6 +482,42 @@ importers:
 
   apps/worker:
     dependencies:
+      '@ai-trading/adapters':
+        specifier: workspace:*
+        version: link:../../packages/adapters
+      '@ai-trading/backtesting':
+        specifier: workspace:*
+        version: link:../../packages/backtesting
+      '@ai-trading/configuration':
+        specifier: workspace:*
+        version: link:../../packages/configuration
+      '@ai-trading/database':
+        specifier: workspace:*
+        version: link:../../packages/database
+      '@ai-trading/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
+      '@ai-trading/execution-engine':
+        specifier: workspace:*
+        version: link:../../packages/execution-engine
+      '@ai-trading/market-data':
+        specifier: workspace:*
+        version: link:../../packages/market-data
+      '@ai-trading/notifications':
+        specifier: workspace:*
+        version: link:../../packages/notifications
+      '@ai-trading/observability':
+        specifier: workspace:*
+        version: link:../../packages/observability
+      '@ai-trading/risk-engine':
+        specifier: workspace:*
+        version: link:../../packages/risk-engine
+      '@ai-trading/strategies':
+        specifier: workspace:*
+        version: link:../../packages/strategies
+      '@ai-trading/trading-engine':
+        specifier: workspace:*
+        version: link:../../packages/trading-engine
       '@nestjs/bullmq':
         specifier: ^12.0.0
         version: 12.0.0(@nestjs/common@12.2.0(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.2.0)(bullmq@6.4.0(ioredis@6.0.0(supports-color@7.2.0)))
@@ -524,6 +602,19 @@ importers:
         version: 4.1.12(@types/node@24.19.2)(@vitest/coverage-v8@4.1.12)(jsdom@30.1.3(@noble/hashes@1.8.0))(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.0))
 
   packages/adapters:
+    dependencies:
+      '@ai-trading/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@ai-trading/execution-engine':
+        specifier: workspace:*
+        version: link:../execution-engine
+      '@ai-trading/market-data':
+        specifier: workspace:*
+        version: link:../market-data
+      zod:
+        specifier: ^4.6.7
+        version: 4.6.7
     devDependencies:
       eslint:
         specifier: 'catalog:'
@@ -539,6 +630,19 @@ importers:
         version: 3.2.7(@types/node@24.19.2)(jiti@2.7.0)(jsdom@30.1.3(@noble/hashes@1.8.0))(lightningcss@1.33.0)(supports-color@7.2.0)(tsx@4.23.15)(yaml@2.9.0)
 
   packages/backtesting:
+    dependencies:
+      '@ai-trading/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@ai-trading/execution-engine':
+        specifier: workspace:*
+        version: link:../execution-engine
+      '@ai-trading/risk-engine':
+        specifier: workspace:*
+        version: link:../risk-engine
+      '@ai-trading/trading-engine':
+        specifier: workspace:*
+        version: link:../trading-engine
     devDependencies:
       eslint:
         specifier: 'catalog:'
@@ -554,6 +658,13 @@ importers:
         version: 3.2.7(@types/node@24.19.2)(jiti@2.7.0)(jsdom@30.1.3(@noble/hashes@1.8.0))(lightningcss@1.33.0)(supports-color@7.2.0)(tsx@4.23.15)(yaml@2.9.0)
 
   packages/configuration:
+    dependencies:
+      '@ai-trading/domain':
+        specifier: workspace:*
+        version: link:../domain
+      zod:
+        specifier: ^4.6.7
+        version: 4.6.7
     devDependencies:
       eslint:
         specifier: 'catalog:'
@@ -569,6 +680,16 @@ importers:
         version: 3.2.7(@types/node@24.19.2)(jiti@2.7.0)(jsdom@30.1.3(@noble/hashes@1.8.0))(lightningcss@1.33.0)(supports-color@7.2.0)(tsx@4.23.15)(yaml@2.9.0)
 
   packages/database:
+    dependencies:
+      '@ai-trading/domain':
+        specifier: workspace:*
+        version: link:../domain
+      drizzle-orm:
+        specifier: ^0.44.7
+        version: 0.44.7(postgres@3.4.9)
+      postgres:
+        specifier: ^3.4.9
+        version: 3.4.9
     devDependencies:
       eslint:
         specifier: 'catalog:'
@@ -599,6 +720,10 @@ importers:
         version: 3.2.7(@types/node@24.19.2)(jiti@2.7.0)(jsdom@30.1.3(@noble/hashes@1.8.0))(lightningcss@1.33.0)(supports-color@7.2.0)(tsx@4.23.15)(yaml@2.9.0)
 
   packages/execution-engine:
+    dependencies:
+      '@ai-trading/domain':
+        specifier: workspace:*
+        version: link:../domain
     devDependencies:
       eslint:
         specifier: 'catalog:'
@@ -614,6 +739,13 @@ importers:
         version: 3.2.7(@types/node@24.19.2)(jiti@2.7.0)(jsdom@30.1.3(@noble/hashes@1.8.0))(lightningcss@1.33.0)(supports-color@7.2.0)(tsx@4.23.15)(yaml@2.9.0)
 
   packages/market-data:
+    dependencies:
+      '@ai-trading/domain':
+        specifier: workspace:*
+        version: link:../domain
+      zod:
+        specifier: ^4.6.7
+        version: 4.6.7
     devDependencies:
       eslint:
         specifier: 'catalog:'
@@ -629,6 +761,10 @@ importers:
         version: 3.2.7(@types/node@24.19.2)(jiti@2.7.0)(jsdom@30.1.3(@noble/hashes@1.8.0))(lightningcss@1.33.0)(supports-color@7.2.0)(tsx@4.23.15)(yaml@2.9.0)
 
   packages/notifications:
+    dependencies:
+      '@ai-trading/domain':
+        specifier: workspace:*
+        version: link:../domain
     devDependencies:
       eslint:
         specifier: 'catalog:'
@@ -659,6 +795,10 @@ importers:
         version: 3.2.7(@types/node@24.19.2)(jiti@2.7.0)(jsdom@30.1.3(@noble/hashes@1.8.0))(lightningcss@1.33.0)(supports-color@7.2.0)(tsx@4.23.15)(yaml@2.9.0)
 
   packages/risk-engine:
+    dependencies:
+      '@ai-trading/domain':
+        specifier: workspace:*
+        version: link:../domain
     devDependencies:
       eslint:
         specifier: 'catalog:'
@@ -674,6 +814,13 @@ importers:
         version: 3.2.7(@types/node@24.19.2)(jiti@2.7.0)(jsdom@30.1.3(@noble/hashes@1.8.0))(lightningcss@1.33.0)(supports-color@7.2.0)(tsx@4.23.15)(yaml@2.9.0)
 
   packages/strategies:
+    dependencies:
+      '@ai-trading/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@ai-trading/trading-engine':
+        specifier: workspace:*
+        version: link:../trading-engine
     devDependencies:
       eslint:
         specifier: 'catalog:'
@@ -689,6 +836,10 @@ importers:
         version: 3.2.7(@types/node@24.19.2)(jiti@2.7.0)(jsdom@30.1.3(@noble/hashes@1.8.0))(lightningcss@1.33.0)(supports-color@7.2.0)(tsx@4.23.15)(yaml@2.9.0)
 
   packages/trading-engine:
+    dependencies:
+      '@ai-trading/domain':
+        specifier: workspace:*
+        version: link:../domain
     devDependencies:
       eslint:
         specifier: 'catalog:'

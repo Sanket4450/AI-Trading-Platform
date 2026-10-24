@@ -13,7 +13,9 @@
       "require": "./dist/index.cjs"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsup index.ts --format esm,cjs --dts --clean --sourcemap",
     "dev": "tsup index.ts --format esm,cjs --dts --watch --sourcemap",
@@ -26,5 +28,11 @@
     "tsup": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "dependencies": {
+    "@ai-trading/domain": "workspace:*",
+    "@ai-trading/execution-engine": "workspace:*",
+    "@ai-trading/risk-engine": "workspace:*",
+    "@ai-trading/trading-engine": "workspace:*"
   }
 }

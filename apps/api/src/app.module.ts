@@ -1,6 +1,7 @@
 import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { validateEnv } from '@ai-trading/configuration';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { StrategiesModule } from './modules/strategies/strategies.module.js';
@@ -19,6 +20,7 @@ import { SystemControlModule } from './modules/system-control/system-control.mod
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: ['.env', '../../.env'],
+      validate: validateEnv,
     }),
     BullModule.forRootAsync({
       inject: [ConfigService],
