@@ -1,0 +1,30 @@
+{
+  "name": "database",
+  "root": "packages/database",
+  "sourceRoot": "packages/database",
+  "projectType": "library",
+  "tags": ["type:lib", "scope:database"],
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "outputs": ["{projectRoot}/dist"],
+      "options": { "command": "pnpm --filter @ai-trading/database build" }
+    },
+    "dev": {
+      "executor": "nx:run-commands",
+      "options": { "command": "pnpm --filter @ai-trading/database dev" }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": { "command": "pnpm --filter @ai-trading/database typecheck" }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": { "command": "pnpm --filter @ai-trading/database lint" }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": { "command": "pnpm --filter @ai-trading/database test" }
+    }
+  }
+}

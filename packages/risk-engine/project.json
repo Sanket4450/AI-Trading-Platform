@@ -1,0 +1,30 @@
+{
+  "name": "risk-engine",
+  "root": "packages/risk-engine",
+  "sourceRoot": "packages/risk-engine",
+  "projectType": "library",
+  "tags": ["type:lib", "scope:risk-engine"],
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "outputs": ["{projectRoot}/dist"],
+      "options": { "command": "pnpm --filter @ai-trading/risk-engine build" }
+    },
+    "dev": {
+      "executor": "nx:run-commands",
+      "options": { "command": "pnpm --filter @ai-trading/risk-engine dev" }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": { "command": "pnpm --filter @ai-trading/risk-engine typecheck" }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": { "command": "pnpm --filter @ai-trading/risk-engine lint" }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": { "command": "pnpm --filter @ai-trading/risk-engine test" }
+    }
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "name": "configuration",
+  "root": "packages/configuration",
+  "sourceRoot": "packages/configuration",
+  "projectType": "library",
+  "tags": ["type:lib", "scope:configuration"],
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "outputs": ["{projectRoot}/dist"],
+      "options": { "command": "pnpm --filter @ai-trading/configuration build" }
+    },
+    "dev": {
+      "executor": "nx:run-commands",
+      "options": { "command": "pnpm --filter @ai-trading/configuration dev" }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": { "command": "pnpm --filter @ai-trading/configuration typecheck" }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": { "command": "pnpm --filter @ai-trading/configuration lint" }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": { "command": "pnpm --filter @ai-trading/configuration test" }
+    }
+  }
+}

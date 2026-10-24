@@ -1,0 +1,30 @@
+{
+  "name": "observability",
+  "root": "packages/observability",
+  "sourceRoot": "packages/observability",
+  "projectType": "library",
+  "tags": ["type:lib", "scope:observability"],
+  "targets": {
+    "build": {
+      "executor": "nx:run-commands",
+      "outputs": ["{projectRoot}/dist"],
+      "options": { "command": "pnpm --filter @ai-trading/observability build" }
+    },
+    "dev": {
+      "executor": "nx:run-commands",
+      "options": { "command": "pnpm --filter @ai-trading/observability dev" }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": { "command": "pnpm --filter @ai-trading/observability typecheck" }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": { "command": "pnpm --filter @ai-trading/observability lint" }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": { "command": "pnpm --filter @ai-trading/observability test" }
+    }
+  }
+}
