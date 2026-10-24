@@ -8,7 +8,7 @@
     "pnpm": ">=11.0.0"
   },
   "scripts": {
-    "dev": "nx run-many -t build --exclude=web,api,worker,tests && nx run-many -t dev --parallel=8",
+    "dev": "nx run-many -t build --exclude=web,api,worker,tests && nx run-many -t dev -p web,api,worker --parallel=3",
     "build": "nx run-many -t build",
     "typecheck": "nx run-many -t typecheck",
     "lint": "nx run-many -t lint",

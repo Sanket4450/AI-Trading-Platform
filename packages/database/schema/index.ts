@@ -5,7 +5,5 @@ import { pgTable, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
 export const systemHeartbeats = pgTable('system_heartbeats', {
   id: uuid('id').primaryKey().defaultRandom(),
   service: varchar('service', { length: 64 }).notNull(),
-  createdAt: timestamp('created_at', { withTimezone: true })
-    .notNull()
-    .defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });

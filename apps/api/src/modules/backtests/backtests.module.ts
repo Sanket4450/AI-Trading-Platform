@@ -4,6 +4,6 @@ import { BacktestsService } from './backtests.service.js';
 
 @Module({
   controllers: [BacktestsController],
-  providers: [BacktestsService]
+  providers: [BacktestsService],
 })
 export class BacktestsModule {}

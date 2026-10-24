@@ -1,10 +1,4 @@
-import type {
-  Bar,
-  Instrument,
-  PositionSnapshot,
-  Signal,
-  StrategyConfig,
-} from '@ai-trading/domain';
+import type { Bar, Instrument, PositionSnapshot, Signal, StrategyConfig } from '@ai-trading/domain';
 
 export interface StrategyContext {
   readonly now: Date;

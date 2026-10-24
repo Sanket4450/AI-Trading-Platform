@@ -28,14 +28,14 @@ docker compose down
 
 ## Common failures
 
-| Symptom | Check |
-| --- | --- |
-| API cannot connect to PostgreSQL | `docker compose ps`, `DATABASE_URL` |
-| Worker cannot connect to Redis | `docker compose ps redis`, `REDIS_URL` |
-| Nx project missing | `pnpm nx show projects`, then `pnpm nx reset` |
-| Package not found | `pnpm install`, then build the package through Nx |
-| Dashboard cannot reach API | `WEB_URL`, API CORS, port 4000 |
-| Migration fails | `pnpm db:generate`, review SQL, never edit applied migrations |
+| Symptom                          | Check                                                         |
+| -------------------------------- | ------------------------------------------------------------- |
+| API cannot connect to PostgreSQL | `docker compose ps`, `DATABASE_URL`                           |
+| Worker cannot connect to Redis   | `docker compose ps redis`, `REDIS_URL`                        |
+| Nx project missing               | `pnpm nx show projects`, then `pnpm nx reset`                 |
+| Package not found                | `pnpm install`, then build the package through Nx             |
+| Dashboard cannot reach API       | `WEB_URL`, API CORS, port 4000                                |
+| Migration fails                  | `pnpm db:generate`, review SQL, never edit applied migrations |
 
 ## Incidents
 

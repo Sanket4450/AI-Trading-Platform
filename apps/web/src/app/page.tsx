@@ -11,13 +11,7 @@ import {
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { buttonVariants } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 const features = [
   {
@@ -35,7 +29,8 @@ const features = [
   {
     href: '/trading',
     title: 'Trading',
-    description: 'Signals, orders, fills and live position state once the execution milestone lands.',
+    description:
+      'Signals, orders, fills and live position state once the execution milestone lands.',
     icon: Activity,
   },
   {
@@ -68,14 +63,15 @@ export default function Home() {
         >
           R1 foundation · offline mode
         </Badge>
-        <h1 className="max-w-3xl text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
+        <h1 className="max-w-3xl text-balance text-4xl font-semibold tracking-tight sm:text-5xl">
           Research, validate and operate one strategy at a time.
         </h1>
-        <p className="max-w-2xl text-base leading-7 text-muted-foreground">
-          The dashboard sits in front of a modular monolith: shared strategy contracts, an independent risk
-          engine and a broker-independent execution layer. Trading stays offline until the R8 gates are met.
+        <p className="text-muted-foreground max-w-2xl text-base leading-7">
+          The dashboard sits in front of a modular monolith: shared strategy contracts, an
+          independent risk engine and a broker-independent execution layer. Trading stays offline
+          until the R8 gates are met.
         </p>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-muted-foreground text-xs">
           Supported modes: <span className="text-emerald-300/90">{tradingModes.join(' · ')}</span>
         </p>
         <div className="flex flex-wrap gap-3 pt-2">
@@ -121,11 +117,23 @@ export default function Home() {
             These are enforced by configuration and architecture, not by dashboard copy.
           </CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-3 text-sm text-muted-foreground md:grid-cols-2">
-          <p><strong className="text-foreground">Offline by default.</strong> No live order path is enabled in this milestone.</p>
-          <p><strong className="text-foreground">One entry point.</strong> The dashboard calls the API; it never reaches the broker or database directly.</p>
-          <p><strong className="text-foreground">Independent risk.</strong> Strategies cannot bypass sizing, exposure or the kill switch.</p>
-          <p><strong className="text-foreground">Versioned sessions.</strong> Every trade and backtest records its strategy and configuration snapshot.</p>
+        <CardContent className="text-muted-foreground grid gap-3 text-sm md:grid-cols-2">
+          <p>
+            <strong className="text-foreground">Offline by default.</strong> No live order path is
+            enabled in this milestone.
+          </p>
+          <p>
+            <strong className="text-foreground">One entry point.</strong> The dashboard calls the
+            API; it never reaches the broker or database directly.
+          </p>
+          <p>
+            <strong className="text-foreground">Independent risk.</strong> Strategies cannot bypass
+            sizing, exposure or the kill switch.
+          </p>
+          <p>
+            <strong className="text-foreground">Versioned sessions.</strong> Every trade and
+            backtest records its strategy and configuration snapshot.
+          </p>
         </CardContent>
       </Card>
     </main>

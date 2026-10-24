@@ -8,12 +8,10 @@ export const metadata: Metadata = {
   description: 'Strategy control, backtesting, risk and trade operations.',
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{ children: React.ReactNode }>) {
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className="dark">
-      <body className="min-h-screen bg-background text-foreground antialiased">
+      <body className="bg-background text-foreground min-h-screen antialiased">
         <TooltipProvider>{children}</TooltipProvider>
         <Toaster />
       </body>

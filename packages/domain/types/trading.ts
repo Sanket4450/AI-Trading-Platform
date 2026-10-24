@@ -1,12 +1,7 @@
 export type OrderSide = 'BUY' | 'SELL';
 export type OrderType = 'MARKET' | 'LIMIT' | 'SL' | 'SL-M';
 export type OrderStatus =
-  | 'PENDING'
-  | 'OPEN'
-  | 'PARTIALLY_FILLED'
-  | 'FILLED'
-  | 'CANCELLED'
-  | 'REJECTED';
+  'PENDING' | 'OPEN' | 'PARTIALLY_FILLED' | 'FILLED' | 'CANCELLED' | 'REJECTED';
 
 export type SignalSide = 'LONG' | 'SHORT' | 'EXIT';
 

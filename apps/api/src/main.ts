@@ -29,7 +29,11 @@ async function bootstrap() {
     .setTitle('AI Trading API')
     .setVersion('1.0')
     .build();
-  SwaggerModule.setup('api/docs', app, SwaggerModule.createDocument(app, swagger));
+  SwaggerModule.setup(
+    'api/docs',
+    app,
+    SwaggerModule.createDocument(app, swagger),
+  );
 
   app.enableShutdownHooks();
   await app.listen(Number(config.get('API_PORT', 4000)));

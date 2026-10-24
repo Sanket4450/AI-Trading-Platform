@@ -1,20 +1,12 @@
 import { z } from 'zod';
 
-export const tradingModes = [
-  'offline',
-  'research',
-  'backtesting',
-  'paper',
-  'live',
-] as const;
+export const tradingModes = ['offline', 'research', 'backtesting', 'paper', 'live'] as const;
 
 export const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   TZ: z.string().default('Asia/Kolkata'),
   MARKET_TIMEZONE: z.string().default('Asia/Kolkata'),
-  LOG_LEVEL: z
-    .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace'])
-    .default('info'),
+  LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
 
   WEB_URL: z.string().url().default('http://localhost:3000'),
   API_PORT: z.coerce.number().int().positive().default(4000),

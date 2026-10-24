@@ -4,6 +4,6 @@ import { MarketDataService } from './market-data.service.js';
 
 @Module({
   controllers: [MarketDataController],
-  providers: [MarketDataService]
+  providers: [MarketDataService],
 })
 export class MarketDataModule {}

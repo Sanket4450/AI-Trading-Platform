@@ -4,6 +4,6 @@ import { RiskService } from './risk.service.js';
 
 @Module({
   controllers: [RiskController],
-  providers: [RiskService]
+  providers: [RiskService],
 })
 export class RiskModule {}
