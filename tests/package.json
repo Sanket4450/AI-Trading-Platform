@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "test": "vitest run --passWithNoTests",
-    "test:integration": "vitest run integration --passWithNoTests",
+    "test:integration": "pnpm --filter @ai-trading/domain build && vitest run integration --passWithNoTests",
     "test:broker-contracts": "vitest run broker-contracts --passWithNoTests",
     "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit",
