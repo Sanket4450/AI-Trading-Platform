@@ -25,8 +25,8 @@ pnpm dev
 | Service    | URL                            |
 | ---------- | ------------------------------ |
 | Dashboard  | http://localhost:3000          |
-| API        | http://localhost:4000/api/v1   |
-| Swagger    | http://localhost:4000/api/docs |
+| API        | http://localhost:8000/api/v1   |
+| Swagger    | http://localhost:8000/api/docs |
 | PostgreSQL | localhost:5432                 |
 | Redis      | localhost:6379                 |
 

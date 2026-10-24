@@ -7,5 +7,5 @@ COPY . .
 RUN pnpm install --frozen-lockfile
 RUN pnpm --filter @ai-trading/api... build
 
-EXPOSE 4000
+EXPOSE 8000
 CMD ["node", "apps/api/dist/main.js"]

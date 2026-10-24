@@ -1,0 +1,1641 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Developer Command Deck — AI Trading System</title>
+<meta name="description" content="Searchable command reference for developing, testing, building and deploying the AI Trading System monorepo." />
+<style>
+  :root{
+    color-scheme: dark;
+    --sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    --bg:#05080c;
+    --bg-soft:#080d13;
+    --panel:#0b121a;
+    --panel-2:#0e1721;
+    --line:#1a2a3a;
+    --line-2:#263c50;
+    --text:#e5eff9;
+    --text-2:#a8bccf;
+    --muted:#6f879d;
+    --green:#3ce3a7;
+    --cyan:#4dd8f5;
+    --amber:#f5c76a;
+    --red:#ff8585;
+    --violet:#b89cff;
+    --code:#04070a;
+    --radius:15px;
+    --shadow:0 22px 55px rgba(0,0,0,.42);
+  }
+  *,*::before,*::after{box-sizing:border-box}
+  html{scroll-behavior:smooth;scroll-padding-top:92px}
+  body{
+    margin:0;
+    font-family:var(--sans);
+    font-size:15px;
+    line-height:1.62;
+    color:var(--text);
+    background:
+      radial-gradient(1000px 560px at 8% -8%, rgba(60,227,167,.12), transparent 58%),
+      radial-gradient(900px 520px at 94% -2%, rgba(77,216,245,.09), transparent 56%),
+      radial-gradient(800px 700px at 50% 112%, rgba(184,156,255,.05), transparent 62%),
+      var(--bg);
+    -webkit-font-smoothing:antialiased;
+  }
+  body::before{
+    content:"";
+    position:fixed;inset:0;z-index:0;pointer-events:none;
+    background-image:
+      linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px);
+    background-size:56px 56px;
+    mask-image:radial-gradient(circle at 48% 12%, #000 0%, transparent 76%);
+    opacity:.42;
+  }
+  ::selection{background:rgba(60,227,167,.28);color:#fff}
+  a{color:var(--cyan);text-decoration:none}
+  a:hover{color:#a9f1ff}
+  [hidden]{display:none!important}
+  .skip{
+    position:fixed;left:12px;top:-60px;z-index:200;
+    padding:10px 14px;border-radius:8px;background:var(--green);color:#03110c;
+    font-weight:700;text-decoration:none;transition:top .2s;
+  }
+  .skip:focus{top:12px}
+  .scroll-progress{
+    position:fixed;top:0;left:0;height:2px;width:0;z-index:100;
+    background:linear-gradient(90deg,var(--green),var(--cyan));
+    box-shadow:0 0 16px rgba(60,227,167,.55);
+  }
+
+  /* Sidebar */
+  .sidebar{
+    position:fixed;inset:0 auto 0 0;width:284px;z-index:60;
+    display:flex;flex-direction:column;gap:18px;
+    padding:24px 16px 20px;
+    background:rgba(5,8,12,.86);
+    border-right:1px solid var(--line);
+    backdrop-filter:blur(18px);
+    overflow-y:auto;
+  }
+  .brand{display:flex;align-items:center;gap:11px;color:inherit;text-decoration:none}
+  .logo{
+    width:40px;height:40px;flex:0 0 auto;border-radius:12px;display:grid;place-items:center;
+    background:linear-gradient(145deg,rgba(60,227,167,.22),rgba(77,216,245,.08));
+    border:1px solid rgba(60,227,167,.34);
+    box-shadow:0 0 28px rgba(60,227,167,.13), inset 0 1px 0 rgba(255,255,255,.08);
+  }
+  .brand strong{display:block;font-size:12.8px;line-height:1.3;letter-spacing:.01em}
+  .brand span{display:block;font-size:9.5px;color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-top:2px}
+
+  .search-wrap{position:relative}
+  .search{
+    width:100%;appearance:none;border:1px solid var(--line);border-radius:10px;
+    background:rgba(255,255,255,.035);color:var(--text);
+    font:12px/1.2 var(--sans);padding:10px 34px 10px 11px;outline:none;
+    transition:border-color .15s,background .15s,box-shadow .15s;
+  }
+  .search::placeholder{color:var(--muted)}
+  .search:focus{border-color:rgba(60,227,167,.5);background:rgba(60,227,167,.055);box-shadow:0 0 0 3px rgba(60,227,167,.08)}
+  .search-icon{
+    position:absolute;right:10px;top:50%;transform:translateY(-50%);
+    color:var(--muted);pointer-events:none;font-size:13px;
+  }
+  .kbd{
+    display:inline-block;padding:1px 5px;border:1px solid var(--line-2);border-radius:4px;
+    font:9px/1.4 var(--mono);color:var(--muted);background:rgba(255,255,255,.025);
+  }
+  .search-hint{display:flex;justify-content:space-between;gap:8px;margin-top:6px;font-size:10px;color:var(--muted)}
+  .search-hint b{color:var(--text-2);font-weight:600}
+
+  .side-label{
+    margin:4px 0 -7px;font:600 9px/1 var(--mono);letter-spacing:.18em;
+    text-transform:uppercase;color:var(--muted);
+  }
+  .side-nav{display:flex;flex-direction:column;gap:1px}
+  .side-nav a{
+    display:flex;align-items:center;gap:9px;padding:6.5px 9px;border-radius:8px;
+    color:var(--text-2);font-size:12px;line-height:1.35;
+    border-left:2px solid transparent;transition:background .15s,color .15s,border-color .15s;
+  }
+  .side-nav a:hover{background:rgba(255,255,255,.04);color:var(--text)}
+  .side-nav a.active{color:var(--green);background:rgba(60,227,167,.075);border-left-color:var(--green)}
+  .side-nav .n{font:9.5px/1 var(--mono);color:var(--muted);width:18px;flex:0 0 auto}
+  .side-nav a.active .n{color:var(--green)}
+  .side-nav .c{margin-left:auto;font:9px/1 var(--mono);color:var(--muted)}
+  .side-status{
+    margin-top:auto;padding-top:14px;border-top:1px solid var(--line);
+    font-size:10px;color:var(--muted);line-height:1.55;
+  }
+  .side-status b{display:block;color:var(--text-2);font-size:10.5px;margin-bottom:6px}
+  .side-status .row{display:flex;justify-content:space-between;gap:8px;margin-top:3px}
+  .side-status .row span:last-child{color:var(--text-2);font-family:var(--mono)}
+  .side-bar{height:3px;background:var(--line);border-radius:99px;overflow:hidden;margin-top:8px}
+  .side-bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--green),var(--cyan))}
+
+  /* Main */
+  main{
+    position:relative;z-index:1;margin-left:284px;
+    padding:54px clamp(22px,4.6vw,72px) 110px;
+    max-width:1320px;
+  }
+  .hero{padding:6px 0 6px;max-width:1020px}
+  .hero-top{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+  .hero h1{
+    margin:0 0 16px;font-size:clamp(2.35rem,5vw,4.1rem);
+    line-height:1.03;letter-spacing:-.047em;font-weight:760;
+  }
+  .grad{
+    background:linear-gradient(100deg,#f1f8ff 0%,#9ff5d3 44%,#63e3f7 100%);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  .lede{font-size:16px;line-height:1.7;color:var(--text-2);max-width:800px;margin:0 0 22px}
+  .meta{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:26px}
+  .meta span{
+    font:10.5px/1 var(--mono);color:var(--text-2);border:1px solid var(--line);
+    background:rgba(255,255,255,.028);padding:7px 9px;border-radius:99px;
+  }
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin-top:24px}
+  .stat{
+    padding:14px 15px;border:1px solid var(--line);border-radius:13px;
+    background:linear-gradient(180deg,rgba(255,255,255,.032),rgba(255,255,255,.008));
+  }
+  .stat b{display:block;font-size:23px;line-height:1.05;letter-spacing:-.03em}
+  .stat span{display:block;margin-top:6px;font-size:9.5px;text-transform:uppercase;letter-spacing:.13em;color:var(--muted)}
+
+  .pill{
+    display:inline-flex;align-items:center;gap:5px;padding:4.5px 8px;border-radius:99px;
+    border:1px solid var(--line);background:rgba(255,255,255,.03);
+    font:600 9px/1 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--text-2);
+  }
+  .pill.green{border-color:rgba(60,227,167,.3);background:rgba(60,227,167,.085);color:#95f5d0}
+  .pill.cyan{border-color:rgba(77,216,245,.3);background:rgba(77,216,245,.075);color:#a8eeff}
+  .pill.amber{border-color:rgba(245,199,106,.3);background:rgba(245,199,106,.075);color:#ffe3a4}
+  .pill.red{border-color:rgba(255,133,133,.3);background:rgba(255,133,133,.075);color:#ffb6b6}
+  .pill.violet{border-color:rgba(184,156,255,.3);background:rgba(184,156,255,.075);color:#d8caff}
+
+  /* Quick start terminal */
+  .terminal{
+    margin-top:20px;border:1px solid var(--line);border-radius:16px;overflow:hidden;
+    background:linear-gradient(180deg,rgba(255,255,255,.025),rgba(255,255,255,.006)),var(--code);
+    box-shadow:var(--shadow);
+  }
+  .terminal-bar{
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    padding:9px 13px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.028);
+  }
+  .dots{display:flex;gap:5px}
+  .dots i{width:8px;height:8px;border-radius:50%;display:block}
+  .dots i:nth-child(1){background:#ff6b6b}
+  .dots i:nth-child(2){background:#f5c76a}
+  .dots i:nth-child(3){background:#3ce3a7}
+  .terminal-path{font:10.5px/1 var(--mono);color:var(--muted)}
+  .terminal-actions{margin-left:auto;display:flex;align-items:center;gap:8px}
+  .terminal pre{
+    margin:0;padding:16px 18px;overflow:auto;font:12.2px/1.85 var(--mono);
+    color:#d2e4f3;white-space:pre-wrap;word-break:break-word;
+  }
+  .terminal .prompt{color:var(--green);user-select:none}
+  .terminal .comment{color:#5f788e}
+  .terminal .out{color:#7f97ad}
+
+  /* Toolbar */
+  .toolbar{
+    position:sticky;top:0;z-index:40;margin:30px 0 10px;
+    padding:13px 0 11px;
+    background:linear-gradient(180deg,rgba(5,8,12,.96),rgba(5,8,12,.86));
+    border-bottom:1px solid var(--line);
+    backdrop-filter:blur(16px);
+  }
+  .toolbar-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .chips{display:flex;gap:6px;flex-wrap:wrap}
+  .chip{
+    appearance:none;cursor:pointer;border:1px solid var(--line);
+    background:rgba(255,255,255,.025);color:var(--text-2);
+    font:600 9.5px/1 var(--mono);letter-spacing:.07em;text-transform:uppercase;
+    padding:7px 9px;border-radius:99px;transition:all .15s;
+  }
+  .chip:hover{color:var(--text);border-color:var(--line-2);background:rgba(255,255,255,.045)}
+  .chip.active{color:#03110c;background:var(--green);border-color:var(--green);box-shadow:0 0 18px rgba(60,227,167,.2)}
+  .results{margin-left:auto;font:10px/1 var(--mono);color:var(--muted);white-space:nowrap}
+  .results b{color:var(--text-2)}
+  .no-results{
+    margin:20px 0;padding:22px;border:1px dashed var(--line-2);border-radius:14px;
+    text-align:center;color:var(--muted);font-size:13px;
+  }
+  .no-results strong{display:block;color:var(--text);font-size:15px;margin-bottom:4px}
+
+  /* Sections + cards */
+  .cmd-section{margin-top:52px;scroll-margin-top:110px}
+  .section-head{display:flex;align-items:flex-start;gap:14px;margin-bottom:17px}
+  .num{
+    flex:0 0 auto;display:grid;place-items:center;width:40px;height:40px;border-radius:11px;
+    font:600 11px/1 var(--mono);color:var(--green);
+    background:rgba(60,227,167,.08);border:1px solid rgba(60,227,167,.27);
+  }
+  .kicker{margin:0 0 3px;font:600 9.5px/1 var(--mono);letter-spacing:.17em;text-transform:uppercase;color:var(--muted)}
+  h2{margin:0;font-size:clamp(1.35rem,2.4vw,1.85rem);line-height:1.2;letter-spacing:-.03em}
+  .section-head p{margin:5px 0 0;color:var(--text-2);font-size:12.5px;max-width:780px}
+  .section-head .count{
+    margin-left:auto;flex:0 0 auto;align-self:center;
+    font:9.5px/1 var(--mono);color:var(--muted);border:1px solid var(--line);
+    padding:6px 8px;border-radius:99px;background:rgba(255,255,255,.02);
+  }
+  .cmd-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}
+  .single-grid{grid-template-columns:1fr}
+  .cmd-card{
+    display:flex;flex-direction:column;gap:7px;
+    border:1px solid var(--line);border-radius:var(--radius);
+    padding:16px 16px 15px;
+    background:linear-gradient(180deg,rgba(255,255,255,.032),rgba(255,255,255,.008));
+    transition:border-color .16s,transform .16s,background .16s;
+  }
+  .cmd-card:hover{border-color:rgba(60,227,167,.22);transform:translateY(-1px);background:linear-gradient(180deg,rgba(60,227,167,.035),rgba(255,255,255,.008))}
+  .cmd-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .cmd-kicker{font:600 9px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+  .copy{
+    appearance:none;cursor:pointer;border:1px solid var(--line);
+    background:rgba(255,255,255,.03);color:var(--text-2);
+    font:600 9px/1 var(--mono);letter-spacing:.07em;text-transform:uppercase;
+    padding:6px 8px;border-radius:7px;transition:all .15s;
+  }
+  .copy:hover,.copy:focus-visible{color:var(--green);border-color:rgba(60,227,167,.4);background:rgba(60,227,167,.075);outline:none}
+  .copy.done{color:var(--green);border-color:rgba(60,227,167,.5)}
+  .cmd-card h3{margin:0;font-size:14px;line-height:1.35;letter-spacing:-.012em}
+  .cmd-card p{margin:0;font-size:12px;line-height:1.55;color:var(--text-2)}
+  .cmd-code{
+    margin-top:2px;border:1px solid var(--line);border-radius:9px;overflow:hidden;
+    background:var(--code);
+  }
+  .cmd-code pre{
+    margin:0;padding:10px 11px;overflow-x:auto;
+    font:11.3px/1.7 var(--mono);color:#cfe2f2;
+    white-space:pre-wrap;word-break:break-word;
+  }
+  .cmd-code .c{color:#5f788e}
+  .cmd-code .p{color:var(--green)}
+  .cmd-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:1px}
+  .tag{
+    font:8.5px/1 var(--mono);letter-spacing:.06em;text-transform:uppercase;
+    color:var(--muted);border:1px solid var(--line);border-radius:4px;
+    padding:4px 5px;background:rgba(255,255,255,.018);
+  }
+
+  .callout{
+    display:grid;grid-template-columns:20px 1fr;gap:11px;
+    border:1px solid var(--line);border-left:3px solid var(--cyan);
+    border-radius:11px;padding:12px 14px;margin:14px 0;
+    background:linear-gradient(90deg,rgba(77,216,245,.065),transparent 72%);
+    font-size:12.2px;color:var(--text-2);
+  }
+  .callout .ico{color:var(--cyan);line-height:1.5}
+  .callout strong{color:var(--text)}
+  .callout.warn{border-left-color:var(--amber);background:linear-gradient(90deg,rgba(245,199,106,.075),transparent 72%)}
+  .callout.warn .ico{color:var(--amber)}
+  .callout.danger{border-left-color:var(--red);background:linear-gradient(90deg,rgba(255,133,133,.075),transparent 72%)}
+  .callout.danger .ico{color:var(--red)}
+  .callout.ok{border-left-color:var(--green);background:linear-gradient(90deg,rgba(60,227,167,.075),transparent 72%)}
+  .callout.ok .ico{color:var(--green)}
+
+  /* Port grid */
+  .ports{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:14px 0}
+  .port{
+    border:1px solid var(--line);border-radius:12px;padding:13px;
+    background:rgba(255,255,255,.022);
+  }
+  .port b{display:block;font:600 17px/1 var(--mono);color:var(--green)}
+  .port span{display:block;font-size:9.5px;text-transform:uppercase;letter-spacing:.11em;color:var(--muted);margin-top:6px}
+  .port small{display:block;font-size:10px;color:var(--text-2);margin-top:4px}
+
+  /* Deploy timeline */
+  .deploy{display:grid;gap:12px;margin-top:14px}
+  .deploy-step{
+    border:1px solid var(--line);border-radius:13px;padding:15px 16px;
+    background:linear-gradient(180deg,rgba(255,255,255,.028),rgba(255,255,255,.007));
+  }
+  .deploy-step h3{margin:0 0 4px;font-size:13.5px}
+  .deploy-step p{margin:0 0 8px;font-size:12px;color:var(--text-2)}
+  .deploy-step .cmd-code{margin-top:6px}
+
+  .table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;margin:14px 0;background:rgba(255,255,255,.012)}
+  table{width:100%;border-collapse:collapse;font-size:12px;min-width:620px}
+  th{text-align:left;padding:10px 12px;font:600 9px/1.2 var(--mono);letter-spacing:.11em;text-transform:uppercase;color:var(--muted);background:rgba(255,255,255,.026);border-bottom:1px solid var(--line);white-space:nowrap}
+  td{padding:10px 12px;border-bottom:1px solid rgba(26,42,58,.7);color:var(--text-2);vertical-align:top}
+  tr:last-child td{border-bottom:0}
+  td strong{color:var(--text);font-weight:600}
+  td code{font-family:var(--mono);font-size:11px;color:#a7f3d0}
+
+  footer{
+    margin-top:70px;padding-top:22px;border-top:1px solid var(--line);
+    display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;
+    font-size:10.5px;color:var(--muted);
+  }
+  footer code{font-family:var(--mono);color:var(--text-2)}
+
+  .to-top{
+    position:fixed;right:20px;bottom:20px;z-index:70;
+    width:39px;height:39px;border-radius:10px;display:grid;place-items:center;
+    border:1px solid var(--line-2);background:rgba(11,18,26,.92);color:var(--text-2);
+    cursor:pointer;backdrop-filter:blur(10px);
+    opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;
+  }
+  .to-top.show{opacity:1;pointer-events:auto}
+  .to-top:hover{color:var(--green);border-color:rgba(60,227,167,.35);transform:translateY(-2px)}
+
+  .mobile-top,.mobile-menu{display:none}
+
+  @media(max-width:1120px){
+    .sidebar{display:none}
+    main{margin-left:0;padding:76px 20px 96px}
+    .mobile-top{
+      display:flex;position:fixed;top:0;left:0;right:0;height:56px;z-index:80;
+      align-items:center;justify-content:space-between;padding:0 15px;
+      background:rgba(5,8,12,.93);border-bottom:1px solid var(--line);backdrop-filter:blur(16px);
+    }
+    .mobile-brand{font-size:12px;font-weight:700}
+    .mobile-brand span{color:var(--muted);font-weight:500}
+    .menu-btn{
+      appearance:none;border:1px solid var(--line);background:rgba(255,255,255,.03);
+      color:var(--text-2);font:600 9.5px/1 var(--mono);letter-spacing:.08em;
+      text-transform:uppercase;padding:8px 9px;border-radius:8px;cursor:pointer;
+    }
+    .mobile-menu{
+      display:block;position:fixed;top:56px;left:0;right:0;bottom:0;z-index:79;
+      background:rgba(5,8,12,.985);padding:16px;overflow:auto;
+    }
+    .mobile-menu .side-nav a{font-size:13.5px;padding:9px 10px}
+    .toolbar{top:56px}
+    .stats,.ports{grid-template-columns:repeat(2,1fr)}
+    .cmd-grid{grid-template-columns:1fr}
+    .section-head .count{display:none}
+  }
+  @media(max-width:560px){
+    .stats,.ports{grid-template-columns:1fr 1fr}
+    .hero h1{font-size:clamp(2.2rem,12vw,3.2rem)}
+    .lede{font-size:14.5px}
+    .toolbar-row{align-items:flex-start}
+    .results{width:100%;margin-left:0}
+    .terminal pre{font-size:11px}
+    footer{flex-direction:column}
+  }
+  @media(prefers-reduced-motion:reduce){
+    html{scroll-behavior:auto}
+    *,*::before,*::after{transition:none!important;animation:none!important}
+  }
+  @media print{
+    .sidebar,.mobile-top,.mobile-menu,.to-top,.scroll-progress,.copy,.toolbar{display:none!important}
+    main{margin:0;padding:0;max-width:none}
+    body{background:#fff;color:#111}
+    .cmd-card,.terminal,.cmd-code{box-shadow:none;break-inside:avoid}
+  }
+</style>
+</head>
+<body>
+<a class="skip" href="#top">Skip to commands</a>
+<div class="scroll-progress" id="scrollProgress" aria-hidden="true"></div>
+
+<aside class="sidebar" aria-label="Command navigation">
+  <a class="brand" href="#top">
+    <span class="logo" aria-hidden="true">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none">
+        <path d="M4 7l4 4-4 4M11 17h9" stroke="#3ce3a7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M14 7h6M14 11h4" stroke="#4dd8f5" stroke-width="1.5" stroke-linecap="round" opacity=".8"/>
+      </svg>
+    </span>
+    <span>
+      <strong>AI Trading System</strong>
+      <span>Command deck</span>
+    </span>
+  </a>
+
+  <div class="search-wrap">
+    <input class="search" id="search" type="search" placeholder="Search commands…" autocomplete="off" spellcheck="false" aria-label="Search commands" />
+    <span class="search-icon">⌕</span>
+  </div>
+  <div class="search-hint"><span>Press <span class="kbd">/</span> to search</span><span><b data-result-count>—</b> commands</span></div>
+
+  <p class="side-label">Categories</p>
+  <nav class="side-nav" id="sideNav">
+    <a href="#install"><span class="n">01</span> Install &amp; workspace <span class="c">7</span></a>
+    <a href="#develop"><span class="n">02</span> Run locally <span class="c">8</span></a>
+    <a href="#build"><span class="n">03</span> Build <span class="c">7</span></a>
+    <a href="#test"><span class="n">04</span> Test <span class="c">8</span></a>
+    <a href="#quality"><span class="n">05</span> Quality gates <span class="c">6</span></a>
+    <a href="#nx"><span class="n">06</span> Nx navigation <span class="c">7</span></a>
+    <a href="#database"><span class="n">07</span> Database <span class="c">9</span></a>
+    <a href="#docker"><span class="n">08</span> Docker <span class="c">8</span></a>
+    <a href="#deploy"><span class="n">09</span> Deploy <span class="c">10</span></a>
+    <a href="#troubleshoot"><span class="n">10</span> Troubleshooting <span class="c">9</span></a>
+  </nav>
+
+  <div class="side-status">
+    <b>Workspace snapshot</b>
+    <div class="row"><span>pnpm</span><span>11.28.8</span></div>
+    <div class="row"><span>Nx</span><span>22.7.12</span></div>
+    <div class="row"><span>Node</span><span>24 LTS</span></div>
+    <div class="row"><span>Projects</span><span>16</span></div>
+    <div class="side-bar"><i id="sideBar"></i></div>
+  </div>
+</aside>
+
+<div class="mobile-top">
+  <div class="mobile-brand">Command Deck <span>· AI Trading</span></div>
+  <button class="menu-btn" id="menuBtn" aria-expanded="false" aria-controls="mobileMenu">Menu</button>
+</div>
+<div class="mobile-menu" id="mobileMenu" hidden>
+  <input class="search" id="mobileSearch" type="search" placeholder="Search commands…" autocomplete="off" aria-label="Search commands" />
+  <nav class="side-nav" id="mobileNav"></nav>
+</div>
+
+<main id="top">
+<section class="hero" id="overview">
+  <div class="hero-top">
+    <span class="pill green">Developer reference</span>
+    <span class="pill cyan">16 Nx projects</span>
+    <span class="pill amber">Trading mode: offline</span>
+  </div>
+  <h1>Developer<br /><span class="grad">Command Deck</span></h1>
+  <p class="lede">
+    Every command you need to install, run, test, build and deploy the AI Trading System monorepo.
+    Search by keyword, filter by category, and copy any block with one click.
+  </p>
+  <div class="meta">
+    <span>pnpm 11.28.8</span>
+    <span>Nx 22.7.12</span>
+    <span>Node 24 LTS</span>
+    <span>Next.js 16</span>
+    <span>NestJS 12</span>
+    <span>PostgreSQL 17</span>
+    <span>Redis 7.4</span>
+  </div>
+  <div class="stats">
+    <div class="stat"><b>3</b><span>Apps</span></div>
+    <div class="stat"><b>12</b><span>Packages</span></div>
+    <div class="stat"><b>16</b><span>Nx projects</span></div>
+    <div class="stat"><b>4</b><span>Local ports</span></div>
+  </div>
+</section>
+
+<div class="terminal">
+  <div class="terminal-bar">
+    <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+    <span class="terminal-path">~/ai-trading-system</span>
+    <span class="terminal-actions">
+      <span class="pill green">first run</span>
+      <button class="copy" data-copy type="button">Copy</button>
+    </span>
+  </div>
+  <pre><code><span class="prompt">$</span> pnpm install
+<span class="prompt">$</span> cp .env.example .env
+<span class="prompt">$</span> docker compose up -d
+<span class="prompt">$</span> pnpm db:migrate
+<span class="prompt">$</span> pnpm dev
+<span class="comment"># web :3000  ·  api :8000  ·  worker: BullMQ processors</span>
+<span class="comment"># api health: http://localhost:8000/api/v1/health</span></code></pre>
+</div>
+
+<div class="toolbar" id="toolbar">
+  <div class="toolbar-row">
+    <div class="chips" role="group" aria-label="Filter commands by category">
+      <button class="chip active" data-filter="all" type="button">All</button>
+      <button class="chip" data-filter="setup" type="button">Install</button>
+      <button class="chip" data-filter="dev" type="button">Develop</button>
+      <button class="chip" data-filter="build" type="button">Build</button>
+      <button class="chip" data-filter="test" type="button">Test</button>
+      <button class="chip" data-filter="quality" type="button">Quality</button>
+      <button class="chip" data-filter="nx" type="button">Nx</button>
+      <button class="chip" data-filter="database" type="button">Database</button>
+      <button class="chip" data-filter="docker" type="button">Docker</button>
+      <button class="chip" data-filter="deploy" type="button">Deploy</button>
+      <button class="chip" data-filter="troubleshoot" type="button">Fix</button>
+    </div>
+    <div class="results"><b data-result-count>—</b> commands</div>
+  </div>
+</div>
+
+<div class="no-results" id="noResults" hidden>
+  <strong>No commands match that search.</strong>
+  Try a broader keyword, or reset the category filter to “All”.
+</div>
+
+<section class="cmd-section" id="install" data-category="setup">
+  <div class="section-head">
+    <span class="num">01</span>
+    <div>
+      <p class="kicker">Dependencies</p>
+      <h2>Install &amp; workspace</h2>
+      <p>One lockfile, 17 workspace projects and pnpm catalog versions. Quote <code>workspace:*</code> in zsh.</p>
+    </div>
+    <span class="count">7 commands</span>
+  </div>
+
+  <div class="cmd-grid">
+    <article class="cmd-card" data-category="setup" data-search="install dependencies bootstrap pnpm install first run">
+      <div class="cmd-top"><span class="cmd-kicker">setup</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Install the whole workspace</h3>
+      <p>Reads the root lockfile and links every app, package and the test project.</p>
+      <div class="cmd-code"><pre><code>pnpm install</code></pre></div>
+      <div class="cmd-tags"><span class="tag">first run</span><span class="tag">root</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="setup" data-search="ci frozen lockfile reproducible pnpm install">
+      <div class="cmd-top"><span class="cmd-kicker">setup</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Frozen install for CI</h3>
+      <p>Fails if <code>pnpm-lock.yaml</code> is out of sync. Use this in every pipeline.</p>
+      <div class="cmd-code"><pre><code>pnpm install --frozen-lockfile</code></pre></div>
+      <div class="cmd-tags"><span class="tag">ci</span><span class="tag">reproducible</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="setup" data-search="add root dev dependency pnpm add -w">
+      <div class="cmd-top"><span class="cmd-kicker">setup</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Add a root dev dependency</h3>
+      <p>For workspace-wide tooling such as a new Nx plugin, formatter or test runner.</p>
+      <div class="cmd-code"><pre><code>pnpm add -w -D &lt;package&gt;</code></pre></div>
+      <div class="cmd-tags"><span class="tag">root</span><span class="tag">devdep</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="setup" data-search="add app package dependency pnpm filter">
+      <div class="cmd-top"><span class="cmd-kicker">setup</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Add a dependency to one project</h3>
+      <p>Keep app-specific libraries inside that app instead of hoisting them to the root.</p>
+      <div class="cmd-code"><pre><code>pnpm --filter @ai-trading/web add &lt;package&gt;
+pnpm --filter @ai-trading/api add &lt;package&gt;
+pnpm --filter @ai-trading/worker add -D &lt;package&gt;</code></pre></div>
+      <div class="cmd-tags"><span class="tag">filter</span><span class="tag">per-app</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="setup" data-search="link workspace package monorepo dependency workspace protocol">
+      <div class="cmd-top"><span class="cmd-kicker">setup</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Link a workspace package</h3>
+      <p>Quote the specifier in zsh. pnpm creates the symlink and Nx adds the graph edge.</p>
+      <div class="cmd-code"><pre><code>pnpm --filter @ai-trading/api add '@ai-trading/domain@workspace:*'
+pnpm --filter @ai-trading/worker add '@ai-trading/backtesting@workspace:*'</code></pre></div>
+      <div class="cmd-tags"><span class="tag">workspace:*</span><span class="tag">nx graph</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="setup" data-search="remove dependency uninstall pnpm remove">
+      <div class="cmd-top"><span class="cmd-kicker">setup</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Remove a dependency</h3>
+      <p>Remove it from the owning project, then commit the updated manifest and lockfile.</p>
+      <div class="cmd-code"><pre><code>pnpm --filter @ai-trading/web remove &lt;package&gt;
+pnpm remove -w &lt;package&gt;</code></pre></div>
+      <div class="cmd-tags"><span class="tag">cleanup</span><span class="tag">lockfile</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="setup" data-search="inspect dependency tree why outdated list pnpm">
+      <div class="cmd-top"><span class="cmd-kicker">setup</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Inspect the dependency graph</h3>
+      <p>Use these before guessing at a duplicate package or a version conflict.</p>
+      <div class="cmd-code"><pre><code>pnpm why &lt;package&gt;
+pnpm outdated -r
+pnpm list -r --depth 0</code></pre></div>
+      <div class="cmd-tags"><span class="tag">debug</span><span class="tag">versions</span></div>
+    </article>
+  </div>
+
+  <div class="callout warn">
+    <span class="ico">▲</span>
+    <div><strong>Do not add TypeScript path aliases for package names.</strong> Apps resolve packages through pnpm workspace links and each package's built <code>exports</code>. Path aliases make the editor read source while Node reads <code>dist</code>.</div>
+  </div>
+</section>
+
+<section class="cmd-section" id="develop" data-category="dev">
+  <div class="section-head">
+    <span class="num">02</span>
+    <div>
+      <p class="kicker">Local runtime</p>
+      <h2>Run locally</h2>
+      <p>One command for the full stack, or run a single app while the others stay off.</p>
+    </div>
+    <span class="count">8 commands</span>
+  </div>
+
+  <div class="ports">
+    <div class="port"><b>:3000</b><span>Web</span><small>Next.js dashboard</small></div>
+    <div class="port"><b>:8000</b><span>API</span><small>NestJS HTTP</small></div>
+    <div class="port"><b>:5432</b><span>PostgreSQL</span><small>Docker</small></div>
+    <div class="port"><b>:6379</b><span>Redis</span><small>BullMQ</small></div>
+  </div>
+
+  <div class="cmd-grid">
+    <article class="cmd-card" data-category="dev" data-search="run full stack dev development all apps pnpm dev">
+      <div class="cmd-top"><span class="cmd-kicker">develop</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Run the full stack</h3>
+      <p>Builds the shared packages once, then starts web, API and worker in parallel.</p>
+      <div class="cmd-code"><pre><code>pnpm dev</code></pre></div>
+      <div class="cmd-tags"><span class="tag">web + api + worker</span><span class="tag">recommended</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="dev" data-search="run web only next dev dashboard frontend">
+      <div class="cmd-top"><span class="cmd-kicker">develop</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Run the dashboard only</h3>
+      <p>Starts Next.js with Turbopack on port 3000.</p>
+      <div class="cmd-code"><pre><code>pnpm nx dev web
+<span class="c"># or: pnpm --filter @ai-trading/web dev</span></code></pre></div>
+      <div class="cmd-tags"><span class="tag">next.js</span><span class="tag">:3000</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="dev" data-search="run api only nest start watch backend">
+      <div class="cmd-top"><span class="cmd-kicker">develop</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Run the API only</h3>
+      <p>Nest watch mode on port 8000. Requires PostgreSQL and Redis for full startup.</p>
+      <div class="cmd-code"><pre><code>pnpm nx dev api
+<span class="c"># or: pnpm --filter @ai-trading/api dev</span></code></pre></div>
+      <div class="cmd-tags"><span class="tag">nestjs</span><span class="tag">:8000</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="dev" data-search="run worker only bullmq background processors nest">
+      <div class="cmd-top"><span class="cmd-kicker">develop</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Run the worker only</h3>
+      <p>Nest application context with BullMQ queues and the market scheduler.</p>
+      <div class="cmd-code"><pre><code>pnpm nx dev worker
+<span class="c"># or: pnpm --filter @ai-trading/worker dev</span></code></pre></div>
+      <div class="cmd-tags"><span class="tag">bullmq</span><span class="tag">schedulers</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="dev" data-search="watch package tsup rebuild shared library">
+      <div class="cmd-top"><span class="cmd-kicker">develop</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Watch one shared package</h3>
+      <p>Rebuilds <code>dist</code> on change. Start it alongside the app that consumes the package.</p>
+      <div class="cmd-code"><pre><code>pnpm --filter @ai-trading/domain dev
+pnpm --filter @ai-trading/trading-engine dev</code></pre></div>
+      <div class="cmd-tags"><span class="tag">tsup --watch</span><span class="tag">package</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="dev" data-search="start production web next start built">
+      <div class="cmd-top"><span class="cmd-kicker">develop</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Start a built web app</h3>
+      <p>Run <code>pnpm nx build web</code> first. Serves the optimized Next.js build on port 3000.</p>
+      <div class="cmd-code"><pre><code>pnpm nx start web
+<span class="c"># or: pnpm --filter @ai-trading/web start</span></code></pre></div>
+      <div class="cmd-tags"><span class="tag">production</span><span class="tag">next start</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="dev" data-search="start built api node dist production">
+      <div class="cmd-top"><span class="cmd-kicker">develop</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Start the built API</h3>
+      <p>Runs <code>node dist/main</code> from the API project. Build first.</p>
+      <div class="cmd-code"><pre><code>pnpm nx start api
+<span class="c"># or: pnpm --filter @ai-trading/api start</span></code></pre></div>
+      <div class="cmd-tags"><span class="tag">production</span><span class="tag">node</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="dev" data-search="start built worker node dist background">
+      <div class="cmd-top"><span class="cmd-kicker">develop</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Start the built worker</h3>
+      <p>Runs the worker application context without an HTTP listener.</p>
+      <div class="cmd-code"><pre><code>pnpm nx start worker
+<span class="c"># or: pnpm --filter @ai-trading/worker start</span></code></pre></div>
+      <div class="cmd-tags"><span class="tag">production</span><span class="tag">no http</span></div>
+    </article>
+  </div>
+
+  <div class="callout ok">
+    <span class="ico">✓</span>
+    <div><strong>Local URLs:</strong> dashboard <code>http://localhost:3000</code> · API health <code>http://localhost:8000/api/v1/health</code> · Swagger <code>http://localhost:8000/api/docs</code>.</div>
+  </div>
+
+  <div class="callout warn">
+    <span class="ico">▲</span>
+    <div><strong>Package changes:</strong> <code>pnpm dev</code> builds packages once but does not run every package watcher. Run <code>pnpm --filter @ai-trading/&lt;package&gt; dev</code> in a second terminal, then restart or reload the consuming app if it does not pick up the new <code>dist</code>.</div>
+  </div>
+</section>
+
+<section class="cmd-section" id="build" data-category="build">
+  <div class="section-head">
+    <span class="num">03</span>
+    <div>
+      <p class="kicker">Compilation</p>
+      <h2>Build</h2>
+      <p>Nx builds in dependency order. Web build forces <code>NODE_ENV=production</code> because Nx loads the root <code>.env</code>.</p>
+    </div>
+    <span class="count">7 commands</span>
+  </div>
+
+  <div class="cmd-grid">
+    <article class="cmd-card" data-category="build" data-search="build everything all projects pnpm build">
+      <div class="cmd-top"><span class="cmd-kicker">build</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Build everything</h3>
+      <p>Packages emit ESM, CJS and declarations; apps emit <code>dist</code> or <code>.next</code>.</p>
+      <div class="cmd-code"><pre><code>pnpm build</code></pre></div>
+      <div class="cmd-tags"><span class="tag">all</span><span class="tag">nx cache</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="build" data-search="build web api worker single app nx build">
+      <div class="cmd-top"><span class="cmd-kicker">build</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Build one app</h3>
+      <p>Builds the app and its workspace dependencies through <code>dependsOn: ["^build"]</code>.</p>
+      <div class="cmd-code"><pre><code>pnpm nx build web
+pnpm nx build api
+pnpm nx build worker</code></pre></div>
+      <div class="cmd-tags"><span class="tag">single app</span><span class="tag">deps first</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="build" data-search="build shared package domain configuration tsup">
+      <div class="cmd-top"><span class="cmd-kicker">build</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Build one shared package</h3>
+      <p>Useful before starting an app that consumes the package directly.</p>
+      <div class="cmd-code"><pre><code>pnpm nx build domain
+pnpm nx build configuration
+pnpm --filter @ai-trading/domain build</code></pre></div>
+      <div class="cmd-tags"><span class="tag">tsup</span><span class="tag">esm + cjs</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="build" data-search="build app with dependencies pnpm filter ellipsis">
+      <div class="cmd-top"><span class="cmd-kicker">build</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Build an app plus dependencies</h3>
+      <p>The <code>...</code> suffix includes every workspace dependency, even outside Nx.</p>
+      <div class="cmd-code"><pre><code>pnpm --filter @ai-trading/web... build
+pnpm --filter @ai-trading/api... build</code></pre></div>
+      <div class="cmd-tags"><span class="tag">pnpm filter</span><span class="tag">container build</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="build" data-search="typecheck typescript all projects pnpm typecheck">
+      <div class="cmd-top"><span class="cmd-kicker">build</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Typecheck the workspace</h3>
+      <p>Runs <code>tsc --noEmit</code> for every project that defines the target.</p>
+      <div class="cmd-code"><pre><code>pnpm typecheck
+<span class="c"># or: pnpm nx run-many -t typecheck</span></code></pre></div>
+      <div class="cmd-tags"><span class="tag">typescript</span><span class="tag">all</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="build" data-search="typecheck one project web api worker tests">
+      <div class="cmd-top"><span class="cmd-kicker">build</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Typecheck one project</h3>
+      <p>Faster feedback while iterating on a single app or package.</p>
+      <div class="cmd-code"><pre><code>pnpm nx typecheck web
+pnpm nx typecheck api
+pnpm nx typecheck domain</code></pre></div>
+      <div class="cmd-tags"><span class="tag">single project</span><span class="tag">fast</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="build" data-search="clean build artifacts dist next nx reset remove">
+      <div class="cmd-top"><span class="cmd-kicker">build</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Clean build output</h3>
+      <p>Clear Nx's cache first; remove generated output only when you suspect stale artifacts.</p>
+      <div class="cmd-code"><pre><code>pnpm nx reset
+rm -rf apps/web/.next apps/api/dist apps/worker/dist packages/*/dist</code></pre></div>
+      <div class="cmd-tags"><span class="tag">destructive</span><span class="tag">cache</span></div>
+    </article>
+  </div>
+
+  <div class="callout danger">
+    <span class="ico">■</span>
+    <div><strong>Next.js build caveat:</strong> the web build script is <code>NODE_ENV=production next build</code>. Running a raw <code>next build</code> with <code>NODE_ENV=development</code> can crash the internal <code>_global-error</code> prerender with a null <code>useContext</code> error.</div>
+  </div>
+</section>
+
+<section class="cmd-section" id="test" data-category="test">
+  <div class="section-head">
+    <span class="num">04</span>
+    <div>
+      <p class="kicker">Verification</p>
+      <h2>Test</h2>
+      <p>Unit, integration, broker-contract and browser end-to-end suites all run through Nx.</p>
+    </div>
+    <span class="count">8 commands</span>
+  </div>
+
+  <div class="cmd-grid">
+    <article class="cmd-card" data-category="test" data-search="run all tests unit pnpm test nx">
+      <div class="cmd-top"><span class="cmd-kicker">test</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Run every test target</h3>
+      <p>Packages and web use Vitest 3; Nest apps use Vitest 4; the test project covers contracts and integration.</p>
+      <div class="cmd-code"><pre><code>pnpm test</code></pre></div>
+      <div class="cmd-tags"><span class="tag">all</span><span class="tag">nx cache</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="test" data-search="test one project api worker web domain">
+      <div class="cmd-top"><span class="cmd-kicker">test</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Test one project</h3>
+      <p>Runs the project's own test target without waiting for the rest of the workspace.</p>
+      <div class="cmd-code"><pre><code>pnpm nx test api
+pnpm nx test worker
+pnpm nx test tests
+pnpm nx test domain</code></pre></div>
+      <div class="cmd-tags"><span class="tag">single project</span><span class="tag">fast</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="test" data-search="integration tests database configuration testcontainers">
+      <div class="cmd-top"><span class="cmd-kicker">test</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Integration suite</h3>
+      <p>Runs the <code>tests/integration</code> folder, including configuration contract checks.</p>
+      <div class="cmd-code"><pre><code>pnpm nx run tests:integration
+<span class="c"># or: pnpm --filter @ai-trading/tests test:integration</span></code></pre></div>
+      <div class="cmd-tags"><span class="tag">integration</span><span class="tag">database</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="test" data-search="broker contract fixtures upstox strategy shared contract">
+      <div class="cmd-top"><span class="cmd-kicker">test</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Broker &amp; strategy contracts</h3>
+      <p>Checks the shared strategy identity and adapter conformance against recorded fixtures.</p>
+      <div class="cmd-code"><pre><code>pnpm nx run tests:broker-contracts
+<span class="c"># or: pnpm --filter @ai-trading/tests test:broker-contracts</span></code></pre></div>
+      <div class="cmd-tags"><span class="tag">fixtures</span><span class="tag">no live orders</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="test" data-search="e2e playwright browser dashboard end to end">
+      <div class="cmd-top"><span class="cmd-kicker">test</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Browser end-to-end</h3>
+      <p>Playwright starts the web dev server, then checks the dashboard foundation state.</p>
+      <div class="cmd-code"><pre><code>pnpm nx run tests:e2e
+<span class="c"># or: pnpm --filter @ai-trading/tests test:e2e</span></code></pre></div>
+      <div class="cmd-tags"><span class="tag">playwright</span><span class="tag">chromium</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="test" data-search="playwright ui headed debug install browser">
+      <div class="cmd-top"><span class="cmd-kicker">test</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Debug the browser suite</h3>
+      <p>Open the Playwright UI or run headed when a selector or timing check fails.</p>
+      <div class="cmd-code"><pre><code>pnpm --filter @ai-trading/tests exec playwright test --ui
+pnpm --filter @ai-trading/tests exec playwright test --headed
+pnpm --filter @ai-trading/tests exec playwright install chromium</code></pre></div>
+      <div class="cmd-tags"><span class="tag">ui mode</span><span class="tag">debug</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="test" data-search="watch coverage api vitest test cov">
+      <div class="cmd-top"><span class="cmd-kicker">test</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Watch or measure coverage</h3>
+      <p>Nest apps expose watch and coverage scripts directly through their own manifest.</p>
+      <div class="cmd-code"><pre><code>pnpm --filter @ai-trading/api test:watch
+pnpm --filter @ai-trading/api test:cov
+pnpm --filter @ai-trading/worker test:watch</code></pre></div>
+      <div class="cmd-tags"><span class="tag">watch</span><span class="tag">coverage</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="test" data-search="single test file filter vitest path">
+      <div class="cmd-top"><span class="cmd-kicker">test</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Run one test file</h3>
+      <p>Run Vitest inside the owning package and pass the relative file path or name filter.</p>
+      <div class="cmd-code"><pre><code>pnpm --filter @ai-trading/tests exec vitest run integration/configuration.test.ts
+pnpm --filter @ai-trading/api exec vitest run src/app.controller.spec.ts</code></pre></div>
+      <div class="cmd-tags"><span class="tag">single file</span><span class="tag">vitest</span></div>
+    </article>
+  </div>
+</section>
+
+<section class="cmd-section" id="quality" data-category="quality">
+  <div class="section-head">
+    <span class="num">05</span>
+    <div>
+      <p class="kicker">Before commit</p>
+      <h2>Quality gates</h2>
+      <p>Lint, format and affected checks. Run these locally so CI stays boring.</p>
+    </div>
+    <span class="count">6 commands</span>
+  </div>
+
+  <div class="cmd-grid">
+    <article class="cmd-card" data-category="quality" data-search="lint all eslint oxlint pnpm lint">
+      <div class="cmd-top"><span class="cmd-kicker">quality</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Lint every project</h3>
+      <p>Web, packages and tests use ESLint; Nest apps use oxlint from the official CLI.</p>
+      <div class="cmd-code"><pre><code>pnpm lint
+<span class="c"># or: pnpm nx run-many -t lint</span></code></pre></div>
+      <div class="cmd-tags"><span class="tag">eslint</span><span class="tag">oxlint</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="quality" data-search="lint one project web api worker domain">
+      <div class="cmd-top"><span class="cmd-kicker">quality</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Lint one project</h3>
+      <p>Find the owning linter quickly while iterating on a single app.</p>
+      <div class="cmd-code"><pre><code>pnpm nx lint web
+pnpm nx lint api
+pnpm nx lint domain</code></pre></div>
+      <div class="cmd-tags"><span class="tag">single project</span><span class="tag">fast</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="quality" data-search="format prettier write code style">
+      <div class="cmd-top"><span class="cmd-kicker">quality</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Format the workspace</h3>
+      <p>Applies the root Prettier config and Tailwind class ordering. <code>context/</code> is ignored.</p>
+      <div class="cmd-code"><pre><code>pnpm format</code></pre></div>
+      <div class="cmd-tags"><span class="tag">prettier</span><span class="tag">write</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="quality" data-search="format check ci prettier check">
+      <div class="cmd-top"><span class="cmd-kicker">quality</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Verify formatting in CI</h3>
+      <p>Fails without writing files. Use this in the pipeline.</p>
+      <div class="cmd-code"><pre><code>pnpm format:check</code></pre></div>
+      <div class="cmd-tags"><span class="tag">ci</span><span class="tag">no writes</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="quality" data-search="affected typecheck lint test build git base">
+      <div class="cmd-top"><span class="cmd-kicker">quality</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Check only affected projects</h3>
+      <p>Compares against <code>main</code>. Change the base if your branch uses a different default.</p>
+      <div class="cmd-code"><pre><code>pnpm nx affected -t typecheck lint test build --base=main</code></pre></div>
+      <div class="cmd-tags"><span class="tag">affected</span><span class="tag">ci</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="quality" data-search="full gate before commit typecheck lint test build">
+      <div class="cmd-top"><span class="cmd-kicker">quality</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Full pre-commit gate</h3>
+      <p>The same four targets used for the setup acceptance check.</p>
+      <div class="cmd-code"><pre><code>pnpm nx run-many -t typecheck lint test build
+pnpm format:check</code></pre></div>
+      <div class="cmd-tags"><span class="tag">all 16 projects</span><span class="tag">release</span></div>
+    </article>
+  </div>
+</section>
+
+<section class="cmd-section" id="nx" data-category="nx">
+  <div class="section-head">
+    <span class="num">06</span>
+    <div>
+      <p class="kicker">Workspace intelligence</p>
+      <h2>Nx navigation</h2>
+      <p>Inspect the project graph, run targets by name, and clear stale state.</p>
+    </div>
+    <span class="count">7 commands</span>
+  </div>
+
+  <div class="cmd-grid">
+    <article class="cmd-card" data-category="nx" data-search="graph visualize project dependencies nx graph">
+      <div class="cmd-top"><span class="cmd-kicker">nx</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Open the project graph</h3>
+      <p>Shows every app, package and dependency edge in the browser.</p>
+      <div class="cmd-code"><pre><code>pnpm nx graph
+<span class="c"># save a static copy</span>
+pnpm nx graph --file=graph.html</code></pre></div>
+      <div class="cmd-tags"><span class="tag">graph</span><span class="tag">browser</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="nx" data-search="list projects show projects workspace">
+      <div class="cmd-top"><span class="cmd-kicker">nx</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>List all projects</h3>
+      <p>Expect 16: web, api, worker, tests and twelve packages.</p>
+      <div class="cmd-code"><pre><code>pnpm nx show projects</code></pre></div>
+      <div class="cmd-tags"><span class="tag">16 projects</span><span class="tag">inventory</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="nx" data-search="show project targets configuration web api">
+      <div class="cmd-top"><span class="cmd-kicker">nx</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Inspect one project</h3>
+      <p>Shows its root, tags, targets and cache configuration.</p>
+      <div class="cmd-code"><pre><code>pnpm nx show project web
+pnpm nx show project api
+pnpm nx show project domain</code></pre></div>
+      <div class="cmd-tags"><span class="tag">targets</span><span class="tag">tags</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="nx" data-search="run target infix nx dev build test web">
+      <div class="cmd-top"><span class="cmd-kicker">nx</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Run a target with infix syntax</h3>
+      <p>Short form of <code>nx run &lt;project&gt;:&lt;target&gt;</code>.</p>
+      <div class="cmd-code"><pre><code>pnpm nx dev web
+pnpm nx build api
+pnpm nx test worker
+pnpm nx run web:build</code></pre></div>
+      <div class="cmd-tags"><span class="tag">infix</span><span class="tag">single target</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="nx" data-search="run many selected projects parallel">
+      <div class="cmd-top"><span class="cmd-kicker">nx</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Run a target on selected projects</h3>
+      <p>Useful for a focused rebuild of apps or a package set.</p>
+      <div class="cmd-code"><pre><code>pnpm nx run-many -t build -p web api worker
+pnpm nx run-many -t typecheck -p domain configuration
+pnpm nx run-many -t test -p api worker tests</code></pre></div>
+      <div class="cmd-tags"><span class="tag">run-many</span><span class="tag">selected</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="nx" data-search="affected base head git changed projects">
+      <div class="cmd-top"><span class="cmd-kicker">nx</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Run only affected work</h3>
+      <p>Compares the current branch against a base commit. Adjust <code>main</code> if needed.</p>
+      <div class="cmd-code"><pre><code>pnpm nx affected -t build --base=main
+pnpm nx affected -t typecheck lint test --base=main~1</code></pre></div>
+      <div class="cmd-tags"><span class="tag">affected</span><span class="tag">fast ci</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="nx" data-search="reset cache daemon stale nx reset">
+      <div class="cmd-top"><span class="cmd-kicker">nx</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Reset Nx state</h3>
+      <p>Stops the daemon and clears local cache metadata when the graph looks stale.</p>
+      <div class="cmd-code"><pre><code>pnpm nx reset</code></pre></div>
+      <div class="cmd-tags"><span class="tag">cache</span><span class="tag">daemon</span></div>
+    </article>
+  </div>
+
+  <div class="callout">
+    <span class="ico">◆</span>
+    <div><strong>Project names are bare:</strong> <code>web</code>, <code>api</code>, <code>worker</code>, <code>tests</code>, <code>domain</code>, <code>trading-engine</code> — not the scoped package names such as <code>@ai-trading/web</code>.</div>
+  </div>
+</section>
+
+<section class="cmd-section" id="database" data-category="database">
+  <div class="section-head">
+    <span class="num">07</span>
+    <div>
+      <p class="kicker">Persistence</p>
+      <h2>Database</h2>
+      <p>Drizzle schema, migrations and local PostgreSQL/Redis shells. The root <code>drizzle.config.ts</code> owns the paths.</p>
+    </div>
+    <span class="count">9 commands</span>
+  </div>
+
+  <div class="cmd-grid">
+    <article class="cmd-card" data-category="database" data-search="env environment copy example secret jwt openssl">
+      <div class="cmd-top"><span class="cmd-kicker">database</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Create the local environment</h3>
+      <p>Generate a real JWT secret, then edit broker and database values as needed.</p>
+      <div class="cmd-code"><pre><code>cp .env.example .env
+openssl rand -hex 32
+<span class="c"># paste the output into JWT_SECRET</span></code></pre></div>
+      <div class="cmd-tags"><span class="tag">.env</span><span class="tag">never commit</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="database" data-search="start postgres redis docker compose up">
+      <div class="cmd-top"><span class="cmd-kicker">database</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Start PostgreSQL and Redis</h3>
+      <p>Starts the two stateful services with health checks and persistent volumes.</p>
+      <div class="cmd-code"><pre><code>docker compose up -d
+docker compose ps</code></pre></div>
+      <div class="cmd-tags"><span class="tag">:5432</span><span class="tag">:6379</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="database" data-search="generate migration drizzle kit schema">
+      <div class="cmd-top"><span class="cmd-kicker">database</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Generate a migration</h3>
+      <p>Diffs <code>packages/database/schema</code> and writes SQL into <code>packages/database/migrations</code>.</p>
+      <div class="cmd-code"><pre><code>pnpm db:generate</code></pre></div>
+      <div class="cmd-tags"><span class="tag">drizzle-kit</span><span class="tag">review sql</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="database" data-search="apply migration migrate database drizzle">
+      <div class="cmd-top"><span class="cmd-kicker">database</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Apply migrations</h3>
+      <p>Runs every unapplied migration against <code>DATABASE_URL</code>.</p>
+      <div class="cmd-code"><pre><code>pnpm db:migrate</code></pre></div>
+      <div class="cmd-tags"><span class="tag">deploy step</span><span class="tag">neon</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="database" data-search="push schema prototype drizzle push danger">
+      <div class="cmd-top"><span class="cmd-kicker">database</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Push schema directly</h3>
+      <p>Prototype-only. It skips migration files and should not be used against shared or production data.</p>
+      <div class="cmd-code"><pre><code>pnpm db:push</code></pre></div>
+      <div class="cmd-tags"><span class="tag">prototype</span><span class="tag">no history</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="database" data-search="drizzle studio inspect database ui">
+      <div class="cmd-top"><span class="cmd-kicker">database</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Open Drizzle Studio</h3>
+      <p>Browse tables and rows through Drizzle's local UI.</p>
+      <div class="cmd-code"><pre><code>pnpm db:studio</code></pre></div>
+      <div class="cmd-tags"><span class="tag">ui</span><span class="tag">inspect</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="database" data-search="psql postgres shell query tables">
+      <div class="cmd-top"><span class="cmd-kicker">database</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Open a PostgreSQL shell</h3>
+      <p>Useful for checking migrations, indexes and the <code>system_heartbeats</code> table.</p>
+      <div class="cmd-code"><pre><code>docker compose exec postgres psql -U ai_trading -d ai_trading
+<span class="c"># inside psql</span>
+\dt
+select * from system_heartbeats;</code></pre></div>
+      <div class="cmd-tags"><span class="tag">psql</span><span class="tag">debug</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="database" data-search="redis cli bullmq queue keys ping">
+      <div class="cmd-top"><span class="cmd-kicker">database</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Open a Redis shell</h3>
+      <p>Check connectivity and inspect BullMQ keys when a worker job is stuck.</p>
+      <div class="cmd-code"><pre><code>docker compose exec redis redis-cli
+<span class="c"># inside redis-cli</span>
+ping
+keys bull:*</code></pre></div>
+      <div class="cmd-tags"><span class="tag">redis-cli</span><span class="tag">queues</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="database" data-search="backup restore pg_dump postgres dump">
+      <div class="cmd-top"><span class="cmd-kicker">database</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Back up or restore local data</h3>
+      <p>Dump before a risky migration. Restore into an empty database.</p>
+      <div class="cmd-code"><pre><code>docker compose exec -T postgres pg_dump -U ai_trading ai_trading &gt; backup.sql
+cat backup.sql | docker compose exec -T postgres psql -U ai_trading -d ai_trading</code></pre></div>
+      <div class="cmd-tags"><span class="tag">pg_dump</span><span class="tag">recovery</span></div>
+    </article>
+  </div>
+
+  <div class="callout danger">
+    <span class="ico">■</span>
+    <div><strong>Production data:</strong> use the Neon pooled URL with <code>?sslmode=require</code>. Never point a local migration command at a production branch, and never edit a migration that has already been applied.</div>
+  </div>
+</section>
+
+<section class="cmd-section" id="docker" data-category="docker">
+  <div class="section-head">
+    <span class="num">08</span>
+    <div>
+      <p class="kicker">Containers</p>
+      <h2>Docker</h2>
+      <p>Local services, the full app stack and the three app images. Compose files live under <code>infra/</code>.</p>
+    </div>
+    <span class="count">8 commands</span>
+  </div>
+
+  <div class="cmd-grid">
+    <article class="cmd-card" data-category="docker" data-search="start services postgres redis compose up">
+      <div class="cmd-top"><span class="cmd-kicker">docker</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Start local services</h3>
+      <p>Launches PostgreSQL and Redis in the background with persistent volumes.</p>
+      <div class="cmd-code"><pre><code>docker compose up -d</code></pre></div>
+      <div class="cmd-tags"><span class="tag">stateful</span><span class="tag">detached</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="docker" data-search="status health inspect containers compose ps">
+      <div class="cmd-top"><span class="cmd-kicker">docker</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Check container health</h3>
+      <p>Both services should report <code>healthy</code> before the API or worker starts.</p>
+      <div class="cmd-code"><pre><code>docker compose ps
+docker inspect -f '{{.State.Health.Status}}' ai-trading-postgres
+docker inspect -f '{{.State.Health.Status}}' ai-trading-redis</code></pre></div>
+      <div class="cmd-tags"><span class="tag">health</span><span class="tag">debug</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="docker" data-search="logs follow postgres redis tail">
+      <div class="cmd-top"><span class="cmd-kicker">docker</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Follow service logs</h3>
+      <p>Watch startup failures, migration notices and Redis warnings.</p>
+      <div class="cmd-code"><pre><code>docker compose logs -f
+docker compose logs -f postgres redis</code></pre></div>
+      <div class="cmd-tags"><span class="tag">logs</span><span class="tag">follow</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="docker" data-search="stop services compose down keep volumes">
+      <div class="cmd-top"><span class="cmd-kicker">docker</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Stop local services</h3>
+      <p>Stops containers but keeps the database and Redis volumes.</p>
+      <div class="cmd-code"><pre><code>docker compose down</code></pre></div>
+      <div class="cmd-tags"><span class="tag">safe</span><span class="tag">keeps data</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="docker" data-search="reset volumes delete data compose down -v danger">
+      <div class="cmd-top"><span class="cmd-kicker">docker</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Reset local data</h3>
+      <p>Deletes PostgreSQL and Redis volumes. The next start is a clean database.</p>
+      <div class="cmd-code"><pre><code>docker compose down -v
+docker compose up -d
+pnpm db:migrate</code></pre></div>
+      <div class="cmd-tags"><span class="tag">destructive</span><span class="tag">local only</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="docker" data-search="app stack web api worker compose build up">
+      <div class="cmd-top"><span class="cmd-kicker">docker</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Run the full app stack</h3>
+      <p>Includes the root PostgreSQL/Redis services and builds web, API and worker images.</p>
+      <div class="cmd-code"><pre><code>docker compose -f infra/compose/docker-compose.apps.yml up -d --build</code></pre></div>
+      <div class="cmd-tags"><span class="tag">3 apps</span><span class="tag">+ services</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="docker" data-search="app stack logs status stop apps compose">
+      <div class="cmd-top"><span class="cmd-kicker">docker</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Inspect or stop the app stack</h3>
+      <p>Follow API/worker logs or tear down the app stack while leaving the stateful services alone.</p>
+      <div class="cmd-code"><pre><code>docker compose -f infra/compose/docker-compose.apps.yml ps
+docker compose -f infra/compose/docker-compose.apps.yml logs -f api worker
+docker compose -f infra/compose/docker-compose.apps.yml down</code></pre></div>
+      <div class="cmd-tags"><span class="tag">logs</span><span class="tag">lifecycle</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="docker" data-search="build image web api worker dockerfile">
+      <div class="cmd-top"><span class="cmd-kicker">docker</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Build one image at a time</h3>
+      <p>Useful for registry tagging or debugging a single Dockerfile.</p>
+      <div class="cmd-code"><pre><code>docker build -f infra/docker/web.Dockerfile -t ai-trading-web:local .
+docker build -f infra/docker/api.Dockerfile -t ai-trading-api:local .
+docker build -f infra/docker/worker.Dockerfile -t ai-trading-worker:local .</code></pre></div>
+      <div class="cmd-tags"><span class="tag">dockerfile</span><span class="tag">images</span></div>
+    </article>
+  </div>
+
+  <div class="callout warn">
+    <span class="ico">▲</span>
+    <div><strong>The app stack publishes ports 3000 and 8000.</strong> In production, put a reverse proxy in front and do not expose PostgreSQL, Redis or the API directly to the internet.</div>
+  </div>
+</section>
+
+<section class="cmd-section" id="deploy" data-category="deploy">
+  <div class="section-head">
+    <span class="num">09</span>
+    <div>
+      <p class="kicker">Ship it</p>
+      <h2>Deploy</h2>
+      <p>Local image validation, Azure Linux VPS provisioning and the remote Compose path. Provisioning commands are templates — confirm names and region first.</p>
+    </div>
+    <span class="count">10 steps</span>
+  </div>
+
+  <div class="cmd-grid single-grid">
+    <article class="cmd-card" data-category="deploy" data-search="pre deploy gates typecheck lint test build frozen">
+      <div class="cmd-top"><span class="cmd-kicker">deploy 01</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Run the pre-deploy gates</h3>
+      <p>Never deploy from a workspace that has not passed the same gates used in CI.</p>
+      <div class="cmd-code"><pre><code>pnpm install --frozen-lockfile
+pnpm nx run-many -t typecheck lint test build
+pnpm format:check</code></pre></div>
+      <div class="cmd-tags"><span class="tag">required</span><span class="tag">ci parity</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="deploy" data-search="build docker images registry tag web api worker">
+      <div class="cmd-top"><span class="cmd-kicker">deploy 02</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Build the three images</h3>
+      <p>Build locally or on the host. Tag with a release or commit SHA before pushing to a registry.</p>
+      <div class="cmd-code"><pre><code>docker build -f infra/docker/web.Dockerfile -t ai-trading-web:local .
+docker build -f infra/docker/api.Dockerfile -t ai-trading-api:local .
+docker build -f infra/docker/worker.Dockerfile -t ai-trading-worker:local .</code></pre></div>
+      <div class="cmd-tags"><span class="tag">images</span><span class="tag">release tag</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="deploy" data-search="start app stack compose up build production">
+      <div class="cmd-top"><span class="cmd-kicker">deploy 03</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Start the stack</h3>
+      <p>Compose includes PostgreSQL and Redis from the root file, then starts web, API and worker.</p>
+      <div class="cmd-code"><pre><code>docker compose -f infra/compose/docker-compose.apps.yml up -d --build
+docker compose -f infra/compose/docker-compose.apps.yml ps</code></pre></div>
+      <div class="cmd-tags"><span class="tag">compose</span><span class="tag">detached</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="deploy" data-search="migration remote container drizzle migrate">
+      <div class="cmd-top"><span class="cmd-kicker">deploy 04</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Apply migrations in the stack</h3>
+      <p>Run the migration once against the deployed database, before sending traffic.</p>
+      <div class="cmd-code"><pre><code>docker compose -f infra/compose/docker-compose.apps.yml run --rm api pnpm db:migrate</code></pre></div>
+      <div class="cmd-tags"><span class="tag">one-off</span><span class="tag">before traffic</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="deploy" data-search="azure login subscription resource group vm create ubuntu">
+      <div class="cmd-top"><span class="cmd-kicker">deploy 05</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Provision the Azure VM</h3>
+      <p>Template only. Choose a region close to the exchange and a size that fits the workload.</p>
+      <div class="cmd-code"><pre><code>az login
+az account set --subscription "&lt;subscription-id&gt;"
+
+az group create --name ai-trading-rg --location centralindia
+
+az vm create \
+  --resource-group ai-trading-rg \
+  --name ai-trading-vps \
+  --image Ubuntu2404 \
+  --size Standard_B2s \
+  --admin-username azureuser \
+  --generate-ssh-keys</code></pre></div>
+      <div class="cmd-tags"><span class="tag">azure</span><span class="tag">ubuntu 24.04</span><span class="tag">r6</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="deploy" data-search="open ports firewall static ip public ip azure">
+      <div class="cmd-top"><span class="cmd-kicker">deploy 06</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Open web ports and pin the IP</h3>
+      <p>Expose only 80/443. Upstox requires a registered static public IP before R6 validation.</p>
+      <div class="cmd-code"><pre><code>az vm open-port --resource-group ai-trading-rg --name ai-trading-vps --port 80 --priority 100
+az vm open-port --resource-group ai-trading-rg --name ai-trading-vps --port 443 --priority 110
+
+az network public-ip list --resource-group ai-trading-rg -o table
+az network public-ip update \
+  --resource-group ai-trading-rg \
+  --name &lt;public-ip-name&gt; \
+  --allocation-method Static</code></pre></div>
+      <div class="cmd-tags"><span class="tag">80/443 only</span><span class="tag">static ip</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="deploy" data-search="ssh host bootstrap docker install azure vm">
+      <div class="cmd-top"><span class="cmd-kicker">deploy 07</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Connect and install Docker</h3>
+      <p>Run this once on a fresh Ubuntu VM. Reconnect after adding the user to the docker group.</p>
+      <div class="cmd-code"><pre><code>ssh azureuser@&lt;public-ip&gt;
+
+sudo apt-get update
+sudo apt-get install -y ca-certificates curl git
+curl -fsSL https://get.docker.com | sudo sh
+sudo usermod -aG docker $USER
+<span class="c"># log out and back in, then verify:</span>
+docker run --rm hello-world</code></pre></div>
+      <div class="cmd-tags"><span class="tag">host setup</span><span class="tag">docker engine</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="deploy" data-search="clone repo environment secrets env production">
+      <div class="cmd-top"><span class="cmd-kicker">deploy 08</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Clone the repository and set secrets</h3>
+      <p>Use a deploy key or read-only token. Fill in the Neon URL, Redis URL, JWT secret and broker credentials.</p>
+      <div class="cmd-code"><pre><code>sudo mkdir -p /opt/ai-trading-system
+sudo chown $USER:$USER /opt/ai-trading-system
+git clone &lt;repo-url&gt; /opt/ai-trading-system
+cd /opt/ai-trading-system
+cp .env.example .env
+nano .env</code></pre></div>
+      <div class="cmd-tags"><span class="tag">secrets</span><span class="tag">neon</span><span class="tag">never commit</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="deploy" data-search="remote deploy compose up production host">
+      <div class="cmd-top"><span class="cmd-kicker">deploy 09</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Deploy on the host</h3>
+      <p>Build and start the stack, then apply migrations from the same release.</p>
+      <div class="cmd-code"><pre><code>docker compose -f infra/compose/docker-compose.apps.yml up -d --build
+docker compose -f infra/compose/docker-compose.apps.yml run --rm api pnpm db:migrate
+docker compose -f infra/compose/docker-compose.apps.yml ps</code></pre></div>
+      <div class="cmd-tags"><span class="tag">release</span><span class="tag">migrate</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="deploy" data-search="caddy reverse proxy https smoke test health">
+      <div class="cmd-top"><span class="cmd-kicker">deploy 10</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Front it with Caddy and smoke test</h3>
+      <p>Terminate TLS at the proxy. Keep the API, PostgreSQL and Redis off the public interface.</p>
+      <div class="cmd-code"><pre><code>sudo apt-get install -y caddy
+sudo nano /etc/caddy/Caddyfile
+
+<span class="c"># Caddyfile</span>
+&lt;domain&gt; {
+  reverse_proxy /api/* localhost:8000
+  reverse_proxy localhost:3000
+}
+
+sudo systemctl reload caddy
+
+curl -fsS https://&lt;domain&gt;/api/v1/health
+curl -fsS -o /dev/null -w '%{http_code}\n' https://&lt;domain&gt;/</code></pre></div>
+      <div class="cmd-tags"><span class="tag">tls</span><span class="tag">reverse proxy</span><span class="tag">smoke</span></div>
+    </article>
+  </div>
+
+  <div class="callout danger">
+    <span class="ico">■</span>
+    <div><strong>Live-trading guardrail:</strong> deployment is not permission to trade. Keep <code>TRADING_MODE=offline</code> until the R6 sandbox, R7 paper-trading and R8 controlled-live gates are satisfied. Do not expose ports 8000, 5432 or 6379 publicly.</div>
+  </div>
+</section>
+
+<section class="cmd-section" id="troubleshoot" data-category="troubleshoot">
+  <div class="section-head">
+    <span class="num">10</span>
+    <div>
+      <p class="kicker">When it breaks</p>
+      <h2>Troubleshooting</h2>
+      <p>Fast checks for ports, caches, containers, workspace links and the Next.js build.</p>
+    </div>
+    <span class="count">9 commands</span>
+  </div>
+
+  <div class="cmd-grid">
+    <article class="cmd-card" data-category="troubleshoot" data-search="port in use eaddrinuse 3000 8000 lsof kill">
+      <div class="cmd-top"><span class="cmd-kicker">fix</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Find and free a port</h3>
+      <p>Usually a previous dev server or worker is still listening after an interrupted run.</p>
+      <div class="cmd-code"><pre><code>lsof -nP -iTCP:3000 -sTCP:LISTEN
+lsof -nP -iTCP:8000 -sTCP:LISTEN
+kill &lt;pid&gt;</code></pre></div>
+      <div class="cmd-tags"><span class="tag">EADDRINUSE</span><span class="tag">ports</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="troubleshoot" data-search="docker daemon not running open docker desktop socket">
+      <div class="cmd-top"><span class="cmd-kicker">fix</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Start the Docker daemon</h3>
+      <p>On macOS, launch Docker Desktop and wait for the socket to become available.</p>
+      <div class="cmd-code"><pre><code>open -a Docker
+docker info
+docker compose ps</code></pre></div>
+      <div class="cmd-tags"><span class="tag">docker.sock</span><span class="tag">macos</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="troubleshoot" data-search="nx stale cache daemon project missing reset">
+      <div class="cmd-top"><span class="cmd-kicker">fix</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Nx sees stale projects or targets</h3>
+      <p>Clear the daemon and cache metadata, then reopen the graph.</p>
+      <div class="cmd-code"><pre><code>pnpm nx reset
+pnpm nx show projects
+pnpm nx graph</code></pre></div>
+      <div class="cmd-tags"><span class="tag">cache</span><span class="tag">daemon</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="troubleshoot" data-search="next build global-error useContext NODE_ENV production">
+      <div class="cmd-top"><span class="cmd-kicker">fix</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Next build fails on <code>_global-error</code></h3>
+      <p>This happens when Next runs with <code>NODE_ENV=development</code>. The package script already forces production.</p>
+      <div class="cmd-code"><pre><code>NODE_ENV=production pnpm --filter @ai-trading/web build
+<span class="c"># or use the project target</span>
+pnpm nx build web</code></pre></div>
+      <div class="cmd-tags"><span class="tag">next 16</span><span class="tag">prerender</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="troubleshoot" data-search="postgres redis unhealthy connection refused docker">
+      <div class="cmd-top"><span class="cmd-kicker">fix</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Database or Redis is unhealthy</h3>
+      <p>Check health, read logs, then restart only the failing service.</p>
+      <div class="cmd-code"><pre><code>docker compose ps
+docker compose logs --tail=50 postgres redis
+docker compose restart postgres
+docker compose exec redis redis-cli ping</code></pre></div>
+      <div class="cmd-tags"><span class="tag">ECONNREFUSED</span><span class="tag">health</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="troubleshoot" data-search="workspace package not found cannot find module build dist">
+      <div class="cmd-top"><span class="cmd-kicker">fix</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Workspace package cannot be resolved</h3>
+      <p>Re-link the workspace, then build the package so its <code>dist</code> and declarations exist.</p>
+      <div class="cmd-code"><pre><code>pnpm install
+pnpm nx build domain
+pnpm nx build configuration
+pnpm nx graph</code></pre></div>
+      <div class="cmd-tags"><span class="tag">workspace:*</span><span class="tag">dist</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="troubleshoot" data-search="clean reinstall node_modules reset dependencies">
+      <div class="cmd-top"><span class="cmd-kicker">fix</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Clean reinstall</h3>
+      <p>Last resort for corrupted installs. This removes every local dependency folder, not source.</p>
+      <div class="cmd-code"><pre><code>rm -rf node_modules apps/*/node_modules packages/*/node_modules tests/node_modules
+pnpm install</code></pre></div>
+      <div class="cmd-tags"><span class="tag">destructive</span><span class="tag">recovery</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="troubleshoot" data-search="pnpm ignored builds approve-builds allowBuilds native">
+      <div class="cmd-top"><span class="cmd-kicker">fix</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Approve a blocked build script</h3>
+      <p>pnpm 11 blocks unreviewed install scripts. Approve only packages you recognise.</p>
+      <div class="cmd-code"><pre><code>pnpm approve-builds
+<span class="c"># or add an explicit entry under allowBuilds in pnpm-workspace.yaml</span></code></pre></div>
+      <div class="cmd-tags"><span class="tag">allowBuilds</span><span class="tag">security</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="troubleshoot" data-search="dependency conflict why outdated list versions">
+      <div class="cmd-top"><span class="cmd-kicker">fix</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Diagnose a dependency conflict</h3>
+      <p>Find who pulls a package, which versions exist, and whether the workspace is out of date.</p>
+      <div class="cmd-code"><pre><code>pnpm why &lt;package&gt;
+pnpm list -r --depth 0
+pnpm outdated -r</code></pre></div>
+      <div class="cmd-tags"><span class="tag">versions</span><span class="tag">duplicates</span></div>
+    </article>
+  </div>
+</section>
+
+<footer>
+  <span>AI Trading System · Developer Command Deck · generated from the live workspace</span>
+  <span>
+    <a href="./monorepo-setup-plan.html">Setup plan</a> ·
+    <a href="../docs/operations/implementation-notes.md">Implementation notes</a> ·
+    <a href="../docs/operations/runbook.md">Runbook</a> ·
+    <a href="../README.md">README</a>
+  </span>
+</footer>
+
+</main>
+
+<button class="to-top" id="toTop" aria-label="Back to top">↑</button>
+
+<script>
+(function(){
+  const cards = Array.from(document.querySelectorAll('.cmd-card'));
+  const sections = Array.from(document.querySelectorAll('.cmd-section'));
+  const search = document.getElementById('search');
+  const mobileSearch = document.getElementById('mobileSearch');
+  const chips = Array.from(document.querySelectorAll('.chip[data-filter]'));
+  const resultCounts = Array.from(document.querySelectorAll('[data-result-count]'));
+  const noResults = document.getElementById('noResults');
+  let activeFilter = 'all';
+
+  function applyFilters(){
+    const q = (search.value || mobileSearch.value || '').trim().toLowerCase();
+    let visible = 0;
+
+    cards.forEach(function(card){
+      const category = card.dataset.category || '';
+      const haystack = (card.dataset.search || '') + ' ' + card.textContent.toLowerCase();
+      const categoryOk = activeFilter === 'all' || category === activeFilter;
+      const queryOk = !q || haystack.toLowerCase().includes(q);
+      const show = categoryOk && queryOk;
+      card.hidden = !show;
+      if (show) visible += 1;
+    });
+
+    sections.forEach(function(section){
+      const hasVisible = section.querySelectorAll('.cmd-card:not([hidden])').length > 0;
+      section.hidden = !hasVisible;
+    });
+
+    resultCounts.forEach(function(el){ el.textContent = String(visible); });
+    noResults.hidden = visible !== 0;
+  }
+
+  chips.forEach(function(chip){
+    chip.addEventListener('click', function(){
+      activeFilter = chip.dataset.filter;
+      chips.forEach(function(c){ c.classList.toggle('active', c === chip); });
+      applyFilters();
+    });
+  });
+
+  let searchTimer;
+  function onSearch(){
+    window.clearTimeout(searchTimer);
+    searchTimer = window.setTimeout(applyFilters, 70);
+  }
+  search.addEventListener('input', onSearch);
+  mobileSearch.addEventListener('input', onSearch);
+
+  search.addEventListener('keydown', function(e){
+    if (e.key === 'Escape') { search.value = ''; mobileSearch.value = ''; applyFilters(); search.blur(); }
+  });
+  mobileSearch.addEventListener('keydown', function(e){
+    if (e.key === 'Escape') { search.value = ''; mobileSearch.value = ''; applyFilters(); mobileSearch.blur(); }
+  });
+
+  document.addEventListener('keydown', function(e){
+    const tag = (e.target.tagName || '').toLowerCase();
+    const typing = tag === 'input' || tag === 'textarea' || e.target.isContentEditable;
+    if (e.key === '/' && !typing) {
+      e.preventDefault();
+      if (window.innerWidth <= 1120) { openMenu(); mobileSearch.focus(); }
+      else { search.focus(); search.select(); }
+    }
+  });
+
+  document.querySelectorAll('[data-copy]').forEach(function(btn){
+    btn.addEventListener('click', async function(){
+      const card = btn.closest('.cmd-card, .terminal, .deploy-step');
+      const code = card ? card.querySelector('pre') : null;
+      const text = code ? code.innerText : '';
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(text);
+        } else {
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          ta.style.position = 'fixed';
+          ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          ta.remove();
+        }
+        btn.textContent = 'Copied';
+        btn.classList.add('done');
+        window.setTimeout(function(){ btn.textContent = 'Copy'; btn.classList.remove('done'); }, 1400);
+      } catch (err) {
+        btn.textContent = 'Select';
+      }
+    });
+  });
+
+  const sideLinks = Array.from(document.querySelectorAll('#sideNav a'));
+  const byId = new Map();
+  sideLinks.forEach(function(a){ byId.set(a.getAttribute('href').slice(1), a); });
+  let activeId = null;
+  function setActive(id){
+    if (activeId === id) return;
+    activeId = id;
+    sideLinks.forEach(function(a){ a.classList.remove('active'); });
+    const link = byId.get(id);
+    if (link) link.classList.add('active');
+  }
+  const observer = new IntersectionObserver(function(entries){
+    const visible = entries.filter(function(e){ return e.isIntersecting; });
+    if (visible.length) {
+      visible.sort(function(a,b){ return a.boundingClientRect.top - b.boundingClientRect.top; });
+      setActive(visible[0].target.id);
+    }
+  }, { rootMargin: '-12% 0px -74% 0px', threshold: 0 });
+  sections.forEach(function(s){ observer.observe(s); });
+
+  const progress = document.getElementById('scrollProgress');
+  const sideBar = document.getElementById('sideBar');
+  const toTop = document.getElementById('toTop');
+  function onScroll(){
+    const doc = document.documentElement;
+    const max = doc.scrollHeight - doc.clientHeight;
+    const pct = max > 0 ? Math.min(100, Math.max(0, (doc.scrollTop / max) * 100)) : 0;
+    progress.style.width = pct + '%';
+    sideBar.style.width = pct + '%';
+    toTop.classList.toggle('show', doc.scrollTop > 700);
+  }
+  window.addEventListener('scroll', onScroll, { passive: true });
+  window.addEventListener('resize', onScroll);
+  onScroll();
+  toTop.addEventListener('click', function(){ window.scrollTo({ top: 0, behavior: 'smooth' }); });
+
+  const menuBtn = document.getElementById('menuBtn');
+  const mobileMenu = document.getElementById('mobileMenu');
+  const mobileNav = document.getElementById('mobileNav');
+  mobileNav.innerHTML = document.getElementById('sideNav').innerHTML;
+  mobileNav.querySelectorAll('a').forEach(function(a){ a.addEventListener('click', closeMenu); });
+
+  function openMenu(){
+    mobileMenu.hidden = false;
+    menuBtn.setAttribute('aria-expanded', 'true');
+  }
+  function closeMenu(){
+    mobileMenu.hidden = true;
+    menuBtn.setAttribute('aria-expanded', 'false');
+  }
+  menuBtn.addEventListener('click', function(){
+    if (mobileMenu.hidden) openMenu(); else closeMenu();
+  });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') closeMenu(); });
+
+  applyFilters();
+})();
+</script>
+</body>
+</html>

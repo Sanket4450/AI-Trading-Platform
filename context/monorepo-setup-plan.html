@@ -486,7 +486,7 @@
     <li><code>pnpm nx graph</code> lists <code>web</code>, <code>api</code>, <code>worker</code> and all twelve packages with dependency edges.</li>
     <li><code>pnpm nx run-many -t typecheck</code>, <code>lint</code>, <code>build</code> and <code>test</code> pass.</li>
     <li><code>docker compose up -d</code> starts healthy PostgreSQL and Redis containers.</li>
-    <li><code>pnpm dev</code> starts the dashboard on <code>:3000</code>, the API on <code>:4000</code>, and the worker process.</li>
+    <li><code>pnpm dev</code> starts the dashboard on <code>:3000</code>, the API on <code>:8000</code>, and the worker process.</li>
     <li><code>GET /api/v1/health</code> returns a healthy response and the worker logs a ready queue connection.</li>
     <li><code>pnpm db:generate</code> produces a Drizzle migration without schema drift.</li>
   </ul>
@@ -564,7 +564,7 @@
     <p class="arch-label">Presentation &amp; application</p>
     <div class="arch-row">
       <div class="node app"><b>apps/web · :3000</b><span>Next.js App Router. Strategies, backtests, trading, risk, performance, settings.</span></div>
-      <div class="node app"><b>apps/api · :4000</b><span>NestJS HTTP API. Validates commands, coordinates workflows, exposes reports.</span></div>
+      <div class="node app"><b>apps/api · :8000</b><span>NestJS HTTP API. Validates commands, coordinates workflows, exposes reports.</span></div>
       <div class="node app"><b>apps/worker</b><span>NestJS application context. Ingestion, evaluation, backtests, reconciliation.</span></div>
     </div>
 
@@ -1722,7 +1722,7 @@ async function bootstrap() {
   SwaggerModule.setup('api/docs', app, SwaggerModule.createDocument(app, swagger));
 
   app.enableShutdownHooks();
-  await app.listen(config.get&lt;number&gt;('API_PORT', 4000));
+  await app.listen(config.get&lt;number&gt;('API_PORT', 8000));
 }
 
 void bootstrap();</code></pre>
@@ -1837,7 +1837,7 @@ pnpm --filter @ai-trading/api dev</code></pre>
       </div>
       <div class="code">
         <div class="code-head"><span class="code-lang">bash</span><button class="copy" type="button">Copy</button></div>
-<pre><code>curl -s http://localhost:4000/api/v1/health</code></pre>
+<pre><code>curl -s http://localhost:8000/api/v1/health</code></pre>
       </div>
     </div>
   </div>
@@ -2408,7 +2408,7 @@ LOG_LEVEL=debug
 
 # Apps
 WEB_URL=http://localhost:3000
-API_PORT=4000
+API_PORT=8000
 API_PREFIX=api
 TRADING_MODE=offline
 
@@ -2430,7 +2430,7 @@ JWT_EXPIRES_IN=15m
 # Broker — leave blank until R2/R6
 UPSTOX_API_KEY=
 UPSTOX_API_SECRET=
-UPSTOX_REDIRECT_URI=http://localhost:4000/api/v1/broker/upstox/callback
+UPSTOX_REDIRECT_URI=http://localhost:8000/api/v1/broker/upstox/callback
 UPSTOX_ACCESS_TOKEN=
 UPSTOX_SANDBOX=true
 
@@ -2580,7 +2580,7 @@ COPY . .
 RUN pnpm install --frozen-lockfile
 RUN pnpm --filter @ai-trading/api... build
 
-EXPOSE 4000
+EXPOSE 8000
 CMD ["node", "apps/api/dist/main.js"]</code></pre>
           </div>
         </div>
@@ -2637,7 +2637,7 @@ services:
       dockerfile: infra/docker/api.Dockerfile
     env_file: ../../.env
     ports:
-      - "4000:4000"
+      - "8000:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -2880,8 +2880,8 @@ pnpm dev
 | Service | URL |
 | --- | --- |
 | Dashboard | http://localhost:3000 |
-| API | http://localhost:4000/api/v1 |
-| Swagger | http://localhost:4000/api/docs |
+| API | http://localhost:8000/api/v1 |
+| Swagger | http://localhost:8000/api/docs |
 | PostgreSQL | localhost:5432 |
 | Redis | localhost:6379 |
 
@@ -3019,7 +3019,7 @@ docker compose up -d
 pnpm dev
 
 # Terminal 3 — smoke checks
-curl -s http://localhost:4000/api/v1/health
+curl -s http://localhost:8000/api/v1/health
 curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3000
 docker compose ps</code></pre>
       </div>
@@ -3053,7 +3053,7 @@ git commit -m "feat: scaffold monorepo apps, packages and local infrastructure"<
         <tr><td>Next cannot resolve a workspace package</td><td>Package has no built <code>dist</code>, or it is not in <code>transpilePackages</code>.</td><td>Build the package and add it to <code>next.config.ts</code>.</td></tr>
         <tr><td>shadcn cannot find the alias</td><td>The CLI ran from the wrong directory.</td><td><code>cd apps/web &amp;&amp; pnpm dlx shadcn@latest init</code>.</td></tr>
         <tr><td>Drizzle cannot find <code>DATABASE_URL</code></td><td><code>.env</code> missing at the root.</td><td><code>cp .env.example .env</code>, keep <code>import 'dotenv/config'</code> in the config.</td></tr>
-        <tr><td><code>EADDRINUSE</code> on 3000/4000</td><td>Another dev server is already running.</td><td>Stop it or change <code>--port</code> / <code>API_PORT</code>.</td></tr>
+        <tr><td><code>EADDRINUSE</code> on 3000/8000</td><td>Another dev server is already running.</td><td>Stop it or change <code>--port</code> / <code>API_PORT</code>.</td></tr>
         <tr><td>Peer dependency warnings block install</td><td>Framework peer ranges differ.</td><td>Keep <code>strict-peer-dependencies=false</code> during setup; resolve the actual peer before production.</td></tr>
         <tr><td>Redis connection refused in the worker</td><td>Compose service not started or wrong host.</td><td><code>docker compose up -d redis</code>; check <code>REDIS_URL</code>.</td></tr>
       </tbody>
@@ -3220,7 +3220,7 @@ git commit -m "feat: scaffold monorepo apps, packages and local infrastructure"<
         <tr><td><code>NODE_ENV</code></td><td>All apps</td><td><code>development</code></td><td>Use <code>production</code> only in deployed images.</td></tr>
         <tr><td><code>TZ</code> / <code>MARKET_TIMEZONE</code></td><td>All apps</td><td><code>Asia/Kolkata</code></td><td>Persistence remains UTC; conversion happens at market boundaries.</td></tr>
         <tr><td><code>WEB_URL</code></td><td>API CORS</td><td><code>http://localhost:3000</code></td><td>Must match the deployed dashboard origin.</td></tr>
-        <tr><td><code>API_PORT</code></td><td>API</td><td><code>4000</code></td><td>Worker has no HTTP port.</td></tr>
+        <tr><td><code>API_PORT</code></td><td>API</td><td><code>8000</code></td><td>Worker has no HTTP port.</td></tr>
         <tr><td><code>TRADING_MODE</code></td><td>Configuration package</td><td><code>offline</code></td><td>Allowed: <code>offline</code>, <code>research</code>, <code>backtesting</code>, <code>paper</code>, <code>live</code>. Live requires explicit R8 approval.</td></tr>
         <tr><td><code>DATABASE_URL</code></td><td>Database / Drizzle</td><td>local PostgreSQL URL</td><td>Neon production URLs need <code>sslmode=require</code>.</td></tr>
         <tr><td><code>POSTGRES_*</code></td><td>Docker Compose</td><td><code>ai_trading</code></td><td>Local only; production uses Neon credentials.</td></tr>

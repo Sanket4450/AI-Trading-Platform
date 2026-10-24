@@ -6,7 +6,7 @@ describe('configuration contract', () => {
     const env = validateEnv({});
 
     expect(env.TRADING_MODE).toBe('offline');
-    expect(env.API_PORT).toBe(4000);
+    expect(env.API_PORT).toBe(8000);
     expect(env.MARKET_TIMEZONE).toBe('Asia/Kolkata');
   });
 

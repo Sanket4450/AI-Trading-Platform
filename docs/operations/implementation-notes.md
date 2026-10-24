@@ -35,14 +35,16 @@ were observed while executing it.
    in production mode.
 6. **The generated app test runners differ.** Nest apps use Vitest 4 and oxlint from the official CLI; web,
    packages and the cross-cutting test project use Vitest 3 and ESLint. Both run through Nx targets.
+7. **The API runs on port 8000.** Port 4000 was already occupied in the local environment, so `API_PORT`, the
+   Upstox redirect URI, Docker port mappings, Swagger/health URLs and every command reference now use `8000`.
 
 ## Verification performed
 
 ```bash
 pnpm nx run-many -t typecheck lint test build
 pnpm format:check
-pnpm dev                 # web :3000, API :4000, worker
-curl http://127.0.0.1:4000/api/v1/health
+pnpm dev                 # web :3000, API :8000, worker
+curl http://127.0.0.1:8000/api/v1/health
 pnpm --filter @ai-trading/tests test:e2e
 docker compose ps
 pnpm db:generate && pnpm db:migrate

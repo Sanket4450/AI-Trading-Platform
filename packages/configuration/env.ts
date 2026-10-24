@@ -13,7 +13,7 @@ export const envSchema = z.object({
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
 
   WEB_URL: z.string().url().default('http://localhost:3000'),
-  API_PORT: z.coerce.number().int().positive().default(4000),
+  API_PORT: z.coerce.number().int().positive().default(8000),
   API_PREFIX: z.string().default('api'),
   TRADING_MODE: z.enum(tradingModes).default('offline'),
 
