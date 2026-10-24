@@ -5,7 +5,7 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: 'AI Trading System',
-  description: 'Strategy control, backtesting, risk and trade operations.',
+  description: 'R1 offline operator cockpit for market data, configuration, risk and audit.',
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
