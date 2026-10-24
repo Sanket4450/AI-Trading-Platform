@@ -11,7 +11,7 @@ describe('configuration contract', () => {
   });
 
   it('rejects an unknown trading mode', () => {
-    expect(() => validateEnv({ TRADING_MODE: 'aggressive' })).toThrow();
+    expect(() => validateEnv({ TRADING_MODE: 'aggressive' })).toThrow(/Invalid option/i);
   });
 
   it('parses the sandbox flag as a real boolean', () => {

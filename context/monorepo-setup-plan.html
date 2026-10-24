@@ -446,6 +446,11 @@
   </div>
 </section>
 
+<div class="callout warn">
+  <span class="ico">▲</span>
+  <div><strong>Implementation update:</strong> the workspace now uses <code>oxlint</code> (Rust) across all 16 projects with a single root <code>.oxlintrc.json</code>; ESLint has been removed. Architecture boundaries are enforced by <code>scripts/check-boundaries.mjs</code> via <code>pnpm lint</code> or <code>pnpm boundaries</code>.</div>
+</div>
+
 <section id="outcomes" data-title="Outcomes &amp; scope">
   <div class="section-head">
     <span class="num">01</span>

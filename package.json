@@ -11,11 +11,12 @@
     "dev": "nx run-many -t build --exclude=web,api,worker,tests && nx run-many -t dev -p web,api,worker --parallel=3",
     "build": "nx run-many -t build",
     "typecheck": "nx run-many -t typecheck",
-    "lint": "nx run-many -t lint",
+    "lint": "nx run-many -t lint && node scripts/check-boundaries.mjs",
+    "boundaries": "node scripts/check-boundaries.mjs",
     "test": "nx run-many -t test",
     "affected:build": "nx affected -t build",
     "affected:test": "nx affected -t test",
-    "affected:lint": "nx affected -t lint",
+    "affected:lint": "nx affected -t lint && node scripts/check-boundaries.mjs",
     "graph": "nx graph",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
@@ -35,18 +36,15 @@
     "postgres": "^3.4.0"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.5",
-    "@nx/eslint-plugin": "^22.0.0",
     "@types/node": "catalog:",
     "drizzle-kit": "^0.31.0",
-    "eslint": "catalog:",
-    "eslint-config-prettier": "^10.0.0",
     "nx": "22.7.12",
+    "oxlint": "^1.89.0",
+    "oxlint-tsgolint": "^7.0.2004",
     "prettier": "catalog:",
     "prettier-plugin-tailwindcss": "^0.6.0",
     "tsup": "catalog:",
     "typescript": "catalog:",
-    "typescript-eslint": "^8.0.0",
     "vitest": "catalog:"
   }
 }

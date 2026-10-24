@@ -26,6 +26,9 @@ The system is a modular monolith with a separate worker process.
 6. No package imports NestJS, Next.js or React.
 7. Trading mode comes from validated configuration, never from a strategy or adapter.
 
+These rules are enforced by `scripts/check-boundaries.mjs`, which runs as part of `pnpm lint` (or directly with
+`pnpm boundaries`) using the Nx project graph.
+
 ## Source material
 
 The authoritative specifications live in the repository's `context/` folder:

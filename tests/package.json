@@ -9,7 +9,7 @@
     "test:broker-contracts": "vitest run broker-contracts --passWithNoTests",
     "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint ."
+    "lint": "oxlint --type-aware ."
   },
   "dependencies": {
     "@ai-trading/adapters": "workspace:*",

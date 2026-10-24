@@ -20,11 +20,10 @@
     "build": "tsup index.ts --format esm,cjs --dts --clean --sourcemap",
     "dev": "tsup index.ts --format esm,cjs --dts --watch --sourcemap",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint .",
+    "lint": "oxlint --type-aware .",
     "test": "vitest run --passWithNoTests"
   },
   "devDependencies": {
-    "eslint": "catalog:",
     "tsup": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

@@ -30,7 +30,7 @@
     },
     "lint": {
       "cache": true,
-      "inputs": ["default", "{workspaceRoot}/eslint.config.mjs"]
+      "inputs": ["default", "{workspaceRoot}/.oxlintrc.json"]
     },
     "test": {
       "cache": true,

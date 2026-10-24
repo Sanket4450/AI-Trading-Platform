@@ -1,0 +1,62 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["eslint", "typescript", "unicorn", "oxc", "import", "promise", "node", "vitest"],
+  "categories": {
+    "correctness": "error"
+  },
+  "rules": {
+    "typescript/no-explicit-any": "off",
+    "typescript/no-floating-promises": "error"
+  },
+  "env": {
+    "builtin": true,
+    "node": true
+  },
+  "settings": {
+    "next": {
+      "rootDir": "apps/web/"
+    }
+  },
+  "ignorePatterns": [
+    "**/dist/**",
+    "**/.next/**",
+    "**/coverage/**",
+    "**/node_modules/**",
+    "**/*.d.ts",
+    "context/**",
+    "**/test-results/**",
+    "**/playwright-report/**",
+    "apps/web/src/components/ui/**"
+  ],
+  "overrides": [
+    {
+      "files": ["apps/web/**/*.{ts,tsx}"],
+      "plugins": [
+        "eslint",
+        "typescript",
+        "unicorn",
+        "oxc",
+        "import",
+        "react",
+        "nextjs",
+        "jsx-a11y",
+        "promise",
+        "node",
+        "vitest"
+      ],
+      "env": {
+        "builtin": true,
+        "browser": true,
+        "node": true
+      }
+    },
+    {
+      "files": ["**/*.{test,spec}.{ts,tsx}", "tests/**/*.ts"],
+      "env": {
+        "builtin": true,
+        "node": true,
+        "vitest": true
+      }
+    }
+  ]
+}

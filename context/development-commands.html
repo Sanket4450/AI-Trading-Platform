@@ -421,7 +421,7 @@
     <a href="#develop"><span class="n">02</span> Run locally <span class="c">8</span></a>
     <a href="#build"><span class="n">03</span> Build <span class="c">7</span></a>
     <a href="#test"><span class="n">04</span> Test <span class="c">8</span></a>
-    <a href="#quality"><span class="n">05</span> Quality gates <span class="c">6</span></a>
+    <a href="#quality"><span class="n">05</span> Quality gates <span class="c">7</span></a>
     <a href="#nx"><span class="n">06</span> Nx navigation <span class="c">7</span></a>
     <a href="#database"><span class="n">07</span> Database <span class="c">9</span></a>
     <a href="#docker"><span class="n">08</span> Docker <span class="c">8</span></a>
@@ -886,25 +886,25 @@ pnpm --filter @ai-trading/api exec vitest run src/app.controller.spec.ts</code><
     <div>
       <p class="kicker">Before commit</p>
       <h2>Quality gates</h2>
-      <p>Lint, format and affected checks. Run these locally so CI stays boring.</p>
+      <p>Oxlint, format and affected checks. Run these locally so CI stays boring.</p>
     </div>
-    <span class="count">6 commands</span>
+    <span class="count">7 commands</span>
   </div>
 
   <div class="cmd-grid">
-    <article class="cmd-card" data-category="quality" data-search="lint all eslint oxlint pnpm lint">
+    <article class="cmd-card" data-category="quality" data-search="lint all rust oxlint pnpm lint">
       <div class="cmd-top"><span class="cmd-kicker">quality</span><button class="copy" data-copy type="button">Copy</button></div>
       <h3>Lint every project</h3>
-      <p>Web, packages and tests use ESLint; Nest apps use oxlint from the official CLI.</p>
+      <p>All 16 projects use Oxlint 1.x, the Rust-based linter. The root <code>.oxlintrc.json</code> is the single source of truth.</p>
       <div class="cmd-code"><pre><code>pnpm lint
 <span class="c"># or: pnpm nx run-many -t lint</span></code></pre></div>
-      <div class="cmd-tags"><span class="tag">eslint</span><span class="tag">oxlint</span></div>
+      <div class="cmd-tags"><span class="tag">oxlint</span><span class="tag">rust</span></div>
     </article>
 
-    <article class="cmd-card" data-category="quality" data-search="lint one project web api worker domain">
+    <article class="cmd-card" data-category="quality" data-search="lint one project web api worker domain oxlint">
       <div class="cmd-top"><span class="cmd-kicker">quality</span><button class="copy" data-copy type="button">Copy</button></div>
       <h3>Lint one project</h3>
-      <p>Find the owning linter quickly while iterating on a single app.</p>
+      <p>Runs that project's Oxlint target against the root config while iterating on a single app.</p>
       <div class="cmd-code"><pre><code>pnpm nx lint web
 pnpm nx lint api
 pnpm nx lint domain</code></pre></div>
@@ -930,18 +930,29 @@ pnpm nx lint domain</code></pre></div>
     <article class="cmd-card" data-category="quality" data-search="affected typecheck lint test build git base">
       <div class="cmd-top"><span class="cmd-kicker">quality</span><button class="copy" data-copy type="button">Copy</button></div>
       <h3>Check only affected projects</h3>
-      <p>Compares against <code>main</code>. Change the base if your branch uses a different default.</p>
-      <div class="cmd-code"><pre><code>pnpm nx affected -t typecheck lint test build --base=main</code></pre></div>
+      <p>Compares against <code>main</code>. Change the base if your branch uses a different default. Boundaries are global, so run them too.</p>
+      <div class="cmd-code"><pre><code>pnpm nx affected -t typecheck lint test build --base=main
+pnpm boundaries</code></pre></div>
       <div class="cmd-tags"><span class="tag">affected</span><span class="tag">ci</span></div>
     </article>
 
     <article class="cmd-card" data-category="quality" data-search="full gate before commit typecheck lint test build">
       <div class="cmd-top"><span class="cmd-kicker">quality</span><button class="copy" data-copy type="button">Copy</button></div>
       <h3>Full pre-commit gate</h3>
-      <p>The same four targets used for the setup acceptance check.</p>
-      <div class="cmd-code"><pre><code>pnpm nx run-many -t typecheck lint test build
+      <p>Oxlint plus the boundary check, then typecheck, tests, builds and formatting.</p>
+      <div class="cmd-code"><pre><code>pnpm lint
+pnpm nx run-many -t typecheck test build
 pnpm format:check</code></pre></div>
       <div class="cmd-tags"><span class="tag">all 16 projects</span><span class="tag">release</span></div>
+    </article>
+
+    <article class="cmd-card" data-category="quality" data-search="boundaries architecture dependencies nx graph contracts">
+      <div class="cmd-top"><span class="cmd-kicker">quality</span><button class="copy" data-copy type="button">Copy</button></div>
+      <h3>Check architecture boundaries</h3>
+      <p>Reads the Nx graph and enforces app-to-app, package-to-app and per-package dependency contracts.</p>
+      <div class="cmd-code"><pre><code>pnpm boundaries
+<span class="c"># pnpm lint runs oxlint first, then this check</span></code></pre></div>
+      <div class="cmd-tags"><span class="tag">nx graph</span><span class="tag">boundaries</span></div>
     </article>
   </div>
 </section>

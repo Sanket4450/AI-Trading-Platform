@@ -6,7 +6,7 @@
     "dev": "next dev --turbopack --port 3000",
     "build": "NODE_ENV=production next build",
     "start": "next start --port 3000",
-    "lint": "eslint .",
+    "lint": "oxlint --type-aware .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests"
   },
@@ -33,8 +33,6 @@
     "@types/node": "catalog:",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "eslint": "catalog:",
-    "eslint-config-next": "16.4.2",
     "jsdom": "^30.1.3",
     "tailwindcss": "^4",
     "typescript": "catalog:",

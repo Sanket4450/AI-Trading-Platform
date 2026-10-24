@@ -24,7 +24,8 @@ were observed while executing it.
    `allowBuilds` and stores workspace settings in `pnpm-workspace.yaml`, so the plan's configuration model is
    preserved.
 2. **NestJS 12 rather than NestJS 11.** The current official Nest CLI generates Nest 12 with ESM/NodeNext,
-   Vitest 4 and oxlint. The generated layout was kept; ESLint remains the linter for web and packages.
+   Vitest 4 and oxlint. The generated layout was kept; the CLI's Rust-based oxlint setup was extended to the
+   entire workspace.
 3. **Web build forces `NODE_ENV=production`.** Nx loads the root `.env`, which contains
    `NODE_ENV=development`. Next.js 16 fails to prerender its internal `_global-error` route when the build runs
    with `NODE_ENV=development`. The web build script is therefore `NODE_ENV=production next build`.
@@ -33,17 +34,22 @@ were observed while executing it.
    `pnpm --filter @ai-trading/<package> dev` when changing that package.
 5. **The root layout keeps the shadcn tooltip provider and toaster.** They build correctly once the web build runs
    in production mode.
-6. **The generated app test runners differ.** Nest apps use Vitest 4 and oxlint from the official CLI; web,
-   packages and the cross-cutting test project use Vitest 3 and ESLint. Both run through Nx targets.
+6. **Linting is Oxlint across the whole workspace.** All 16 projects use Oxlint 1.x, the Rust-based linter,
+   with one root `.oxlintrc.json`. Nest apps use Vitest 4; web, packages and the cross-cutting test project use
+   Vitest 3. Both run through Nx targets.
 7. **The API runs on port 8000.** Port 4000 was already occupied in the local environment, so `API_PORT`, the
    Upstox redirect URI, Docker port mappings, Swagger/health URLs and every command reference now use `8000`.
 8. **Stale dev processes are cleaned with `pnpm dev:stop`.** Interrupted `nest start --watch` or `node dist/main`
    processes can keep holding 3000/8000. `pnpm ports` shows listeners and `pnpm dev:stop` stops them.
+9. **ESLint was removed in favour of Oxlint.** The previous mixed ESLint/oxlint setup is gone. Oxlint runs in every
+   app, package and test project against the root config. The old Nx ESLint module-boundary rule is replaced by
+   `scripts/check-boundaries.mjs`, which reads the Nx project graph and enforces the architecture contracts.
 
 ## Verification performed
 
 ```bash
-pnpm nx run-many -t typecheck lint test build
+pnpm lint                # oxlint across all projects + architecture boundaries
+pnpm nx run-many -t typecheck test build
 pnpm format:check
 pnpm dev                 # web :3000, API :8000, worker
 curl http://127.0.0.1:8000/api/v1/health
