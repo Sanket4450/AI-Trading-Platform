@@ -1,19 +1,18 @@
-## Monorepo Folder Structure
+## Implementation Plan
 
-Task 1: Create an implementation plan for the setup the monorepo folder structure step by step. The medium level folder structure is mentioned below.
+Task 1: Implement context/r1-implementation-plan.html
 
 ### Description
 
-- The medium level folder structure is within: context/folder-structure.md
-- Additionally expore all files within context folder so and process the idea behind the solution and it's folder structure.
+- In case of environment variables, you write them in the .env, I'll populate them with real values later. You can assume that the .env file is already created and you can use it in your code.
 
 ### Context
 
-- It should mention every other shell command or dependency required to setup the monorepo folder structure.
-- All apps should be created here at the root level of the monorepo.
+- 
 
 ### Constraints
 
-- It should be an HTML file within context folder having beautiful styles in dark mode.
+- Follow the folder structure, organize the code properly into the context folder with consistency.
+- Follow the coding standards and best practices of the project.
 
 **Before implementing, clarify any ambiguity or missing detail at the feature level. Do not make assumptions about intended behavior, even for small details, if they could affect the implementation. If there is any uncertainty or multiple reasonable interpretations, ask the user for clarification before proceeding.**

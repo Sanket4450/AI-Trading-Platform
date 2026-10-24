@@ -24,21 +24,27 @@ Modular monolith for NSE strategy research, backtesting, risk control and contro
 ```bash
 pnpm install
 cp .env.example .env
+# Set DATABASE_URL to your PostgreSQL instance.
 # Fill SEED_OPERATOR_EMAIL, SEED_OPERATOR_PASSWORD and CONFIG_ENCRYPTION_KEY.
-docker compose up -d
+pnpm docker:up        # starts local Redis Stack
 pnpm db:migrate
 pnpm db:seed
 pnpm db:verify
 pnpm dev
 ```
 
-| Service    | URL                            |
-| ---------- | ------------------------------ |
-| Dashboard  | http://localhost:3000          |
-| API        | http://localhost:8000/api/v1   |
-| Swagger    | http://localhost:8000/api/docs |
-| PostgreSQL | localhost:5432                 |
-| Redis      | localhost:6379                 |
+| Service      | URL                               |
+| ------------ | --------------------------------- |
+| Dashboard    | http://localhost:3000             |
+| API          | http://localhost:8000/api/v1      |
+| Swagger      | http://localhost:8000/api/docs    |
+| PostgreSQL   | external — set `DATABASE_URL`     |
+| Redis        | localhost:6379 (`pnpm docker:up`) |
+| RedisInsight | http://localhost:8001             |
+
+PostgreSQL is external. The Compose file under `infra/docker/` starts Redis Stack only. For the API/worker
+containers, set `DATABASE_URL` to a host reachable from Docker (`host.docker.internal` on Docker Desktop,
+or your managed database host). Use `?sslmode=require` when your provider requires TLS.
 
 ## If a port is already in use
 

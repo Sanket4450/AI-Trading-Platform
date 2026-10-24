@@ -5,8 +5,11 @@
 ```bash
 pnpm install
 cp .env.example .env
-docker compose up -d
+# Set DATABASE_URL to your PostgreSQL instance.
+pnpm docker:up        # starts local Redis Stack
 pnpm db:migrate
+pnpm db:seed
+pnpm db:verify
 pnpm dev
 ```
 
@@ -15,8 +18,9 @@ pnpm dev
 ```bash
 curl -s http://localhost:8000/api/v1/health
 curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3000
-docker compose ps
-docker compose exec redis redis-cli ping
+docker compose --env-file .env -f infra/docker/docker-compose.yml ps
+docker compose --env-file .env -f infra/docker/docker-compose.yml exec redis redis-cli ping
+# RedisInsight: http://localhost:8001
 ```
 
 ## Stop
@@ -25,8 +29,8 @@ docker compose exec redis redis-cli ping
 # Ctrl-C the pnpm dev process, then free any orphaned listeners:
 pnpm dev:stop
 
-# Stop the stateful services:
-docker compose down
+# Stop the local Redis container:
+pnpm docker:down
 ```
 
 ## Port already in use
@@ -43,8 +47,8 @@ pnpm dev:stop   # stop listeners on 3000/8000
 
 | Symptom                          | Check                                                         |
 | -------------------------------- | ------------------------------------------------------------- |
-| API cannot connect to PostgreSQL | `docker compose ps`, `DATABASE_URL`                           |
-| Worker cannot connect to Redis   | `docker compose ps redis`, `REDIS_URL`                        |
+| API cannot connect to PostgreSQL | `DATABASE_URL`, host reachability, TLS/`sslmode`              |
+| Worker cannot connect to Redis   | `pnpm docker:up`, `REDIS_URL`                                 |
 | Nx project missing               | `pnpm nx show projects`, then `pnpm nx reset`                 |
 | Package not found                | `pnpm install`, then build the package through Nx             |
 | Dashboard cannot reach API       | `WEB_URL`, API CORS, port 8000                                |
@@ -67,7 +71,7 @@ by this setup task.
 pnpm install
 cp .env.example .env
 # Fill SEED_OPERATOR_EMAIL, SEED_OPERATOR_PASSWORD and CONFIG_ENCRYPTION_KEY.
-docker compose up -d
+pnpm docker:up
 pnpm db:migrate
 pnpm db:seed
 pnpm db:verify
@@ -75,7 +79,7 @@ pnpm dev
 ```
 
 Open `http://localhost:3000`, sign in with the seeded operator, and confirm the overview shows
-`OFFLINE`, healthy PostgreSQL and healthy Redis.
+`OFFLINE`, reachable PostgreSQL through `DATABASE_URL` and healthy Redis.
 
 ## R1 operating checks
 
@@ -102,5 +106,5 @@ pnpm --filter @ai-trading/tests test:integration
 | Seed refuses to run              | Set `SEED_OPERATOR_EMAIL` and `SEED_OPERATOR_PASSWORD` in `.env`. |
 | Migration checksum mismatch      | Do not edit applied migrations. Add a new numbered SQL migration. |
 | Backfill job says skipped        | Populate Upstox credentials, or leave it skipped for offline R1.  |
-| Worker queue is unavailable      | Check `docker compose ps redis` and `REDIS_URL`.                  |
+| Worker queue is unavailable      | Check `pnpm docker:up` and `REDIS_URL`.                           |
 | Dashboard redirects to login     | The session expired or the API is down. Check `/api/v1/health`.   |

@@ -1,5 +1,5 @@
 include:
-  - ../../docker-compose.yml
+  - ./docker-compose.yml
 
 services:
   web:
@@ -7,6 +7,8 @@ services:
       context: ../..
       dockerfile: infra/docker/web.Dockerfile
     env_file: ../../.env
+    environment:
+      API_URL: http://api:8000/api/v1
     ports:
       - '3000:3000'
     depends_on:
@@ -19,14 +21,13 @@ services:
       dockerfile: infra/docker/api.Dockerfile
     env_file: ../../.env
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-ai_trading}:${POSTGRES_PASSWORD:-ai_trading}@postgres:5432/${POSTGRES_DB:-ai_trading}
       REDIS_URL: redis://redis:6379
       REDIS_HOST: redis
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
     ports:
       - '8000:8000'
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
 
@@ -36,11 +37,10 @@ services:
       dockerfile: infra/docker/worker.Dockerfile
     env_file: ../../.env
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-ai_trading}:${POSTGRES_PASSWORD:-ai_trading}@postgres:5432/${POSTGRES_DB:-ai_trading}
       REDIS_URL: redis://redis:6379
       REDIS_HOST: redis
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy

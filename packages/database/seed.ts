@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import './load-env.js';
 import { pathToFileURL } from 'node:url';
 import { hash } from '@node-rs/argon2';
 import { and, eq, sql } from 'drizzle-orm';

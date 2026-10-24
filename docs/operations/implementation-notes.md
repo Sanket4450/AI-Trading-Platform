@@ -15,8 +15,8 @@ were observed while executing it.
 | NestJS            | 12.0.1                                              |
 | TypeScript        | 5.9.3 (web, packages, tests) and 6.0.3 (Nest apps)  |
 | Vitest            | 3.2.7 (web, packages, tests) and 4.1.12 (Nest apps) |
-| PostgreSQL        | 17-alpine                                           |
-| Redis             | 7.4-alpine                                          |
+| PostgreSQL        | external — `DATABASE_URL` is the source of truth    |
+| Redis             | Redis Stack (`redis/redis-stack`)                   |
 
 ## Deviations from the plan
 
@@ -54,12 +54,11 @@ pnpm format:check
 pnpm dev                 # web :3000, API :8000, worker
 curl http://127.0.0.1:8000/api/v1/health
 pnpm --filter @ai-trading/tests test:e2e
-docker compose ps
+docker compose --env-file .env -f infra/docker/docker-compose.yml ps
 pnpm db:generate && pnpm db:migrate
 ```
 
-All 16 Nx projects pass typecheck, lint, test and build. The Playwright dashboard smoke test passes. PostgreSQL
-and Redis report healthy, and the initial `system_heartbeats` migration is applied.
+All 16 Nx projects pass typecheck, lint, test and build. The Playwright dashboard smoke test passes. Redis reports healthy, the external PostgreSQL is reachable through `DATABASE_URL`, and the R1 migrations are applied.
 
 ## R1 implementation notes
 
@@ -181,3 +180,12 @@ partitions, zero live orders and a parameters binding for every strategy version
 login, every read route, configuration create/idempotency/diff/bind, settings update and a bounded backfill. The
 worker processes the backfill and records a skipped result when Upstox credentials are empty. The Playwright
 dashboard smoke test passes for all nine routes at 1440px and 390px with no page or server errors.
+
+### Infrastructure layout
+
+- `infra/docker/docker-compose.yml` starts Redis Stack only. PostgreSQL is external and configured solely
+  through `DATABASE_URL` in the workspace `.env`. RedisInsight is available at http://localhost:8001.
+- `infra/docker/docker-compose.apps.yml` composes the API, worker and web containers against that external
+  database and the Compose Redis service.
+- `.dockerignore` remains at the repository root because Docker only reads it from the build context root; the
+  Dockerfiles still use the repository root as their build context.
