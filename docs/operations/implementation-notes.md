@@ -153,7 +153,11 @@ seed, repositories, configuration management, API, dashboard, worker jobs and au
 5. **Net equity formula.** The R1 schema stores the inputs; the exact formula remains an R5/R6 check.
 6. **Retention and KMS.** Candle retention, quote retention and key rotation ownership remain operational
    decisions before R7.
-7. **Instrument master size.** The first real sync can be large; `INSTRUMENT_SYNC_LIMIT` caps the fixture-sized
+7. **Future Drizzle generation.** The R1 custom SQL uses the `0001`–`0007` range. Before running
+   `drizzle-kit generate` in a later release, point it at a fresh output directory or rename the generated file to
+   the next free number; do not overwrite the checked-in custom migrations. The runtime applies
+   `packages/database/migrations/*.sql` in filename order.
+8. **Instrument master size.** The first real sync can be large; `INSTRUMENT_SYNC_LIMIT` caps the fixture-sized
    R1 run. Raise it deliberately and monitor the transaction.
 
 ### Verification performed
