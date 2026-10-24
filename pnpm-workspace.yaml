@@ -5,7 +5,7 @@ packages:
 
 catalog:
   "@types/node": ^24.19.2
-  "@vitest/coverage-v8": ^3.0.0
+  "@vitest/coverage-v8": ^3.2.7
   eslint: ^9.0.0
   prettier: ^3.0.0
   tsup: ^8.0.0
@@ -22,8 +22,11 @@ allowBuilds:
   "@nestjs/core": true
   "@scarf/scarf": false
   "@swc/core": true
+  cpu-features: false
   esbuild: true
   msgpackr-extract: true
   nx: true
+  protobufjs: true
   sharp: true
+  ssh2: false
   unrs-resolver: true

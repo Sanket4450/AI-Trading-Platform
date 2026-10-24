@@ -1,0 +1,34 @@
+{
+  "name": "web",
+  "root": "apps/web",
+  "sourceRoot": "apps/web/src",
+  "projectType": "application",
+  "tags": ["type:app", "scope:web"],
+  "targets": {
+    "dev": {
+      "executor": "nx:run-commands",
+      "options": { "command": "pnpm --filter @ai-trading/web dev" }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "outputs": ["{projectRoot}/.next"],
+      "options": { "command": "pnpm --filter @ai-trading/web build" }
+    },
+    "start": {
+      "executor": "nx:run-commands",
+      "options": { "command": "pnpm --filter @ai-trading/web start" }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": { "command": "pnpm --filter @ai-trading/web lint" }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": { "command": "pnpm --filter @ai-trading/web typecheck" }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": { "command": "pnpm --filter @ai-trading/web test" }
+    }
+  }
+}

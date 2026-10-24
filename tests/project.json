@@ -1,0 +1,32 @@
+{
+  "name": "tests",
+  "root": "tests",
+  "projectType": "library",
+  "tags": ["type:test"],
+  "targets": {
+    "test": {
+      "executor": "nx:run-commands",
+      "options": { "command": "pnpm --filter @ai-trading/tests test" }
+    },
+    "integration": {
+      "executor": "nx:run-commands",
+      "options": { "command": "pnpm --filter @ai-trading/tests test:integration" }
+    },
+    "broker-contracts": {
+      "executor": "nx:run-commands",
+      "options": { "command": "pnpm --filter @ai-trading/tests test:broker-contracts" }
+    },
+    "e2e": {
+      "executor": "nx:run-commands",
+      "options": { "command": "pnpm --filter @ai-trading/tests test:e2e" }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": { "command": "pnpm --filter @ai-trading/tests typecheck" }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": { "command": "pnpm --filter @ai-trading/tests lint" }
+    }
+  }
+}

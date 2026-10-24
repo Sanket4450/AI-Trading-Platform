@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { tradingModes } from '@ai-trading/configuration';
 import {
   Activity,
   ArrowRight,
@@ -73,6 +74,9 @@ export default function Home() {
         <p className="max-w-2xl text-base leading-7 text-muted-foreground">
           The dashboard sits in front of a modular monolith: shared strategy contracts, an independent risk
           engine and a broker-independent execution layer. Trading stays offline until the R8 gates are met.
+        </p>
+        <p className="text-xs text-muted-foreground">
+          Supported modes: <span className="text-emerald-300/90">{tradingModes.join(' · ')}</span>
         </p>
         <div className="flex flex-wrap gap-3 pt-2">
           <Link href="/strategies" className={buttonVariants()}>

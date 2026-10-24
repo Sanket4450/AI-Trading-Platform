@@ -22,6 +22,7 @@ export default [
           depConstraints: [
             { sourceTag: 'type:app', onlyDependOnLibsWithTags: ['type:lib'] },
             { sourceTag: 'type:lib', onlyDependOnLibsWithTags: ['type:lib'] },
+            { sourceTag: 'type:test', onlyDependOnLibsWithTags: ['type:lib'] },
           ],
         },
       ],
