@@ -37,6 +37,8 @@ were observed while executing it.
    packages and the cross-cutting test project use Vitest 3 and ESLint. Both run through Nx targets.
 7. **The API runs on port 8000.** Port 4000 was already occupied in the local environment, so `API_PORT`, the
    Upstox redirect URI, Docker port mappings, Swagger/health URLs and every command reference now use `8000`.
+8. **Stale dev processes are cleaned with `pnpm dev:stop`.** Interrupted `nest start --watch` or `node dist/main`
+   processes can keep holding 3000/8000. `pnpm ports` shows listeners and `pnpm dev:stop` stops them.
 
 ## Verification performed
 

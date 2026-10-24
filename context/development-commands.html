@@ -639,7 +639,7 @@ pnpm list -r --depth 0</code></pre></div>
     <article class="cmd-card" data-category="dev" data-search="run api only nest start watch backend">
       <div class="cmd-top"><span class="cmd-kicker">develop</span><button class="copy" data-copy type="button">Copy</button></div>
       <h3>Run the API only</h3>
-      <p>Nest watch mode on port 8000. Requires PostgreSQL and Redis for full startup.</p>
+      <p>Stop <code>pnpm dev</code> first — it already runs the API. Nest watch mode on port 8000.</p>
       <div class="cmd-code"><pre><code>pnpm nx dev api
 <span class="c"># or: pnpm --filter @ai-trading/api dev</span></code></pre></div>
       <div class="cmd-tags"><span class="tag">nestjs</span><span class="tag">:8000</span></div>
@@ -689,6 +689,11 @@ pnpm --filter @ai-trading/trading-engine dev</code></pre></div>
 <span class="c"># or: pnpm --filter @ai-trading/worker start</span></code></pre></div>
       <div class="cmd-tags"><span class="tag">production</span><span class="tag">no http</span></div>
     </article>
+  </div>
+
+  <div class="callout warn">
+    <span class="ico">▲</span>
+    <div><strong>One instance per app:</strong> <code>pnpm dev</code> already starts web, API and worker. Running <code>pnpm nx dev api</code> while it is running exits with <code>EADDRINUSE</code> on 8000. Use <code>pnpm dev:stop</code> to clear listeners, or <code>pnpm ports</code> to inspect them.</div>
   </div>
 
   <div class="callout ok">
@@ -1382,8 +1387,9 @@ curl -fsS -o /dev/null -w '%{http_code}\n' https://&lt;domain&gt;/</code></pre><
     <article class="cmd-card" data-category="troubleshoot" data-search="port in use eaddrinuse 3000 8000 lsof kill">
       <div class="cmd-top"><span class="cmd-kicker">fix</span><button class="copy" data-copy type="button">Copy</button></div>
       <h3>Find and free a port</h3>
-      <p>Usually a previous dev server or worker is still listening after an interrupted run.</p>
-      <div class="cmd-code"><pre><code>lsof -nP -iTCP:3000 -sTCP:LISTEN
+      <p>Usually a previous dev server or worker is still listening after an interrupted run. <code>pnpm dev:stop</code> only touches ports 3000 and 8000.</p>
+      <div class="cmd-code"><pre><code>pnpm ports
+pnpm dev:stop
 lsof -nP -iTCP:8000 -sTCP:LISTEN
 kill &lt;pid&gt;</code></pre></div>
       <div class="cmd-tags"><span class="tag">EADDRINUSE</span><span class="tag">ports</span></div>

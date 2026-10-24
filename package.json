@@ -24,6 +24,8 @@
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down",
     "docker:logs": "docker compose logs -f",
+    "ports": "bash scripts/ports.sh",
+    "dev:stop": "bash scripts/stop-dev.sh",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },

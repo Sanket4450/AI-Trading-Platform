@@ -22,8 +22,21 @@ docker compose exec redis redis-cli ping
 ## Stop
 
 ```bash
-# Ctrl-C the pnpm dev process, then:
+# Ctrl-C the pnpm dev process, then free any orphaned listeners:
+pnpm dev:stop
+
+# Stop the stateful services:
 docker compose down
+```
+
+## Port already in use
+
+`pnpm dev` already starts web on 3000, the API on 8000 and the worker. Do not start a second API while the full
+stack is running.
+
+```bash
+pnpm ports      # show what owns 3000/8000
+pnpm dev:stop   # stop listeners on 3000/8000
 ```
 
 ## Common failures
@@ -35,6 +48,7 @@ docker compose down
 | Nx project missing               | `pnpm nx show projects`, then `pnpm nx reset`                 |
 | Package not found                | `pnpm install`, then build the package through Nx             |
 | Dashboard cannot reach API       | `WEB_URL`, API CORS, port 8000                                |
+| `EADDRINUSE` on 3000/8000        | `pnpm ports`, `pnpm dev:stop`, stop duplicate dev processes   |
 | Migration fails                  | `pnpm db:generate`, review SQL, never edit applied migrations |
 
 ## Incidents

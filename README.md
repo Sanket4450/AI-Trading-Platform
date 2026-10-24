@@ -30,6 +30,15 @@ pnpm dev
 | PostgreSQL | localhost:5432                 |
 | Redis      | localhost:6379                 |
 
+## If a port is already in use
+
+`pnpm dev` already starts web, API and worker. Stop it before starting a single app.
+
+```bash
+pnpm ports      # inspect listeners on 3000/8000
+pnpm dev:stop   # stop stale listeners on 3000/8000
+```
+
 ## Guardrails
 
 - `TRADING_MODE` defaults to `offline`.
@@ -39,4 +48,5 @@ pnpm dev
 - Every backtest and live trade records its strategy version and configuration snapshot.
 
 See `context/` for the architecture, strategy, risk, execution and backtesting specifications.
-See `context/monorepo-setup-plan.html` for the full setup plan.
+See `context/monorepo-setup-plan.html` for the full setup plan and
+`context/development-commands.html` for the searchable command deck.
