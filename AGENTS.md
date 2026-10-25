@@ -4,6 +4,43 @@ Project context and binding working rules for coding agents.
 
 ## Working agreement
 
+### Clarify before implementing (mandatory)
+
+This rule applies to **every task, in every release, for every agent**. It overrides any instruction to
+"just implement", "use best judgment", "make reasonable assumptions" or "fill in the gaps".
+
+Definitions:
+
+- **Ambiguity** — a missing requirement, unclear intended behavior, conflicting spec, undefined edge
+  case, or more than one reasonable interpretation of what the feature should do.
+- **Feature-level detail** — anything that can change observable behavior, data written, API contracts,
+  validation rules, error handling, permissions, audit output, UI flow or operator workflow.
+
+Obligations:
+
+- **MUST** look for ambiguity before writing code, not after.
+- **MUST** ask the user and wait for an answer when any ambiguity exists.
+- **MUST** state each ambiguity, list the plausible interpretations, and recommend one option.
+- **MUST** batch all open questions into one clarification round instead of asking one at a time.
+- **MUST NOT** infer intended behavior silently, even for details that seem small.
+- **MUST NOT** pick a "reasonable default" for feature-level behavior and proceed.
+- **MUST NOT** postpone clarification until the implementation is finished or partially committed.
+- **MUST NOT** expand scope to resolve ambiguity on your own; stop and ask.
+- **MUST** treat a user-approved assumption as binding for the rest of the task and write it down.
+
+The only cases where proceeding without asking is allowed — all must hold:
+
+1. The requirement has exactly one reasonable interpretation.
+2. The decision is internal and mechanically reversible (naming, private structure, formatting).
+3. The choice cannot alter behavior, schema, contracts, security or operator-visible output.
+
+Before writing code, emit a short check in this form:
+
+```text
+Ambiguities: <bulleted list, or "none">
+Action: <"proceeding" or "asking user">
+```
+
 ### Git: the user owns commits
 
 - Never create a commit by default. Do not run `git commit`, `git commit --amend`, `git rebase`, `git push`, or any other history-changing command unless the user explicitly instructs it.
@@ -792,10 +829,12 @@ infra/docker/
 
 ### Before changing code
 
-1. Read the relevant package and its `project.json`.
-2. Use the Nx graph or `pnpm nx show project <name> --json` for targets and dependencies.
-3. Prefer Nx commands over invoking underlying tools directly.
-4. Check `context/r1-implementation-plan.html` for schema intent and
+1. Apply the mandatory "Clarify before implementing" rule. If behavior is ambiguous, ask before
+   exploring implementation options.
+2. Read the relevant package and its `project.json`.
+3. Use the Nx graph or `pnpm nx show project <name> --json` for targets and dependencies.
+4. Prefer Nx commands over invoking underlying tools directly.
+5. Check `context/r1-implementation-plan.html` for schema intent and
    `docs/operations/implementation-notes.md` for known deviations.
 
 ### Adding a database change
