@@ -248,6 +248,11 @@ export async function findProviderByCode(code: string) {
   return rows[0] ?? null;
 }
 
+export async function findProviderById(id: string) {
+  const rows = await db.select().from(providers).where(eq(providers.id, id)).limit(1);
+  return rows[0] ?? null;
+}
+
 export async function findExchangeByCode(code: string) {
   const rows = await db.select().from(exchanges).where(eq(exchanges.code, code)).limit(1);
   return rows[0] ?? null;

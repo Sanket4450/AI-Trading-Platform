@@ -1,5 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
 import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import {
+  findProviderById,
   listAccountAccessByAccount,
   listAccountEquitySnapshots,
   listAccountPermissions,
@@ -53,9 +58,12 @@ export class AccountsService {
     userAgent: string,
   ) {
     const accounts = await listAccounts();
-    if (!accounts.some((account) => account.id === accountId)) {
+    const account = accounts.find((candidate) => candidate.id === accountId);
+    if (!account) {
       throw new NotFoundException('Account not found');
     }
+
+    await this.assertBrokerUserRef(account);
 
     const row = await upsertBrokerCredential({
       accountId,
@@ -85,5 +93,26 @@ export class AccountsService {
     });
 
     return row;
+  }
+
+  /**
+   * Broker-kind accounts identify the client by a provider-side reference (Upstox UCC).
+   * Without it, credential storage would allow a broker connection that cannot be reconciled.
+   */
+  private async assertBrokerUserRef(
+    account: Awaited<ReturnType<typeof listAccounts>>[number],
+  ) {
+    const provider = await findProviderById(account.brokerProviderId);
+    if (!provider || !['broker', 'both'].includes(provider.kind)) {
+      return;
+    }
+
+    if (account.brokerUserRef?.trim()) {
+      return;
+    }
+
+    throw new BadRequestException(
+      `Account "${account.code}" has no broker_user_ref; set the broker client code before storing credentials`,
+    );
   }
 }
