@@ -48,6 +48,32 @@ Action: <"proceeding" or "asking user">
 - The user reviews and creates commits. If a commit is explicitly requested, confirm the intended scope first and commit only the reviewed files.
 - Never rewrite, squash, reset, or force-push history unless the user explicitly asks for that exact operation.
 
+### Verification: no browser-based feature testing (hard rule)
+
+This rule overrides any instinct to "open the app and check", any request to self-verify visually, and
+any generic agent guidance that recommends browser automation after implementation.
+
+- **MUST NOT** verify a finished feature by driving a real or headless browser. This includes
+  Chromium, Chrome, Firefox, WebKit, Playwright, Puppeteer, Selenium, Cypress, WebdriverIO, a
+  browser MCP server, browser DevTools automation, screenshot diffing and scripted click-through of
+  `pnpm dev`.
+- **MUST NOT** start the web dev server or the API just to confirm a page renders, a form submits or
+  a button works.
+- **MUST NOT** add browser-driven tests to prove a feature works. Unit, integration and contract
+  tests are the expected verification shape.
+- **MUST** verify with static and non-browser gates instead: `pnpm typecheck`, `pnpm lint`,
+  `pnpm test`, `pnpm build`. Typecheck plus build passing is the accepted bar for UI and framework
+  changes.
+- **MUST** report the verification honestly, e.g. "typecheck and build pass; no browser verification
+  performed by policy", and list any manual browser check as a step for the user.
+- **MAY** run `pnpm test:e2e` only when the user explicitly asks for the end-to-end suite in that
+  turn. A general "finish the feature", "test it" or "make sure it works" does **not** authorize a
+  browser run.
+
+Rationale: the browser run adds no signal that typecheck, unit/integration tests and a production
+build cannot provide here, and it costs startup time, flaky waits and environment coupling. The user
+owns visual review.
+
 ### Code comments
 
 - Do not add unnecessary comments. Clear names and small functions are preferred over explanatory noise.
@@ -97,6 +123,8 @@ monthly candle and quote partitions, a seeded operator, and zero live orders.
 - Strategies may not import broker adapters or send orders directly.
 - Every backtest and live trade must record its strategy version and configuration snapshot.
 - Broker credentials are encrypted at rest. Plaintext secrets are never logged, audited or returned.
+- Features are never verified through a real or headless browser. Typecheck, lint, tests and build are
+  the accepted verification bar; see "Verification: no browser-based feature testing" above.
 
 Git ownership and code-comment rules are in the Working agreement above.
 
@@ -799,6 +827,8 @@ pnpm --filter @ai-trading/<package> dev
 - End-to-end:
   - `tests/end-to-end/dashboard.spec.ts` uses Playwright and starts the web dev server. A meaningful
     run needs the API and a seeded database.
+  - Agents do not run this suite on their own initiative. It runs only when the user explicitly asks
+    for it; per-feature verification stops at typecheck, lint, unit/integration tests and build.
 
 The runtime database is external, but integration tests use an isolated testcontainers PostgreSQL.
 
@@ -891,6 +921,10 @@ pnpm build
 ```
 
 Do not commit. Report what changed, what was verified, and any remaining manual step.
+
+Do not add a browser-based verification step. `pnpm typecheck` plus `pnpm build` is the accepted bar
+for UI changes; `pnpm test:e2e` runs only when the user explicitly requests it in that turn. Any
+visual or click-through check belongs to the user.
 
 ## Known gotchas
 
