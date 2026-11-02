@@ -55,19 +55,29 @@ pnpm ports      # inspect listeners on 3000/8000
 pnpm dev:stop   # stop stale listeners on 3000/8000
 ```
 
-## R1 dashboard
+## R2 research dashboard
 
-The R1 cockpit has nine routes: `/`, `/accounts`, `/instruments`, `/universes`, `/strategies`,
-`/configuration`, `/data`, `/audit` and `/settings`. Sign in with the operator created by
-`pnpm db:seed`. The API and worker refuse to start outside `offline` mode.
+The R2 research cockpit keeps the nine R1 routes and adds the instrument catalog and data-console
+detail pages: `/instruments`, `/instruments/[id]`, `/data`, `/data/backfills/[id]`, `/data/runs/[id]`,
+`/data/issues/[id]` and the coverage day detail. Sign in with the operator created by `pnpm db:seed`.
+The API and worker accept `offline` or `research` and refuse `backtesting`, `paper` and `live`.
+
+R2 adds Upstox V3 historical ingestion, a persisted per-instrument fetch/data status, strict coverage,
+a daily OHLCV validation oracle, 25 quality rules, resumable monthly chunks and a Redis-backed provider
+budget. It still has no order route and no broker write method.
 
 ## Guardrails
 
-- `TRADING_MODE` defaults to `offline`.
+- `TRADING_MODE` defaults to `offline`; the R2 example sets `research`.
 - Live trading is gated by R6–R8 and is never enabled by a local default.
 - Never commit `.env`.
 - Strategies may not import broker adapters or send orders directly.
 - Every backtest and live trade records its strategy version and configuration snapshot.
+- The Upstox adapter is read-only. R2 adds no order, modify or cancel method.
+- A successful HTTP fetch is never displayed as complete; only coverage plus the daily oracle can.
+
+See `docs/operations/r2-runbook.md`, `docs/operations/data-quality-rules.md` and
+`docs/operations/catalog-status.md` for the R2 operating model.
 
 See `context/` for the architecture, strategy, risk, execution and backtesting specifications.
 See `context/monorepo-setup-plan.html` for the full setup plan and

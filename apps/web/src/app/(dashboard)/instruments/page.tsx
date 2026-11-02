@@ -1,11 +1,13 @@
 import Link from 'next/link';
 import { apiFetch } from '@/lib/api';
-import type { CorporateAction, Instrument, InstrumentMapping } from '@/lib/types';
-import { formatDate, formatNumber } from '@/lib/format';
+import type { BackfillPreview, InstrumentStatusRow } from '@/lib/types';
+import { formatDateTime, formatNumber } from '@/lib/format';
+import { displayStatus, statusTone } from '@/lib/status';
 import { PageHeader } from '@/components/dashboard/page-header';
 import { StatCard } from '@/components/dashboard/stat-card';
 import { StatusBadge } from '@/components/dashboard/status-badge';
 import { EmptyState } from '@/components/dashboard/empty-state';
+import { AutoRefresh } from '@/components/dashboard/auto-refresh';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,265 +21,446 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { cancelInstrumentAction, fetchInstrumentsAction, retryInstrumentAction } from './actions';
 
-const segments = ['NSE_EQ', 'BSE_EQ', 'NSE_INDEX', 'BSE_INDEX'];
+type SearchParams = Promise<{
+  universeCode?: string;
+  fetchStatus?: string;
+  dataStatus?: string;
+  search?: string;
+  preview?: string;
+  mode?: string;
+  from?: string;
+  to?: string;
+  instrumentIds?: string | string[];
+  error?: string;
+  queued?: string;
+  cancelled?: string;
+  recomputed?: string;
+}>;
 
-export default async function InstrumentsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{
-    search?: string;
-    segment?: string;
-    active?: string;
-    instrument?: string;
-  }>;
-}) {
+function selectedIds(value: string | string[] | undefined): string[] {
+  if (!value) return [];
+  return Array.isArray(value) ? value : [value];
+}
+
+export default async function InstrumentsPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams;
-  const query = new URLSearchParams();
+  const universeCode = params.universeCode ?? 'nifty-50';
+  const query = new URLSearchParams({ universeCode, limit: '200' });
+  if (params.fetchStatus) query.set('fetchStatus', params.fetchStatus);
+  if (params.dataStatus) query.set('dataStatus', params.dataStatus);
   if (params.search) query.set('search', params.search);
-  if (params.segment) query.set('segment', params.segment);
-  query.set('active', params.active ?? 'true');
-  query.set('limit', '500');
 
-  const instruments = await apiFetch<Instrument[]>(`/instruments?${query.toString()}`);
-  const selected = instruments.find((instrument) => instrument.id === params.instrument) ?? null;
+  const [rows, summary] = await Promise.all([
+    apiFetch<InstrumentStatusRow[]>(`/data/instrument-status?${query.toString()}`),
+    apiFetch<Record<string, number>>(
+      `/data/instrument-status/summary?universeCode=${encodeURIComponent(universeCode)}`,
+    ),
+  ]);
 
-  const [mappings, corporateActions] = selected
-    ? await Promise.all([
-        apiFetch<InstrumentMapping[]>(`/instruments/${selected.id}/mappings`),
-        apiFetch<CorporateAction[]>(`/instruments/${selected.id}/corporate-actions`),
-      ])
-    : [[], []];
+  const ids = selectedIds(params.instrumentIds);
+  let preview: BackfillPreview | null = null;
+  if (params.preview === '1') {
+    try {
+      const response = await apiFetch<{ dryRun: true; preview: BackfillPreview }>(
+        '/data/instruments/fetch',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            instrumentIds: ids.length > 0 ? ids : undefined,
+            universeCode: ids.length > 0 ? undefined : universeCode,
+            mode: params.mode ?? 'missing_only',
+            from: params.from || undefined,
+            to: params.to || undefined,
+            dryRun: true,
+          }),
+        },
+      );
+      preview = response.preview;
+    } catch (error) {
+      preview = null;
+      params.error = error instanceof Error ? error.message : 'Preview failed';
+    }
+  }
+
+  const active = rows.some(
+    (row) =>
+      row.fetchStatus === 'queued' ||
+      row.fetchStatus === 'fetching' ||
+      row.dataStatus === 'pending',
+  );
+  const selectedRows = rows.filter((row) => ids.includes(row.instrumentId));
+  const selectionCounts = selectedRows.reduce<Record<string, number>>((counts, row) => {
+    const status = displayStatus(row);
+    counts[status] = (counts[status] ?? 0) + 1;
+    return counts;
+  }, {});
 
   return (
     <div>
+      <AutoRefresh active={active} />
       <PageHeader
-        title="Instruments"
-        description="Broker-neutral cash equities and indices. Upstox keys live only in the provider mapping table."
+        title="Instrument catalog"
+        description="NIFTY 50 members in reviewed rank order. A row is complete only when coverage and the daily oracle prove it; a successful HTTP call is not completion."
       />
+
+      {params.error ? (
+        <div className="border-destructive/30 bg-destructive/10 text-destructive mb-4 rounded-lg border px-4 py-3 text-sm">
+          {params.error}
+        </div>
+      ) : null}
+      {params.queued ? (
+        <div className="border-primary/30 bg-primary/10 text-primary mb-4 rounded-lg border px-4 py-3 text-sm">
+          Fetch queued. Rows move through Queued, Fetching and Verifying before their data status
+          settles.
+        </div>
+      ) : null}
+      {params.cancelled ? (
+        <div className="border-primary/30 bg-primary/10 text-primary mb-4 rounded-lg border px-4 py-3 text-sm">
+          Cancellation recorded. The in-flight chunk finishes cleanly.
+        </div>
+      ) : null}
+      {params.recomputed ? (
+        <div className="border-primary/30 bg-primary/10 text-primary mb-4 rounded-lg border px-4 py-3 text-sm">
+          Status recompute queued.
+        </div>
+      ) : null}
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
-          label="Results"
-          value={formatNumber(instruments.length)}
-          hint="Filtered instrument master"
-          tone="green"
-        />
-        <StatCard
-          label="Equities"
-          value={formatNumber(instruments.filter((i) => i.instrumentType === 'EQ').length)}
-          hint="Cash segment"
+          label="Catalog rows"
+          value={formatNumber(summary?.total ?? rows.length)}
+          hint="nifty-50 active version"
           tone="cyan"
         />
         <StatCard
-          label="Indices"
-          value={formatNumber(instruments.filter((i) => i.instrumentType === 'INDEX').length)}
-          hint="Market confirmation"
-          tone="violet"
+          label="Complete"
+          value={formatNumber(summary?.complete ?? 0)}
+          hint="Coverage + oracle"
+          tone="green"
         />
         <StatCard
-          label="Mapped"
-          value={formatNumber(instruments.filter((i) => i.mappingCount > 0).length)}
-          hint="At least one provider key"
+          label="Gaps"
+          value={formatNumber((summary?.partialReconciled ?? 0) + (summary?.partialMismatch ?? 0))}
+          hint="Reconciled or mismatch"
           tone="amber"
+        />
+        <StatCard
+          label="Needs review"
+          value={formatNumber((summary?.needsReview ?? 0) + (summary?.missing ?? 0))}
+          hint="Blocking or missing"
+          tone="red"
         />
       </div>
 
       <Card className="border-border/70 bg-card/60 mt-6">
         <CardHeader>
-          <CardTitle>Search</CardTitle>
+          <CardTitle>Filters</CardTitle>
           <CardDescription>
-            Filter by symbol or name. Select an instrument to inspect its mapping history.
+            Default order is reviewed index rank. Rank 1 is the NIFTY 50 index; no weights are
+            stored.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form method="get" className="grid gap-3 sm:grid-cols-[1.4fr_1fr_1fr_auto]">
+          <form
+            method="get"
+            className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[1.4fr_1fr_1fr_1fr_auto]"
+          >
             <div className="space-y-1.5">
               <Label htmlFor="search">Search</Label>
               <Input
                 id="search"
                 name="search"
                 defaultValue={params.search ?? ''}
-                placeholder="RELIANCE, NIFTY…"
+                placeholder="RELIANCE, bank…"
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="segment">Segment</Label>
+              <Label htmlFor="fetchStatus">Fetch status</Label>
               <select
-                id="segment"
-                name="segment"
-                defaultValue={params.segment ?? ''}
+                id="fetchStatus"
+                name="fetchStatus"
+                defaultValue={params.fetchStatus ?? ''}
                 className="border-input h-9 w-full rounded-md border bg-transparent px-3 text-sm"
               >
-                <option value="">All segments</option>
-                {segments.map((segment) => (
-                  <option key={segment} value={segment}>
-                    {segment}
+                <option value="">Any</option>
+                {[
+                  'not_requested',
+                  'queued',
+                  'fetching',
+                  'fetched',
+                  'partial',
+                  'failed',
+                  'cancelled',
+                  'stale',
+                ].map((value) => (
+                  <option key={value} value={value}>
+                    {value.replaceAll('_', ' ')}
                   </option>
                 ))}
               </select>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="active">Status</Label>
+              <Label htmlFor="dataStatus">Data status</Label>
               <select
-                id="active"
-                name="active"
-                defaultValue={params.active ?? 'true'}
+                id="dataStatus"
+                name="dataStatus"
+                defaultValue={params.dataStatus ?? ''}
                 className="border-input h-9 w-full rounded-md border bg-transparent px-3 text-sm"
               >
-                <option value="true">Active only</option>
-                <option value="false">Include inactive</option>
+                <option value="">Any</option>
+                {[
+                  'complete',
+                  'partial_reconciled',
+                  'partial_mismatch',
+                  'missing',
+                  'pending',
+                  'not_applicable',
+                  'needs_review',
+                ].map((value) => (
+                  <option key={value} value={value}>
+                    {value.replaceAll('_', ' ')}
+                  </option>
+                ))}
               </select>
             </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="universeCode">Universe</Label>
+              <Input id="universeCode" name="universeCode" defaultValue={universeCode} />
+            </div>
             <div className="flex items-end">
-              <Button type="submit">Apply</Button>
+              <Button type="submit" variant="outline">
+                Apply
+              </Button>
             </div>
           </form>
         </CardContent>
       </Card>
 
+      <form id="catalog-form" method="get" action="/instruments" className="mt-4">
+        <input type="hidden" name="universeCode" value={universeCode} />
+        <input type="hidden" name="preview" value="1" />
+        <input type="hidden" name="from" value={params.from ?? ''} />
+        <input type="hidden" name="to" value={params.to ?? ''} />
+        <div className="border-border/70 bg-card/60 flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3">
+          <div className="text-muted-foreground text-sm">
+            {ids.length > 0 ? (
+              <span>
+                {ids.length} selected ·{' '}
+                {Object.entries(selectionCounts)
+                  .map(([status, count]) => `${count} ${status}`)
+                  .join(' · ')}
+              </span>
+            ) : (
+              <span>No rows selected. Preview resolves the whole universe.</span>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              name="mode"
+              defaultValue={params.mode ?? 'missing_only'}
+              className="border-input h-9 rounded-md border bg-transparent px-3 text-sm"
+            >
+              <option value="missing_only">missing only</option>
+              <option value="force">force refresh</option>
+            </select>
+            <Button type="submit" variant="outline">
+              Preview
+            </Button>
+          </div>
+        </div>
+      </form>
+
+      {preview ? (
+        <Card className="border-primary/25 bg-primary/5 mt-4">
+          <CardHeader>
+            <CardTitle>Preview · nothing queued yet</CardTitle>
+            <CardDescription>
+              {preview.resolved} resolved of {preview.instrumentCount} · {preview.sessionCount}{' '}
+              sessions · {preview.requestCount} requests · {preview.skippedMonths} months skipped as
+              complete
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="grid gap-2 text-sm sm:grid-cols-3">
+              <p>
+                <span className="text-muted-foreground">Window:</span> {preview.from} → {preview.to}
+              </p>
+              <p>
+                <span className="text-muted-foreground">Months:</span> {preview.monthCount}
+              </p>
+              <p>
+                <span className="text-muted-foreground">Estimated bars:</span>{' '}
+                {formatNumber(preview.estimatedBars)}
+              </p>
+            </div>
+            {preview.blocked.length > 0 ? (
+              <div className="border-destructive/30 bg-destructive/10 text-destructive rounded-lg border px-3 py-2 text-sm">
+                Blocked by missing mapping: {preview.blocked.map((row) => row.symbol).join(', ')}
+              </div>
+            ) : null}
+            <form action={fetchInstrumentsAction} className="flex flex-wrap items-center gap-2">
+              {ids.map((id) => (
+                <input key={id} type="hidden" name="instrumentIds" value={id} />
+              ))}
+              {ids.length === 0 ? (
+                <input type="hidden" name="universeCode" value={universeCode} />
+              ) : null}
+              <input type="hidden" name="mode" value={params.mode ?? 'missing_only'} />
+              <input type="hidden" name="from" value={params.from ?? ''} />
+              <input type="hidden" name="to" value={params.to ?? ''} />
+              <input type="hidden" name="returnTo" value="/instruments" />
+              {(params.mode ?? 'missing_only') === 'force' ? (
+                <Input
+                  name="reason"
+                  placeholder="Reason for force refresh"
+                  required
+                  className="max-w-sm"
+                />
+              ) : null}
+              <Button type="submit">Confirm and launch</Button>
+            </form>
+          </CardContent>
+        </Card>
+      ) : null}
+
       <Card className="border-border/70 bg-card/60 mt-4">
         <CardHeader>
-          <CardTitle>Instrument master</CardTitle>
-          <CardDescription>{instruments.length} rows</CardDescription>
+          <CardTitle>Ranked members</CardTitle>
+          <CardDescription>
+            {rows.length} rows · target window and both status axes are persisted by the worker.
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          {instruments.length === 0 ? (
+          {rows.length === 0 ? (
             <EmptyState
               title="No instruments match"
-              description="Clear the filters or run the seed."
+              description="Clear the filters or run the R2 seed."
             />
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Symbol</TableHead>
-                  <TableHead>Name</TableHead>
-                  <TableHead>ISIN</TableHead>
-                  <TableHead>Segment</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Mappings</TableHead>
-                  <TableHead />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {instruments.map((instrument) => (
-                  <TableRow key={instrument.id}>
-                    <TableCell className="font-medium">{instrument.tradingSymbol}</TableCell>
-                    <TableCell className="text-muted-foreground max-w-64 truncate">
-                      {instrument.name}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground font-mono text-xs">
-                      {instrument.isin ?? '—'}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{instrument.segment}</Badge>
-                    </TableCell>
-                    <TableCell>{instrument.instrumentType}</TableCell>
-                    <TableCell>{instrument.mappingCount}</TableCell>
-                    <TableCell className="text-right">
-                      <Link
-                        href={`/instruments?instrument=${instrument.id}${params.search ? `&search=${encodeURIComponent(params.search)}` : ''}`}
-                        className={buttonVariants({ variant: 'outline', size: 'sm' })}
-                      >
-                        Inspect
-                      </Link>
-                    </TableCell>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead />
+                    <TableHead>Rank</TableHead>
+                    <TableHead>Instrument</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Target window</TableHead>
+                    <TableHead>Days</TableHead>
+                    <TableHead>Issues</TableHead>
+                    <TableHead>Last success</TableHead>
+                    <TableHead />
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {rows.map((row) => {
+                    const status = displayStatus(row);
+                    return (
+                      <TableRow key={row.instrumentId}>
+                        <TableCell>
+                          <input
+                            type="checkbox"
+                            name="instrumentIds"
+                            value={row.instrumentId}
+                            form="catalog-form"
+                            defaultChecked={ids.includes(row.instrumentId)}
+                            aria-label={`Select ${row.symbol}`}
+                          />
+                        </TableCell>
+                        <TableCell className="text-muted-foreground font-mono text-xs">
+                          {row.rank}
+                        </TableCell>
+                        <TableCell>
+                          <p className="font-medium">{row.symbol}</p>
+                          <p className="text-muted-foreground max-w-52 truncate text-xs">
+                            {row.name}
+                          </p>
+                          <p className="text-muted-foreground font-mono text-[10px]">
+                            {row.segment} · tick {row.tickSize}
+                          </p>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={statusTone(status)}>
+                            {status}
+                          </Badge>
+                          <p className="text-muted-foreground mt-1 text-[10px]">
+                            {row.fetchStatus ?? 'not_requested'} / {row.dataStatus ?? 'pending'}
+                          </p>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-xs">
+                          {row.targetFrom ?? '—'} → {row.targetTo ?? '—'}
+                        </TableCell>
+                        <TableCell className="text-xs">
+                          {row.completeDays ?? 0}/{row.expectedDays ?? 0}
+                          <span className="text-muted-foreground block text-[10px]">
+                            {row.partialDays ?? 0} partial · {row.missingDays ?? 0} missing
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          {row.openCriticalIssues ? (
+                            <StatusBadge status="critical" />
+                          ) : (
+                            <span className="text-muted-foreground text-xs">none</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-xs">
+                          {row.lastSuccessAt ? formatDateTime(row.lastSuccessAt) : 'never'}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap items-center justify-end gap-1">
+                            <Link
+                              href={`/instruments/${row.instrumentId}`}
+                              className={buttonVariants({ variant: 'outline', size: 'sm' })}
+                            >
+                              Inspect
+                            </Link>
+                            {row.fetchStatus === 'failed' || row.fetchStatus === 'partial' ? (
+                              <form action={retryInstrumentAction}>
+                                <input type="hidden" name="instrumentId" value={row.instrumentId} />
+                                <input type="hidden" name="returnTo" value="/instruments" />
+                                <Button type="submit" size="sm" variant="outline">
+                                  Retry
+                                </Button>
+                              </form>
+                            ) : null}
+                            {row.fetchStatus === 'queued' || row.fetchStatus === 'fetching' ? (
+                              <form action={cancelInstrumentAction}>
+                                <input type="hidden" name="instrumentId" value={row.instrumentId} />
+                                <input type="hidden" name="returnTo" value="/instruments" />
+                                <Button type="submit" size="sm" variant="outline">
+                                  Cancel
+                                </Button>
+                              </form>
+                            ) : null}
+                            {row.fetchStatus !== 'queued' && row.fetchStatus !== 'fetching' ? (
+                              <form action={fetchInstrumentsAction}>
+                                <input
+                                  type="hidden"
+                                  name="instrumentIds"
+                                  value={row.instrumentId}
+                                />
+                                <input type="hidden" name="mode" value="missing_only" />
+                                <input type="hidden" name="returnTo" value="/instruments" />
+                                <Button type="submit" size="sm">
+                                  {row.fetchStatus === 'not_requested' || !row.fetchStatus
+                                    ? 'Fetch'
+                                    : 'Refresh'}
+                                </Button>
+                              </form>
+                            ) : null}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>
-
-      {selected ? (
-        <div className="mt-4 grid gap-4 xl:grid-cols-[1.2fr_1fr]">
-          <Card className="border-border/70 bg-card/60">
-            <CardHeader>
-              <CardTitle>{selected.tradingSymbol} · provider mappings</CardTitle>
-              <CardDescription>
-                The canonical UUID never changes; a provider key can be versioned or replaced.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {mappings.length === 0 ? (
-                <EmptyState
-                  title="No mappings"
-                  description="Run instrument sync or seed the fixture."
-                />
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Provider</TableHead>
-                      <TableHead>External key</TableHead>
-                      <TableHead>Primary</TableHead>
-                      <TableHead>Valid from</TableHead>
-                      <TableHead>Valid to</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {mappings.map((mapping) => (
-                      <TableRow key={mapping.id}>
-                        <TableCell>{mapping.providerCode}</TableCell>
-                        <TableCell className="font-mono text-xs">{mapping.externalKey}</TableCell>
-                        <TableCell>{mapping.isPrimary ? 'yes' : 'no'}</TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {formatDate(mapping.validFrom)}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {formatDate(mapping.validTo)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="border-border/70 bg-card/60">
-            <CardHeader>
-              <CardTitle>Corporate actions</CardTitle>
-              <CardDescription>
-                Adjustments are applied on read; stored candles stay raw.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {corporateActions.length === 0 ? (
-                <EmptyState
-                  title="No corporate actions"
-                  description="Manual or CSV ingest arrives in R1/R2."
-                />
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Ex-date</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Price factor</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {corporateActions.map((action) => (
-                      <TableRow key={action.id}>
-                        <TableCell>{action.actionType}</TableCell>
-                        <TableCell>{action.exDate}</TableCell>
-                        <TableCell>
-                          <StatusBadge status={action.status} />
-                        </TableCell>
-                        <TableCell>{action.priceAdjustmentFactor}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      ) : null}
     </div>
   );
 }

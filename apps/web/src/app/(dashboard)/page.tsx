@@ -35,12 +35,19 @@ export default async function OverviewPage() {
     <div>
       <PageHeader
         title="System overview"
-        description="One screen for operating mode, component health, reference data, data coverage and recent jobs. R1 is read-only for trading."
+        description="One screen for operating mode, component health, reference data, data coverage and recent jobs. R2 is read-only for trading."
         actions={
           <>
             <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
               {status.mode.toUpperCase()}
             </Badge>
+            <Link
+              href="/instruments"
+              className={buttonVariants({ variant: 'outline', size: 'sm' })}
+            >
+              Open catalog
+              <ArrowUpRight className="size-4" />
+            </Link>
             <Link href="/data" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
               Open data health
               <ArrowUpRight className="size-4" />
@@ -189,9 +196,9 @@ export default async function OverviewPage() {
           <div className="flex items-start gap-3">
             <ShieldCheck className="text-primary mt-0.5 size-5" />
             <div>
-              <p className="text-sm font-medium">Offline is enforced, not implied.</p>
+              <p className="text-sm font-medium">Research is a capability boundary, not a label.</p>
               <p className="text-muted-foreground mt-1 text-xs leading-5">
-                The API and worker refuse to start unless TRADING_MODE=offline. No route writes to
+                The API and worker accept only TRADING_MODE=offline or research. No route writes to
                 orders, fills or positions, and the Upstox adapter has no order method.
               </p>
             </div>

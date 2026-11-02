@@ -87,9 +87,10 @@ A modular monolith for NSE cash-equity strategy research, backtesting, risk cont
 controlled live execution. The same strategy contract is intended to run unchanged in backtesting and
 live execution.
 
-The current implementation is **R1**: an offline operator cockpit with a complete lifecycle database
-schema, configuration management, authentication, API, worker jobs and a nine-route dashboard.
-R1 cannot place orders.
+The current implementation is **R2**: a research data platform with Upstox V3 historical ingestion,
+an index-ranked instrument catalog, persisted fetch/data status, strict coverage, a daily OHLCV
+validation oracle, resumable monthly chunks, a provider budget and a data-quality workflow. It keeps
+the R1 cockpit and lifecycle schema. R2 cannot place orders.
 
 “R1” means release 1, not schema version 1. The schema already covers R1–R9.
 
@@ -108,17 +109,20 @@ R1 cannot place orders.
 | R9      | Additional strategies through the existing strategy interface            | `controlled expansion` |
 
 The environment enum is narrower than the roadmap labels: `TRADING_MODE` accepts only `offline`,
-`research`, `backtesting`, `paper` and `live`. R1 refuses to start on anything except `offline`.
+`research`, `backtesting`, `paper` and `live`. R2 refuses to start on anything except `offline` or
+`research`.
 
-R1 is complete and verified: 58 logical tables, 1 materialized view, 6 explicit M:N join tables,
-monthly candle and quote partitions, a seeded operator, and zero live orders.
+R2 is complete when verified: 60 logical tables, 1 materialized view, 6 explicit M:N join tables,
+monthly candle and quote partitions, a seeded operator, 51 ranked nifty-50 members, 2022–2027
+calendar coverage and zero live orders.
 
 ## Non-negotiable guardrails
 
-- `TRADING_MODE` defaults to `offline`. The API and worker call `assertOfflineMode()` at startup and
-  refuse to start outside `offline`.
-- `SystemControlService.onModuleInit()` also refuses to start if any active account is not `offline`.
-- R1 has **no live order routes**. The `orders` table exists for R5, but R1 verifies zero rows.
+- `TRADING_MODE` defaults to `offline`. The API and worker call `assertResearchMode()` at startup and
+  refuse to start outside `offline` or `research`.
+- `SystemControlService.onModuleInit()` also refuses to start if any active account is not `offline` or
+  `research`.
+- R2 has **no live order routes**. The `orders` table exists for R5, but R2 verifies zero rows.
 - The Upstox client is **read-only**. It deliberately has no order, modify or cancel method.
 - Strategies may not import broker adapters or send orders directly.
 - Every backtest and live trade must record its strategy version and configuration snapshot.
@@ -144,7 +148,7 @@ Git ownership and code-comment rules are in the Working agreement above.
 | Database          | PostgreSQL 17+ — **external**; `DATABASE_URL` is the only database source |
 | ORM / migrations  | Drizzle ORM 0.44.x, drizzle-kit 0.31.x, postgres.js 3.4.x                 |
 | Queue / cache     | Redis Stack (`redis/redis-stack`) + BullMQ                                |
-| Broker            | Upstox V3 historical/market-data API, read-only in R1                     |
+| Broker            | Upstox V3 historical/market-data API, read-only in R1/R2                  |
 | Auth              | Argon2id password hashes, opaque sessions, HttpOnly cookies               |
 | Credential crypto | AES-256-GCM with `CONFIG_ENCRYPTION_KEY`                                  |
 | Containers        | Docker Compose under `infra/docker/`                                      |
@@ -195,7 +199,8 @@ There are **16 Nx projects**: 3 apps, 12 shared packages and `tests`.
 - The only browser-facing surface. It calls the API over HTTP and never touches the database directly.
 - App Router with a `(dashboard)` route group and a separate `/login` route.
 - Nine R1 routes: `/`, `/accounts`, `/instruments`, `/universes`, `/strategies`, `/configuration`,
-  `/data`, `/audit`, `/settings`.
+  `/data`, `/audit`, `/settings`. R2 adds `/instruments/[id]`, `/data/backfills/[id]`,
+  `/data/runs/[id]`, `/data/issues/[id]` and the coverage day detail.
 - Server components read through `src/lib/api.ts`; server actions perform writes.
 - The web app stores the API session token in its own HttpOnly cookie (`ai_trading_session`) and
   forwards it to the API as a Bearer token.
@@ -220,7 +225,7 @@ There are **16 Nx projects**: 3 apps, 12 shared packages and `tests`.
 - A global `SessionAuthGuard` protects every route. `@Public()` is used only by `GET /health` and
   `POST /auth/login`.
 - `bootstrap-env.ts` loads the workspace `.env` before the database client is imported.
-- R1 modules registered: auth, accounts, instruments, universes, strategies, configuration, data,
+- R2 modules registered: auth, accounts, instruments, universes, strategies, configuration, data,
   audit, settings, system-control.
 - Placeholder controllers exist for orders, positions, risk, trading, backtests, reports,
   notifications and market-data, but they are **not imported** into `AppModule`. Do not describe them
@@ -248,7 +253,7 @@ There are **16 Nx projects**: 3 apps, 12 shared packages and `tests`.
 
 ## Shared packages
 
-| Package                        | Purpose                                                     | R1 state                                     |
+| Package                        | Purpose                                                     | R2 state                                     |
 | ------------------------------ | ----------------------------------------------------------- | -------------------------------------------- |
 | `@ai-trading/domain`           | Shared vocabulary, canonical hashing, tick rounding, queues | Implemented                                  |
 | `@ai-trading/configuration`    | Env schema, offline assertion, JSON schemas, env loading    | Implemented                                  |
@@ -303,7 +308,8 @@ There are **16 Nx projects**: 3 apps, 12 shared packages and `tests`.
   - `operations.ts` — job runs, health snapshots, notifications, reports, dashboard overview
 - `migrate.ts` applies numbered SQL files in filename order, wraps each in a transaction, and records
   SHA-256 checksums in `schema_migrations`. It refuses to continue if an applied file changed.
-- `seed.ts` is idempotent and creates the R1 reference fixture.
+- `seed.ts` is idempotent and creates the R2 reference fixture, including the nifty-50 universe,
+  2022–2027 calendar, corrected tick sizes and one status row per member.
 - `verify.ts` checks table count, materialized views, foreign keys, partitions, zero orders and
   strategy-version bindings.
 - `load-env.ts` loads the workspace root `.env` for package-level scripts.
@@ -400,9 +406,9 @@ If you add a legitimate dependency, update `scripts/check-boundaries.mjs` and th
 
 ## Database
 
-### R1 shape
+### R2 shape
 
-- **58 logical tables**
+- **60 logical tables**
 - **1 materialized view** (`mv_instrument_daily_stats`)
 - **6 explicit M:N join tables**
 - Monthly range partitions for `market_candles_1m` and `market_quote_snapshots`
@@ -466,7 +472,7 @@ The six explicit M:N tables are `user_account_access`, `account_instrument_permi
 - Configuration is immutable: a change creates a new `configuration_versions` row with a new hash and
   effective dates. History is never edited.
 - `order_events`, `position_events`, `audit_log` and `domain_events` are append-only.
-- `orders` exists for R5. R1 seeds and verifies zero rows.
+- `orders` exists for R5. R2 seeds and verifies zero rows.
 - Backtest output is trades + daily equity curve + metrics; there is no per-bar row explosion.
 - Corporate actions carry adjustment factors; candles stay raw and are adjusted on read.
 - Cash equities and indices only. No expiry, strike, option type or Greek columns.
@@ -550,7 +556,7 @@ The six explicit M:N tables are `user_account_access`, `account_instrument_permi
 `pnpm db:verify` expects:
 
 ```text
-58 logical tables
+60 logical tables
 1 materialized view
 >= 63 candle partitions
 >= 15 quote partitions
@@ -561,7 +567,7 @@ The six explicit M:N tables are `user_account_access`, `account_instrument_permi
 The integration suite repeats the schema, seed, foreign-key, immutability and binding checks against
 a testcontainers PostgreSQL instance.
 
-## API surface (R1)
+## API surface (R2)
 
 Base URL: `http://localhost:8000/api/v1`. Swagger: `http://localhost:8000/api/docs`.
 
@@ -577,10 +583,20 @@ Base URL: `http://localhost:8000/api/v1`. Swagger: `http://localhost:8000/api/do
   `GET /strategies/:id/versions/:versionId/effective-config`; `POST /strategies/:id/versions`
 - **Configuration**: `GET /configuration`; `GET /configuration/:id`; `GET /configuration/:id/diff`;
   `POST /configuration`; `POST /configuration/:id/bind`
-- **Data**: `GET /data/coverage`; `GET /data/coverage/summary`; `GET /data/ingestion-runs`;
-  `GET /data/quality-issues`; `GET /data/daily-stats`;
-  `POST /data/quality-issues/:id/acknowledge`; `POST /data/backfill`;
+- **Data**: `GET /data/coverage`; `GET /data/coverage/summary`; `GET /data/coverage/heatmap`;
+  `GET /data/coverage/:instrumentId/:date`; `GET /data/ingestion-runs`;
+  `GET /data/ingestion-runs/:id`; `GET /data/quality-issues`; `GET /data/quality-issues/:id`;
+  `GET /data/daily-stats`; `GET /data/validation`; `GET /data/provider-status`;
+  `GET /data/quality-rules`; `POST /data/quality-issues/:id/acknowledge`; `POST /data/backfill`;
   `POST /data/refresh-materialized-view`
+- **Instrument status**: `GET /data/instrument-status`; `GET /data/instrument-status/summary`;
+  `GET /data/instrument-status/:instrumentId`; `POST /data/instrument-status/recompute`
+- **Backfill plans**: `POST /data/instruments/fetch`; `POST /data/instruments/:instrumentId/retry`;
+  `POST /data/instruments/:instrumentId/cancel`; `POST /data/backfill-plans`;
+  `GET /data/backfill-plans`; `GET /data/backfill-plans/:id`; `GET /data/backfill-plans/:id/children`;
+  `POST /data/backfill-plans/:id/cancel`; `POST /data/backfill-plans/:id/retry-failed`
+- **Reference**: `POST /data/reference/instrument-sync`; `POST /data/reference/calendar-sync`;
+  `POST /data/reference/corporate-actions/import` (admin role)
 - **Audit**: `GET /audit`
 - **Settings**: `GET /settings`; `PATCH /settings/:key`
 - **System**: `GET /system/status`; `GET /system/overview`; `GET /system/jobs`;
@@ -615,7 +631,7 @@ end-of-day-square-off
 maintenance
 ```
 
-R1 processors:
+R2 processors:
 
 - `historical-data`: `historical-backfill`, `instrument-sync`, `calendar-sync`,
   `coverage-recompute`
@@ -656,8 +672,8 @@ The API also sets its own HttpOnly cookie on direct login. Both paths are suppor
 - The API never returns ciphertext. Credential reads return metadata.
 - Audit rows capture actor, account, action, entity, before/after state, request id, IP and user
   agent. Callers pass non-secret metadata only; credential values are never written to audit rows.
-- The Upstox adapter cannot write orders. There is no live order route in R1.
-- `JWT_SECRET` and `JWT_EXPIRES_IN` exist in the env schema but are not used by R1 authentication.
+- The Upstox adapter cannot write orders. There is no live order route in R2.
+- `JWT_SECRET` and `JWT_EXPIRES_IN` exist in the env schema but are not used by R2 authentication.
 
 ## Environment
 
@@ -670,7 +686,7 @@ The workspace root `.env` is the single source of truth. It is loaded by:
 
 Inline environment variables win over `.env` values.
 
-### Required for a usable fresh R1 setup
+### Required for a usable fresh R2 setup
 
 | Variable                 | Source                                | Why required                                 |
 | ------------------------ | ------------------------------------- | -------------------------------------------- |
@@ -699,24 +715,24 @@ CONFIG_ENCRYPTION_KEY=<output of openssl rand -hex 32>
 | `UPSTOX_ACCESS_TOKEN` | Upstox OAuth flow            | Daily token; not seeded              |
 
 `UPSTOX_API_SECRET`, `UPSTOX_REDIRECT_URI` and `UPSTOX_SANDBOX` are declared for later OAuth work
-and are not consumed by the R1 worker. `UPSTOX_NETWORK_ENABLED=false` forces provider jobs to skip.
+and are not consumed by the R2 worker. `UPSTOX_NETWORK_ENABLED=false` forces provider jobs to skip.
 
 ### Useful defaults
 
-| Variable                   | Default                        |
-| -------------------------- | ------------------------------ |
-| `API_PORT`                 | `8000`                         |
-| `API_PREFIX`               | `api`                          |
-| `WEB_URL`                  | `http://localhost:3000`        |
-| `API_URL` (web)            | `http://localhost:8000/api/v1` |
-| `REDIS_URL`                | `redis://localhost:6379`       |
-| `TRADING_MODE`             | `offline`                      |
-| `SESSION_TTL_HOURS`        | `12`                           |
-| `COOKIE_SECURE`            | `false`                        |
-| `MARKET_TIMEZONE`          | `Asia/Kolkata`                 |
-| `DATA_BACKFILL_MAX_DAYS`   | `31`                           |
-| `INSTRUMENT_SYNC_LIMIT`    | `5000`                         |
-| `WORKER_SCHEDULES_ENABLED` | `true`                         |
+| Variable                   | Default                          |
+| -------------------------- | -------------------------------- |
+| `API_PORT`                 | `8000`                           |
+| `API_PREFIX`               | `api`                            |
+| `WEB_URL`                  | `http://localhost:3000`          |
+| `API_URL` (web)            | `http://localhost:8000/api/v1`   |
+| `REDIS_URL`                | `redis://localhost:6379`         |
+| `TRADING_MODE`             | `offline` (R2 example: research) |
+| `SESSION_TTL_HOURS`        | `12`                             |
+| `COOKIE_SECURE`            | `false`                          |
+| `MARKET_TIMEZONE`          | `Asia/Kolkata`                   |
+| `DATA_BACKFILL_MAX_DAYS`   | `31`                             |
+| `INSTRUMENT_SYNC_LIMIT`    | `5000`                           |
+| `WORKER_SCHEDULES_ENABLED` | `true`                           |
 
 ### Removed variables
 
@@ -774,7 +790,7 @@ pnpm build
 ```bash
 pnpm db:generate      # drizzle-kit generate, package-level config
 pnpm db:migrate       # apply numbered SQL migrations
-pnpm db:seed          # idempotent R1 seed
+pnpm db:seed          # idempotent R2 seed
 pnpm db:verify        # schema and seed assertions
 pnpm db:studio        # Drizzle Studio
 pnpm db:push          # disposable local databases only; never shared/production
@@ -943,17 +959,18 @@ visual or click-through check belongs to the user.
   `adapters`, `database` and `tests`.
 - Do not add tsconfig path aliases for workspace package names. Add a workspace dependency and build
   the package.
-- The API and worker refuse to start outside `offline`. If they exit immediately, check
-  `TRADING_MODE`.
-- The API also refuses to start if an active account has a non-offline mode.
+- The API and worker refuse to start outside `offline` or `research`. If they exit immediately,
+  check `TRADING_MODE`.
+- The API also refuses to start if an active account has a mode other than `offline` or `research`.
 - `GET /health` returns `degraded` when only one of PostgreSQL or Redis is healthy.
 - The worker needs Redis; `pnpm docker:up` starts it. A queue-unavailable error usually means Redis
   is down or `REDIS_URL` is wrong.
-- R1 provider jobs skip when Upstox credentials are absent. That is not a failure.
-- The R1 calendar is a fixture. Do not treat it as an authoritative exchange calendar.
+- R2 provider jobs skip when Upstox credentials are absent. That is not a failure.
+- The R2 2022–2027 calendar is a reviewed fixture with provisional rows. Do not treat it as an
+  authoritative exchange calendar until the open checks are closed.
 - Upstox order-status mapping and the net-equity formula still need live verification before R5/R6.
 - `orders`, `signals`, `risk_decisions`, `fills` and `positions` are schema-ready but not written by
-  R1 runtime code.
+  R2 runtime code.
 - `db:push` is for disposable local databases only.
 - Wiping a database is destructive:
   `psql "$DATABASE_URL" -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'` then migrate/seed.
@@ -966,6 +983,7 @@ visual or click-through check belongs to the user.
 
 Use these before guessing:
 
+- `context/r2-implementation-plan.html` — authoritative R2 ingestion, coverage, catalog and quality plan
 - `context/r1-implementation-plan.html` — authoritative R1 schema, table fields, enums and rationale
 - `context/monorepo-setup-plan.html` — workspace setup plan
 - `context/high-level-architecture.md` — layer responsibilities and execution flow
@@ -979,7 +997,10 @@ Use these before guessing:
 - `docs/architecture/README.md` — architecture summary and dependency rules
 - `docs/architecture/adr-0001-pnpm-nx-monorepo.md` — monorepo decision record
 - `docs/operations/runbook.md` — local start, health checks, recovery
-- `docs/operations/implementation-notes.md` — verified versions, deviations and R1 notes
+- `docs/operations/implementation-notes.md` — verified versions, deviations and R1/R2 notes
+- `docs/operations/r2-runbook.md` — token, backfill, resume and recovery
+- `docs/operations/data-quality-rules.md` — the 25 rules and severities
+- `docs/operations/catalog-status.md` — status precedence and refresh semantics
 - `docs/strategies/opening-range-breakout.md` — ORB implementation summary
 - `README.md` — quick start and URLs
 
@@ -993,7 +1014,7 @@ Use these before guessing:
 | M:N              | Many-to-many; always an explicit join table here                     |
 | MV               | Materialized view (`mv_instrument_daily_stats`)                      |
 | DTO              | NestJS request/response data-transfer object                         |
-| Offline          | R1 trading mode; no broker orders are possible                       |
+| Offline          | R1/R2 safe mode; no broker orders are possible                       |
 | Provider mapping | Versioned broker key for an instrument; never the canonical identity |
 | Snapshot         | Immutable configuration version with hash and effective dates        |
 

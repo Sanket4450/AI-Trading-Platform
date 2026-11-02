@@ -6,11 +6,11 @@ import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
-import { assertOfflineMode } from '@ai-trading/configuration';
+import { assertResearchMode } from '@ai-trading/configuration';
 import { AppModule } from './app.module.js';
 
 async function bootstrap() {
-  assertOfflineMode();
+  assertResearchMode();
 
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
   const config = app.get(ConfigService);
@@ -34,7 +34,7 @@ async function bootstrap() {
   const swagger = new DocumentBuilder()
     .setTitle('AI Trading API')
     .setDescription(
-      'R1 offline cockpit: reference data, configuration, data health and audit.',
+      'R2 research cockpit: reference data, historical ingestion, coverage, data quality and audit.',
     )
     .setVersion('1.0')
     .addBearerAuth()

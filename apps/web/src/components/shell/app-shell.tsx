@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -9,6 +10,7 @@ import {
   LayoutDashboard,
   Layers,
   LineChart,
+  Loader2,
   LogOut,
   ScrollText,
   Settings,
@@ -17,6 +19,15 @@ import {
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import type { SessionUser } from '@/lib/types';
 
@@ -37,12 +48,40 @@ function isActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function AppShell({ user, children }: { user: SessionUser; children: React.ReactNode }) {
+export function AppShell({
+  user,
+  mode,
+  children,
+}: {
+  user: SessionUser;
+  mode: string;
+  children: React.ReactNode;
+}) {
   const pathname = usePathname();
   const router = useRouter();
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState<string | null>(null);
+
+  function handleConfirmOpenChange(open: boolean) {
+    if (signingOut) return;
+    setConfirmOpen(open);
+    if (open) setSignOutError(null);
+  }
 
   async function logout() {
-    await fetch('/api/auth/logout', { method: 'POST' });
+    setSigningOut(true);
+    setSignOutError(null);
+
+    try {
+      const response = await fetch('/api/auth/logout', { method: 'POST' });
+      if (!response.ok) throw new Error(`Sign out failed with status ${response.status}`);
+    } catch {
+      setSigningOut(false);
+      setSignOutError('We could not sign you out. Please check your connection and try again.');
+      return;
+    }
+
     router.push('/login');
     router.refresh();
   }
@@ -58,7 +97,7 @@ export function AppShell({ user, children }: { user: SessionUser; children: Reac
             <span>
               <span className="block text-sm font-semibold tracking-tight">AI Trading System</span>
               <span className="text-muted-foreground block text-[10px] uppercase tracking-[0.18em]">
-                R1 cockpit
+                R2 research cockpit
               </span>
             </span>
           </Link>
@@ -88,12 +127,15 @@ export function AppShell({ user, children }: { user: SessionUser; children: Reac
           <div className="border-border/70 bg-card/60 text-muted-foreground mt-auto rounded-xl border p-3 text-xs">
             <div className="flex items-center justify-between">
               <span>Mode</span>
-              <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
-                OFFLINE
+              <Badge
+                variant="outline"
+                className="border-primary/30 bg-primary/10 text-primary uppercase"
+              >
+                {mode}
               </Badge>
             </div>
             <p className="mt-2 leading-5">
-              R1 reads and configures only. No order route exists and no broker write call is
+              R2 ingests and validates history. No order route exists and no broker write call is
               compiled.
             </p>
           </div>
@@ -116,14 +158,49 @@ export function AppShell({ user, children }: { user: SessionUser; children: Reac
               <div className="flex items-center gap-2">
                 <Badge
                   variant="outline"
-                  className="border-primary/30 bg-primary/10 text-primary hidden sm:inline-flex"
+                  className="border-primary/30 bg-primary/10 text-primary hidden uppercase sm:inline-flex"
                 >
-                  OFFLINE
+                  {mode}
                 </Badge>
-                <Button variant="outline" size="sm" onClick={logout}>
-                  <LogOut className="size-4" />
-                  <span className="hidden sm:inline">Sign out</span>
-                </Button>
+                <Dialog open={confirmOpen} onOpenChange={handleConfirmOpenChange}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm" aria-label="Sign out">
+                      <LogOut className="size-4" />
+                      <span className="hidden sm:inline">Sign out</span>
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent showCloseButton={!signingOut}>
+                    <DialogHeader>
+                      <DialogTitle>Sign out of your account?</DialogTitle>
+                      <DialogDescription>
+                        You will be returned to the sign-in screen and asked to authenticate again
+                        before you can continue.
+                      </DialogDescription>
+                    </DialogHeader>
+                    {signOutError ? (
+                      <p role="alert" className="text-destructive text-sm">
+                        {signOutError}
+                      </p>
+                    ) : null}
+                    <DialogFooter>
+                      <Button
+                        variant="outline"
+                        onClick={() => handleConfirmOpenChange(false)}
+                        disabled={signingOut}
+                      >
+                        Cancel
+                      </Button>
+                      <Button variant="destructive" onClick={logout} disabled={signingOut}>
+                        {signingOut ? (
+                          <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                          <LogOut className="size-4" />
+                        )}
+                        {signingOut ? 'Signing out…' : 'Sign out'}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
               </div>
             </div>
 

@@ -258,8 +258,16 @@ export interface CoverageRow {
   expectedBars: number;
   storedBars: number;
   gapCount: number;
+  gapRunCount: number;
+  maxGapMinutes: number;
   firstBarAt: string | null;
   lastBarAt: string | null;
+  dailyVolume: string | null;
+  minuteVolume: string | null;
+  volumeDeltaPct: string | null;
+  ohlcMatch: boolean | null;
+  validationStatus: string;
+  details: Record<string, unknown>;
   status: string;
   checkedAt: string;
 }
@@ -268,7 +276,9 @@ export interface CoverageSummary {
   complete: number;
   partial: number;
   missing: number;
+  notApplicable: number;
   total: number;
+  validation: Record<string, number>;
 }
 
 export interface IngestionRun {
@@ -285,6 +295,17 @@ export interface IngestionRun {
   rowsFetched: number;
   rowsWritten: number;
   rowsRejected: number;
+  rowsSkipped: number;
+  rowsUpdated: number;
+  parentJobRunId: string | null;
+  chunkIndex: number | null;
+  chunkCount: number | null;
+  attempt: number;
+  requestFingerprint: string | null;
+  httpStatus: number | null;
+  providerErrorCode: string | null;
+  durationMs: number | null;
+  rateLimitedUntil: string | null;
   errorMessage: string | null;
   startedAt: string | null;
   finishedAt: string | null;
@@ -306,6 +327,14 @@ export interface QualityIssue {
   detectedBy: string;
   detectedAt: string;
   resolvedAt: string | null;
+  ruleId: string | null;
+  dedupeKey: string | null;
+  occurrenceCount: number;
+  lastSeenAt: string;
+  acknowledgedBy: string | null;
+  acknowledgedAt: string | null;
+  resolvedBy: string | null;
+  resolutionNote: string | null;
 }
 
 export interface AuditRow {
@@ -384,4 +413,178 @@ export interface Overview {
   openIssues: QualityIssue[];
   latestCoverageDate: string | null;
   coverageByStatus: { status: string; count: number }[];
+}
+
+export interface InstrumentStatusRow {
+  rank: number;
+  instrumentId: string;
+  symbol: string;
+  name: string;
+  isin: string | null;
+  segment: string;
+  instrumentType: string;
+  tickSize: string;
+  isActive: boolean;
+  listedOn: string | null;
+  delistedOn: string | null;
+  universeCode: string;
+  universeVersionId: string;
+  universeVersion: number;
+  targetFrom: string | null;
+  targetTo: string | null;
+  fetchStatus: string | null;
+  dataStatus: string | null;
+  expectedDays: number | null;
+  completeDays: number | null;
+  partialDays: number | null;
+  missingDays: number | null;
+  notApplicableDays: number | null;
+  openCriticalIssues: number | null;
+  lastRunId: string | null;
+  activeRunId: string | null;
+  lastSuccessAt: string | null;
+  computedAt: string | null;
+  mappingCount: number;
+}
+
+export interface InstrumentStatusMonth {
+  month: string;
+  complete: number;
+  partial: number;
+  missing: number;
+  notApplicable: number;
+  reconciled: number;
+  mismatch: number;
+}
+
+export interface InstrumentStatusDetail extends Omit<
+  InstrumentStatusRow,
+  'rank' | 'universeCode' | 'universeVersionId' | 'universeVersion'
+> {
+  months: InstrumentStatusMonth[];
+  runs: IngestionRun[];
+  issues: QualityIssue[];
+}
+
+export interface DailyValidation {
+  id: string;
+  instrumentId: string;
+  symbol: string;
+  tradingDate: string;
+  status: string;
+  ohlcMatch: boolean | null;
+  volumeMatch: boolean | null;
+  dailyVolume: string | null;
+  minuteVolume: string | null;
+  volumeDeltaPct: string | null;
+  checkedAt: string;
+}
+
+export interface CoverageHeatmapCell {
+  instrumentId: string;
+  symbol: string;
+  rank: number;
+  tradingDate: string;
+  status: string;
+  validationStatus: string;
+  gapCount: number;
+  gapRunCount: number;
+  maxGapMinutes: number;
+}
+
+export interface BackfillPreview {
+  instrumentCount: number;
+  resolved: number;
+  blocked: { instrumentId: string; symbol: string; reason: string }[];
+  sessionCount: number;
+  monthCount: number;
+  skippedMonths: number;
+  requestCount: number;
+  estimatedBars: number;
+  estimatedBytes: number;
+  from: string;
+  to: string;
+  months: { index: number; from: string; to: string }[];
+}
+
+export interface BackfillPlanProgress {
+  chunks: number;
+  instruments: number;
+  queued: number;
+  running: number;
+  succeeded: number;
+  partiallyFailed: number;
+  failed: number;
+  cancelled: number;
+  rowsFetched: number;
+  rowsWritten: number;
+  rowsRejected: number;
+  rowsSkipped: number;
+  rowsUpdated: number;
+}
+
+export interface BackfillPlan extends JobRun {
+  progress: BackfillPlanProgress;
+}
+
+export interface BackfillPlanChunk {
+  id: string;
+  instrumentId: string | null;
+  symbol: string | null;
+  rank: number | null;
+  chunkIndex: number | null;
+  chunkCount: number | null;
+  requestedFrom: string | null;
+  requestedTo: string | null;
+  status: string;
+  attempt: number;
+  rowsFetched: number;
+  rowsWritten: number;
+  rowsRejected: number;
+  rowsSkipped: number;
+  rowsUpdated: number;
+  httpStatus: number | null;
+  providerErrorCode: string | null;
+  durationMs: number | null;
+  errorMessage: string | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+}
+
+export interface BackfillPlanDetail extends BackfillPlan {
+  chunks: BackfillPlanChunk[];
+}
+
+export interface ProviderStatus {
+  provider: string;
+  networkEnabled: boolean;
+  apiKeyConfigured: boolean;
+  tokenConfigured: boolean;
+  baseUrl: string;
+  dailyOracleEnabled: boolean;
+  budget: {
+    availableSecond: number;
+    availableMinute: number;
+    available30Minutes: number;
+    pausedUntil: string | null;
+  } | null;
+  lastSuccessfulSyncAt: string | null;
+  lastSuccessfulBackfillAt: string | null;
+  lastSuccessfulIntradayAt: string | null;
+  lastSuccessfulValidationAt: string | null;
+  failedRuns24h: number;
+  runningChunks: number;
+  queuedChunks: number;
+  payloadCount: number;
+  payloadBytes: string | number;
+  oldestPayloadAt: string | null;
+}
+
+export interface QualityRule {
+  ruleId: string;
+  issueType: string;
+  dimension: string;
+  defaultSeverity: string;
+  description: string;
+  blocksPreflightWhenCritical: boolean;
 }

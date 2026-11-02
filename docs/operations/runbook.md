@@ -1,5 +1,8 @@
 # Operations runbook
 
+R2 adds historical ingestion, the instrument catalog and the quality workflow. See
+`docs/operations/r2-runbook.md` for the token, backfill, resume and recovery procedure.
+
 ## Local start
 
 ```bash

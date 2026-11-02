@@ -4,7 +4,12 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { Cron } from '@nestjs/schedule';
 import type { Queue } from 'bullmq';
 import { QUEUES } from '@ai-trading/domain';
-import { createJobRun, updateJobRun } from '@ai-trading/database';
+import { istToday } from '@ai-trading/market-data';
+import {
+  createJobRun,
+  getTradingCalendarRow,
+  updateJobRun,
+} from '@ai-trading/database';
 
 @Injectable()
 export class MarketScheduler {
@@ -23,6 +28,12 @@ export class MarketScheduler {
     );
   }
 
+  private async isTradingDay(): Promise<boolean> {
+    const today = istToday();
+    const row = await getTradingCalendarRow(today);
+    return Boolean(row?.is_trading_day);
+  }
+
   @Cron('0 8 * * 1-5', { timeZone: 'Asia/Kolkata' })
   async preMarketInstrumentSync(): Promise<void> {
     if (!this.enabled) return;
@@ -31,7 +42,7 @@ export class MarketScheduler {
     });
   }
 
-  @Cron('0 8 * * 1-5', { timeZone: 'Asia/Kolkata' })
+  @Cron('5 8 * * 1-5', { timeZone: 'Asia/Kolkata' })
   async preMarketCalendarSync(): Promise<void> {
     if (!this.enabled) return;
     await this.enqueue(this.historicalQueue, 'calendar-sync', 'ingestion', {
@@ -39,17 +50,92 @@ export class MarketScheduler {
     });
   }
 
+  @Cron('15 8 * * 1-5', { timeZone: 'Asia/Kolkata' })
+  async historicalFinalize(): Promise<void> {
+    if (!this.enabled || !(await this.isTradingDay())) return;
+    await this.enqueue(
+      this.historicalQueue,
+      'historical-finalize',
+      'ingestion',
+      { source: 'schedule' },
+      1,
+    );
+  }
+
+  @Cron('30 8 * * 1-5', { timeZone: 'Asia/Kolkata' })
+  async ingestionReconcile(): Promise<void> {
+    if (!this.enabled) return;
+    await this.enqueue(
+      this.historicalQueue,
+      'ingestion-reconcile',
+      'ingestion',
+      {
+        source: 'schedule',
+      },
+    );
+  }
+
   @Cron('0 16 * * 1-5', { timeZone: 'Asia/Kolkata' })
+  async intradaySync(): Promise<void> {
+    if (!this.enabled || !(await this.isTradingDay())) return;
+    await this.enqueue(
+      this.historicalQueue,
+      'intraday-sync',
+      'ingestion',
+      { source: 'schedule' },
+      1,
+    );
+  }
+
+  @Cron('15 16 * * 1-5', { timeZone: 'Asia/Kolkata' })
+  async coverageRecompute(): Promise<void> {
+    if (!this.enabled || !(await this.isTradingDay())) return;
+    await this.enqueue(
+      this.historicalQueue,
+      'coverage-recompute',
+      'ingestion',
+      {
+        source: 'schedule',
+      },
+    );
+  }
+
+  @Cron('30 16 * * 1-5', { timeZone: 'Asia/Kolkata' })
+  async qualityScan(): Promise<void> {
+    if (!this.enabled || !(await this.isTradingDay())) return;
+    await this.enqueue(this.historicalQueue, 'quality-scan', 'ingestion', {
+      source: 'schedule',
+      days: 10,
+    });
+  }
+
+  @Cron('0 17 * * 1-5', { timeZone: 'Asia/Kolkata' })
+  async dailyValidation(): Promise<void> {
+    if (!this.enabled || !(await this.isTradingDay())) return;
+    await this.enqueue(this.historicalQueue, 'daily-validation', 'ingestion', {
+      source: 'schedule',
+      days: 1,
+    });
+  }
+
+  @Cron('0 18 * * 1-5', { timeZone: 'Asia/Kolkata' })
   async postMarketRefresh(): Promise<void> {
     if (!this.enabled) return;
     await this.enqueue(
       this.maintenanceQueue,
       'refresh-materialized-view',
       'maintenance',
-      {
-        source: 'schedule',
-      },
+      { source: 'schedule' },
     );
+  }
+
+  @Cron('0 9 * * 6', { timeZone: 'Asia/Kolkata' })
+  async weeklyFullQualityScan(): Promise<void> {
+    if (!this.enabled) return;
+    await this.enqueue(this.historicalQueue, 'quality-scan', 'ingestion', {
+      source: 'schedule',
+      full: true,
+    });
   }
 
   @Cron('0 8 1 * *', { timeZone: 'Asia/Kolkata' })
@@ -59,9 +145,7 @@ export class MarketScheduler {
       this.maintenanceQueue,
       'ensure-partitions',
       'maintenance',
-      {
-        source: 'schedule',
-      },
+      { source: 'schedule' },
     );
   }
 
@@ -70,6 +154,7 @@ export class MarketScheduler {
     jobName: string,
     jobType: string,
     payload: Record<string, unknown>,
+    priority = 10,
   ): Promise<void> {
     const jobRun = await createJobRun({
       jobName,
@@ -85,6 +170,7 @@ export class MarketScheduler {
         { ...payload, jobRunId: jobRun.id },
         {
           jobId: jobRun.id,
+          priority,
           attempts: 3,
           backoff: { type: 'exponential', delay: 10_000 },
           removeOnComplete: 200,

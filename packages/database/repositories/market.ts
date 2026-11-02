@@ -16,6 +16,7 @@ export async function listCoverage(filters: {
   date?: string;
   instrumentId?: string;
   status?: string;
+  validationStatus?: string;
   limit?: number;
 }) {
   const conditions = [];
@@ -23,6 +24,8 @@ export async function listCoverage(filters: {
   if (filters.instrumentId)
     conditions.push(eq(marketDataCoverage.instrumentId, filters.instrumentId));
   if (filters.status) conditions.push(eq(marketDataCoverage.status, filters.status));
+  if (filters.validationStatus)
+    conditions.push(eq(marketDataCoverage.validationStatus, filters.validationStatus));
 
   return db
     .select({
@@ -34,8 +37,16 @@ export async function listCoverage(filters: {
       expectedBars: marketDataCoverage.expectedBars,
       storedBars: marketDataCoverage.storedBars,
       gapCount: marketDataCoverage.gapCount,
+      gapRunCount: marketDataCoverage.gapRunCount,
+      maxGapMinutes: marketDataCoverage.maxGapMinutes,
       firstBarAt: marketDataCoverage.firstBarAt,
       lastBarAt: marketDataCoverage.lastBarAt,
+      dailyVolume: marketDataCoverage.dailyVolume,
+      minuteVolume: marketDataCoverage.minuteVolume,
+      volumeDeltaPct: marketDataCoverage.volumeDeltaPct,
+      ohlcMatch: marketDataCoverage.ohlcMatch,
+      validationStatus: marketDataCoverage.validationStatus,
+      details: marketDataCoverage.details,
       status: marketDataCoverage.status,
       checkedAt: marketDataCoverage.checkedAt,
     })
@@ -50,19 +61,30 @@ export async function getCoverageSummary(date?: string) {
   const rows = await db
     .select({
       status: marketDataCoverage.status,
+      validationStatus: marketDataCoverage.validationStatus,
       count: sql<number>`count(*)::int`,
       instruments: sql<number>`count(distinct ${marketDataCoverage.instrumentId})::int`,
     })
     .from(marketDataCoverage)
     .where(date ? eq(marketDataCoverage.tradingDate, date) : undefined)
-    .groupBy(marketDataCoverage.status);
+    .groupBy(marketDataCoverage.status, marketDataCoverage.validationStatus);
 
-  const summary = { complete: 0, partial: 0, missing: 0, total: 0 };
+  const summary = {
+    complete: 0,
+    partial: 0,
+    missing: 0,
+    notApplicable: 0,
+    total: 0,
+    validation: {} as Record<string, number>,
+  };
   for (const row of rows) {
-    if (row.status === 'complete') summary.complete = row.count;
-    if (row.status === 'partial') summary.partial = row.count;
-    if (row.status === 'missing') summary.missing = row.count;
+    if (row.status === 'complete') summary.complete += row.count;
+    if (row.status === 'partial') summary.partial += row.count;
+    if (row.status === 'missing') summary.missing += row.count;
+    if (row.status === 'not_applicable') summary.notApplicable += row.count;
     summary.total += row.count;
+    summary.validation[row.validationStatus] =
+      (summary.validation[row.validationStatus] ?? 0) + row.count;
   }
   return summary;
 }
@@ -84,6 +106,17 @@ export async function listIngestionRuns(filters: { limit?: number; status?: stri
       rowsFetched: marketDataIngestionRuns.rowsFetched,
       rowsWritten: marketDataIngestionRuns.rowsWritten,
       rowsRejected: marketDataIngestionRuns.rowsRejected,
+      rowsSkipped: marketDataIngestionRuns.rowsSkipped,
+      rowsUpdated: marketDataIngestionRuns.rowsUpdated,
+      parentJobRunId: marketDataIngestionRuns.parentJobRunId,
+      chunkIndex: marketDataIngestionRuns.chunkIndex,
+      chunkCount: marketDataIngestionRuns.chunkCount,
+      attempt: marketDataIngestionRuns.attempt,
+      requestFingerprint: marketDataIngestionRuns.requestFingerprint,
+      httpStatus: marketDataIngestionRuns.httpStatus,
+      providerErrorCode: marketDataIngestionRuns.providerErrorCode,
+      durationMs: marketDataIngestionRuns.durationMs,
+      rateLimitedUntil: marketDataIngestionRuns.rateLimitedUntil,
       errorMessage: marketDataIngestionRuns.errorMessage,
       startedAt: marketDataIngestionRuns.startedAt,
       finishedAt: marketDataIngestionRuns.finishedAt,
@@ -106,6 +139,11 @@ export async function createIngestionRun(values: {
   requestedFrom: string | null;
   requestedTo: string | null;
   status?: string;
+  parentJobRunId?: string | null;
+  chunkIndex?: number | null;
+  chunkCount?: number | null;
+  attempt?: number;
+  requestFingerprint?: string | null;
 }) {
   const [created] = await db
     .insert(marketDataIngestionRuns)
@@ -122,6 +160,13 @@ export async function createIngestionRun(values: {
       rowsFetched: 0,
       rowsWritten: 0,
       rowsRejected: 0,
+      rowsSkipped: 0,
+      rowsUpdated: 0,
+      parentJobRunId: values.parentJobRunId ?? null,
+      chunkIndex: values.chunkIndex ?? null,
+      chunkCount: values.chunkCount ?? null,
+      attempt: values.attempt ?? 1,
+      requestFingerprint: values.requestFingerprint ?? null,
       startedAt: null,
       finishedAt: null,
     })
@@ -136,10 +181,17 @@ export async function updateIngestionRun(
     rowsFetched?: number;
     rowsWritten?: number;
     rowsRejected?: number;
+    rowsSkipped?: number;
+    rowsUpdated?: number;
     errorMessage?: string | null;
     rawPayloadId?: string | null;
     startedAt?: Date | null;
     finishedAt?: Date | null;
+    httpStatus?: number | null;
+    providerErrorCode?: string | null;
+    durationMs?: number | null;
+    rateLimitedUntil?: Date | null;
+    attempt?: number;
   },
 ) {
   const [updated] = await db
@@ -179,6 +231,14 @@ export async function listQualityIssues(filters: {
       detectedBy: dataQualityIssues.detectedBy,
       detectedAt: dataQualityIssues.detectedAt,
       resolvedAt: dataQualityIssues.resolvedAt,
+      ruleId: dataQualityIssues.ruleId,
+      dedupeKey: dataQualityIssues.dedupeKey,
+      occurrenceCount: dataQualityIssues.occurrenceCount,
+      lastSeenAt: dataQualityIssues.lastSeenAt,
+      acknowledgedBy: dataQualityIssues.acknowledgedBy,
+      acknowledgedAt: dataQualityIssues.acknowledgedAt,
+      resolvedBy: dataQualityIssues.resolvedBy,
+      resolutionNote: dataQualityIssues.resolutionNote,
     })
     .from(dataQualityIssues)
     .leftJoin(providers, eq(providers.id, dataQualityIssues.providerId))
@@ -300,9 +360,17 @@ export async function upsertCoverage(values: {
   expectedBars: number;
   storedBars: number;
   gapCount: number;
+  gapRunCount?: number;
+  maxGapMinutes?: number;
   firstBarAt: Date | null;
   lastBarAt: Date | null;
   status: string;
+  dailyVolume?: string | null;
+  minuteVolume?: string | null;
+  volumeDeltaPct?: string | null;
+  ohlcMatch?: boolean | null;
+  validationStatus?: string;
+  details?: Record<string, unknown>;
 }) {
   const [row] = await db
     .insert(marketDataCoverage)
@@ -313,9 +381,17 @@ export async function upsertCoverage(values: {
       expectedBars: values.expectedBars,
       storedBars: values.storedBars,
       gapCount: values.gapCount,
+      gapRunCount: values.gapRunCount ?? 0,
+      maxGapMinutes: values.maxGapMinutes ?? 0,
       firstBarAt: values.firstBarAt,
       lastBarAt: values.lastBarAt,
       status: values.status,
+      dailyVolume: values.dailyVolume ?? null,
+      minuteVolume: values.minuteVolume ?? null,
+      volumeDeltaPct: values.volumeDeltaPct ?? null,
+      ohlcMatch: values.ohlcMatch ?? null,
+      validationStatus: values.validationStatus ?? 'not_checked',
+      details: values.details ?? {},
       checkedAt: new Date(),
     })
     .onConflictDoUpdate({
@@ -324,9 +400,17 @@ export async function upsertCoverage(values: {
         expectedBars: values.expectedBars,
         storedBars: values.storedBars,
         gapCount: values.gapCount,
+        gapRunCount: values.gapRunCount ?? 0,
+        maxGapMinutes: values.maxGapMinutes ?? 0,
         firstBarAt: values.firstBarAt,
         lastBarAt: values.lastBarAt,
         status: values.status,
+        dailyVolume: values.dailyVolume ?? null,
+        minuteVolume: values.minuteVolume ?? null,
+        volumeDeltaPct: values.volumeDeltaPct ?? null,
+        ohlcMatch: values.ohlcMatch ?? null,
+        validationStatus: values.validationStatus ?? 'not_checked',
+        details: values.details ?? {},
         checkedAt: new Date(),
         updatedAt: new Date(),
       },

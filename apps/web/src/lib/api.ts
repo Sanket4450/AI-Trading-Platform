@@ -2,6 +2,7 @@ import { cookies } from 'next/headers';
 
 const API_BASE = process.env.API_URL ?? 'http://localhost:8000/api/v1';
 const SESSION_COOKIE = 'ai_trading_session';
+const HEALTH_TIMEOUT_MS = 5_000;
 
 export class ApiError extends Error {
   constructor(
@@ -57,4 +58,21 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
 
 export async function getSession() {
   return apiFetch<{ user: import('./types.js').SessionUser }>('/auth/session');
+}
+
+/** Reads the public health endpoint so pre-auth pages can show the active trading mode. */
+export async function getPublicHealth(): Promise<import('./types.js').HealthResponse | null> {
+  try {
+    const response = await fetch(`${API_BASE}/health`, {
+      headers: { accept: 'application/json' },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(HEALTH_TIMEOUT_MS),
+    });
+    if (!response.ok) {
+      return null;
+    }
+    return (await response.json()) as import('./types.js').HealthResponse;
+  } catch {
+    return null;
+  }
 }

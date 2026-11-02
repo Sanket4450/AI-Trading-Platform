@@ -8,9 +8,12 @@ import { closeDatabase, db } from './client.js';
 import * as schema from './schema/index.js';
 import {
   NIFTY_50_INDEX,
+  defaultEquityTickSize,
   nifty50Constituents,
   nseHolidays,
+  nseSpecialSessions,
   orbUniverseSymbols,
+  reviewedTickSizes,
 } from './fixtures/nse.js';
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -90,6 +93,7 @@ async function getInstrument(
     isin: string | null;
     segment: string;
     instrumentType: string;
+    tickSize?: string;
   },
 ) {
   const existing = await tx
@@ -103,7 +107,22 @@ async function getInstrument(
       ),
     )
     .limit(1);
-  if (existing[0]) return existing[0];
+  const tickSize = values.tickSize ?? defaultEquityTickSize;
+  if (existing[0]) {
+    const [updated] = await tx
+      .update(schema.instruments)
+      .set({
+        name: values.name,
+        isin: values.isin,
+        segment: values.segment,
+        instrumentType: values.instrumentType,
+        tickSize,
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.instruments.id, existing[0].id))
+      .returning();
+    return updated;
+  }
 
   const [created] = await tx
     .insert(schema.instruments)
@@ -117,7 +136,7 @@ async function getInstrument(
       segment: values.segment,
       instrumentType: values.instrumentType,
       lotSize: 1,
-      tickSize: '0.05',
+      tickSize,
       isActive: true,
       listedOn: '2000-01-01',
     })
@@ -181,33 +200,30 @@ async function getOrCreateConfig(
       and(
         eq(schema.configurationVersions.configType, values.configType),
         eq(schema.configurationVersions.scopeKey, values.scopeKey),
-        eq(schema.configurationVersions.version, values.version),
       ),
     )
-    .limit(1);
+    .orderBy(schema.configurationVersions.version);
 
   const payloadHash = hashPayload(values.payload);
-  if (existing[0]) {
-    if (existing[0].payloadHash !== payloadHash) {
-      throw new Error(
-        `Configuration ${values.configType}/${values.scopeKey} v${values.version} already exists with a different payload`,
-      );
-    }
-    return existing[0];
+  const latest = existing.at(-1);
+  if (latest && latest.payloadHash === payloadHash) {
+    return latest;
   }
 
+  const nextVersion = latest ? latest.version + 1 : values.version;
   const [created] = await tx
     .insert(schema.configurationVersions)
     .values({
       id: uuidv7(),
       configType: values.configType,
       scopeKey: values.scopeKey,
-      version: values.version,
+      version: nextVersion,
       payload: values.payload as Record<string, unknown>,
       payloadHash,
       schemaVersion: values.schemaVersion,
       effectiveFrom: values.effectiveFrom,
       effectiveTo: null,
+      supersedesId: latest?.id ?? null,
       createdBy: values.createdBy,
     })
     .returning();
@@ -220,6 +236,7 @@ export async function seedDatabase(options: SeedOptions) {
   const accountCode = options.accountCode?.trim() || 'upstox-primary';
   const accountName = options.accountName?.trim() || 'Upstox Primary';
   const brokerUserRef = options.brokerUserRef?.trim() || null;
+  const tradingMode = process.env.TRADING_MODE === 'research' ? 'research' : 'offline';
 
   if (!operatorEmail) throw new Error('SEED_OPERATOR_EMAIL is required');
   if (!options.password) {
@@ -285,7 +302,7 @@ export async function seedDatabase(options: SeedOptions) {
           brokerProviderId: upstox.id,
           brokerUserRef,
           baseCurrency: 'INR',
-          mode: 'offline',
+          mode: tradingMode,
           timezone: 'Asia/Kolkata',
           isActive: true,
           openedAt: today,
@@ -294,7 +311,7 @@ export async function seedDatabase(options: SeedOptions) {
     } else {
       [account] = await tx
         .update(schema.accounts)
-        .set({ mode: 'offline', isActive: true, updatedAt: new Date() })
+        .set({ mode: tradingMode, isActive: true, updatedAt: new Date() })
         .where(eq(schema.accounts.id, account.id))
         .returning();
     }
@@ -321,28 +338,32 @@ export async function seedDatabase(options: SeedOptions) {
       });
     }
 
-    // Trading calendar for the current and next calendar year.
+    // Reviewed calendar fixture for 2022–2027. Special sessions carry their
+    // exact window; a provisional row never silently becomes reviewed.
     const calendarRows: (typeof schema.tradingCalendar.$inferInsert)[] = [];
-    for (const year of [2026, 2027]) {
+    for (let year = 2022; year <= 2027; year += 1) {
       for (let month = 0; month < 12; month += 1) {
         const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
         for (let day = 1; day <= daysInMonth; day += 1) {
           const date = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
           const weekday = new Date(`${date}T00:00:00+05:30`).getUTCDay();
+          const special = nseSpecialSessions[date];
           const holiday = nseHolidays[date];
-          const isTradingDay = weekday >= 1 && weekday <= 5 && !holiday;
+          const isTradingDay = Boolean(special) || (weekday >= 1 && weekday <= 5 && !holiday);
+          const open = special?.open ?? '09:15:00';
+          const close = special?.close ?? '15:30:00';
           calendarRows.push({
             id: uuidv7(),
             exchangeId: nse.id,
             tradingDate: date,
             isTradingDay,
-            sessionOpen: isTradingDay ? istInstant(date, '09:15:00') : null,
-            sessionClose: isTradingDay ? istInstant(date, '15:30:00') : null,
-            preOpenStart: isTradingDay ? istInstant(date, '09:00:00') : null,
-            closingAuctionStart: isTradingDay ? istInstant(date, '15:30:00') : null,
-            closingAuctionEnd: isTradingDay ? istInstant(date, '15:40:00') : null,
+            sessionOpen: isTradingDay ? istInstant(date, open) : null,
+            sessionClose: isTradingDay ? istInstant(date, close) : null,
+            preOpenStart: isTradingDay && !special ? istInstant(date, '09:00:00') : null,
+            closingAuctionStart: isTradingDay && !special ? istInstant(date, close) : null,
+            closingAuctionEnd: isTradingDay && !special ? istInstant(date, '15:40:00') : null,
             settlementDate: null,
-            description: holiday ?? (isTradingDay ? null : 'Weekend'),
+            description: special?.description ?? holiday ?? (isTradingDay ? null : 'Weekend'),
             sourceProviderId: upstox.id,
           });
         }
@@ -352,8 +373,19 @@ export async function seedDatabase(options: SeedOptions) {
     await tx
       .insert(schema.tradingCalendar)
       .values(calendarRows)
-      .onConflictDoNothing({
+      .onConflictDoUpdate({
         target: [schema.tradingCalendar.exchangeId, schema.tradingCalendar.tradingDate],
+        set: {
+          isTradingDay: sql`excluded.is_trading_day`,
+          sessionOpen: sql`excluded.session_open`,
+          sessionClose: sql`excluded.session_close`,
+          preOpenStart: sql`excluded.pre_open_start`,
+          closingAuctionStart: sql`excluded.closing_auction_start`,
+          closingAuctionEnd: sql`excluded.closing_auction_end`,
+          description: sql`excluded.description`,
+          sourceProviderId: sql`excluded.source_provider_id`,
+          updatedAt: new Date(),
+        },
       });
 
     const indexInstrument = await getInstrument(tx, nse.id, {
@@ -362,6 +394,7 @@ export async function seedDatabase(options: SeedOptions) {
       isin: null,
       segment: 'NSE_INDEX',
       instrumentType: 'INDEX',
+      tickSize: reviewedTickSizes[NIFTY_50_INDEX.symbol],
     });
     await ensureMapping(
       tx,
@@ -380,6 +413,7 @@ export async function seedDatabase(options: SeedOptions) {
         isin: equity.isin,
         segment: 'NSE_EQ',
         instrumentType: 'EQ',
+        tickSize: reviewedTickSizes[equity.symbol] ?? defaultEquityTickSize,
       });
       instrumentBySymbol.set(equity.symbol, instrument);
       await ensureMapping(
@@ -476,6 +510,127 @@ export async function seedDatabase(options: SeedOptions) {
         });
       }
     }
+
+    // R2: the index-ranked nifty-50 catalog. Rank 1 is the index; ranks 2–51
+    // are the reviewed constituent order. Rank is display order, never weight.
+    const completedSessions = calendarRows
+      .filter((row) => row.isTradingDay && row.sessionClose && row.sessionClose <= now)
+      .map((row) => row.tradingDate)
+      .sort();
+    const lastCompletedSession = completedSessions.at(-1) ?? today;
+
+    let niftyUniverse = (
+      await tx
+        .select()
+        .from(schema.instrumentUniverses)
+        .where(eq(schema.instrumentUniverses.code, 'nifty-50'))
+        .limit(1)
+    )[0];
+    if (!niftyUniverse) {
+      [niftyUniverse] = await tx
+        .insert(schema.instrumentUniverses)
+        .values({
+          id: uuidv7(),
+          code: 'nifty-50',
+          name: 'NIFTY 50',
+          description:
+            'Current NIFTY 50 candidate pool in reviewed display order. Rank 1 is the NIFTY 50 index; no weights are stored.',
+          selectionMethod: 'index_constituents',
+          lookbackSessions: null,
+          refreshCadence: 'manual',
+          isActive: true,
+          createdBy: user.id,
+        })
+        .returning();
+    }
+
+    let niftyVersion = (
+      await tx
+        .select()
+        .from(schema.instrumentUniverseVersions)
+        .where(
+          and(
+            eq(schema.instrumentUniverseVersions.universeId, niftyUniverse.id),
+            eq(schema.instrumentUniverseVersions.version, 1),
+          ),
+        )
+        .limit(1)
+    )[0];
+    if (!niftyVersion) {
+      [niftyVersion] = await tx
+        .insert(schema.instrumentUniverseVersions)
+        .values({
+          id: uuidv7(),
+          universeId: niftyUniverse.id,
+          version: 1,
+          effectiveFrom: today,
+          effectiveTo: null,
+          memberCount: nifty50Constituents.length + 1,
+          criteria: {
+            source: 'r2-reviewed-fixture',
+            selectionMethod: 'index_constituents',
+            seedDate: today,
+            provisional: true,
+          },
+          sourceProviderId: upstox.id,
+          createdBy: user.id,
+        })
+        .returning();
+    }
+
+    const rankedMembers: { instrumentId: string; rank: number }[] = [
+      { instrumentId: indexInstrument.id, rank: 1 },
+      ...nifty50Constituents.map((equity, index) => {
+        const instrument = instrumentBySymbol.get(equity.symbol);
+        if (!instrument)
+          throw new Error(`Seed universe references unknown symbol ${equity.symbol}`);
+        return { instrumentId: instrument.id, rank: index + 2 };
+      }),
+    ];
+
+    for (const member of rankedMembers) {
+      const existingMember = await tx
+        .select()
+        .from(schema.instrumentUniverseMembers)
+        .where(
+          and(
+            eq(schema.instrumentUniverseMembers.universeVersionId, niftyVersion.id),
+            eq(schema.instrumentUniverseMembers.instrumentId, member.instrumentId),
+          ),
+        )
+        .limit(1);
+      if (existingMember[0]) {
+        if (existingMember[0].rank !== member.rank) {
+          await tx
+            .update(schema.instrumentUniverseMembers)
+            .set({ rank: member.rank })
+            .where(eq(schema.instrumentUniverseMembers.id, existingMember[0].id));
+        }
+      } else {
+        await tx.insert(schema.instrumentUniverseMembers).values({
+          id: uuidv7(),
+          universeVersionId: niftyVersion.id,
+          instrumentId: member.instrumentId,
+          rank: member.rank,
+          medianTradedValue: null,
+          addedAt: today,
+          removedAt: null,
+        });
+      }
+    }
+
+    await tx
+      .insert(schema.instrumentDataStatus)
+      .values(
+        rankedMembers.map((member) => ({
+          instrumentId: member.instrumentId,
+          targetFrom: '2022-01-01',
+          targetTo: lastCompletedSession,
+          fetchStatus: 'not_requested',
+          dataStatus: 'pending',
+        })),
+      )
+      .onConflictDoNothing({ target: schema.instrumentDataStatus.instrumentId });
 
     let strategy = (
       await tx
@@ -621,7 +776,7 @@ export async function seedDatabase(options: SeedOptions) {
       effectiveFrom: now,
       createdBy: user.id,
       payload: {
-        tradingMode: 'offline',
+        tradingMode,
         marketTimezone: 'Asia/Kolkata',
         dataStartDate: '2022-01-01',
         baseCurrency: 'INR',
@@ -715,13 +870,13 @@ export async function seedDatabase(options: SeedOptions) {
     const settings: { key: string; value: unknown; description: string }[] = [
       {
         key: 'system.instance_name',
-        value: 'ai-trading-r1',
+        value: 'ai-trading-r2',
         description: 'Human label for this installation.',
       },
       {
         key: 'system.trading_mode',
-        value: 'offline',
-        description: 'R1 is offline; no broker order is sent.',
+        value: tradingMode,
+        description: 'R2 research mode; no broker order is sent.',
       },
       { key: 'ui.theme', value: 'dark', description: 'Dashboard default theme.' },
       { key: 'ui.timezone', value: 'Asia/Kolkata', description: 'Display timezone.' },
@@ -731,14 +886,44 @@ export async function seedDatabase(options: SeedOptions) {
         description: 'Retention for quote snapshots.',
       },
       {
+        key: 'data.retention.raw_payload_days',
+        value: 365,
+        description: 'Retention for standard raw payloads.',
+      },
+      {
         key: 'data.retention.raw_payload_months',
         value: 12,
-        description: 'Retention for standard raw payloads.',
+        description: 'Legacy alias for standard raw payload retention.',
+      },
+      {
+        key: 'data.quality.max_gap_minutes',
+        value: 5,
+        description: 'Bounded gap accepted when the daily volume reconciles.',
+      },
+      {
+        key: 'data.quality.volume_tolerance_pct',
+        value: 0.005,
+        description: 'Daily-versus-minute volume tolerance (0.5%).',
+      },
+      {
+        key: 'data.quality.stale_hours',
+        value: 24,
+        description: 'Freshness threshold for stale_ingestion.',
+      },
+      {
+        key: 'data.status.stale_sessions',
+        value: 1,
+        description: 'Completed sessions without coverage before an instrument is stale.',
+      },
+      {
+        key: 'data.validation.daily_oracle',
+        value: true,
+        description: 'Daily OHLCV witness is enabled.',
       },
       { key: 'security.session_ttl_hours', value: 12, description: 'Opaque session lifetime.' },
       {
         key: 'seed.fixture_version',
-        value: 'r1-2026-10',
+        value: 'r2-2026-10',
         description: 'Reference fixture version used by the seed.',
       },
     ];
@@ -772,9 +957,11 @@ export async function seedDatabase(options: SeedOptions) {
       entityId: null,
       beforeState: null,
       afterState: {
-        fixtureVersion: 'r1-2026-10',
+        fixtureVersion: 'r2-2026-10',
         instruments: nifty50Constituents.length + 1,
         orbUniverse: orbUniverseSymbols.length,
+        niftyUniverse: rankedMembers.length,
+        tradingMode,
         strategy: 'orb-15m',
         configurationVersions: [strategyConfig.id, riskConfig.id, systemConfig.id],
       },
@@ -786,9 +973,12 @@ export async function seedDatabase(options: SeedOptions) {
     return {
       user: user.email,
       account: account.code,
+      mode: tradingMode,
       exchanges: [nse.code, bse.code],
       instruments: instrumentBySymbol.size + 1,
       orbUniverse: orbUniverseSymbols.length,
+      niftyUniverse: rankedMembers.length,
+      lastCompletedSession,
       strategy: strategy.code,
       configurationVersions: 3,
       calendarRows: calendarRows.length,

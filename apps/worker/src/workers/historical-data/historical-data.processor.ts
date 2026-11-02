@@ -3,7 +3,7 @@ import type { Job } from 'bullmq';
 import { QUEUES } from '@ai-trading/domain';
 import { HistoricalDataService } from './historical-data.service.js';
 
-@Processor(QUEUES.historicalData)
+@Processor(QUEUES.historicalData, { concurrency: 4 })
 export class HistoricalDataProcessor extends WorkerHost {
   constructor(private readonly historicalData: HistoricalDataService) {
     super();

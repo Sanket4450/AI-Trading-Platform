@@ -52,17 +52,18 @@ export class SystemControlService implements OnModuleInit, OnModuleDestroy {
 
   async onModuleInit(): Promise<void> {
     const accounts = await listAccounts();
-    const nonOffline = accounts.filter(
-      (account) => account.isActive && account.mode !== 'offline',
+    const allowed = new Set(['offline', 'research']);
+    const invalid = accounts.filter(
+      (account) => account.isActive && !allowed.has(account.mode),
     );
-    if (nonOffline.length > 0) {
+    if (invalid.length > 0) {
       throw new Error(
-        `R1 only supports offline accounts. Found non-offline account(s): ${nonOffline
+        `R2 only supports offline or research accounts. Found invalid account(s): ${invalid
           .map((account) => `${account.code}=${account.mode}`)
           .join(', ')}`,
       );
     }
-    this.logger.log('Offline mode asserted for every active account.');
+    this.logger.log('Offline/research mode asserted for every active account.');
   }
 
   async onModuleDestroy(): Promise<void> {

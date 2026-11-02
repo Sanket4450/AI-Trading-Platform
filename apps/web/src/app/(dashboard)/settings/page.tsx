@@ -1,5 +1,5 @@
 import { apiFetch } from '@/lib/api';
-import type { SystemSetting } from '@/lib/types';
+import type { ProviderStatus, SystemSetting } from '@/lib/types';
 import { formatDateTime } from '@/lib/format';
 import { PageHeader } from '@/components/dashboard/page-header';
 import { EmptyState } from '@/components/dashboard/empty-state';
@@ -16,7 +16,10 @@ export default async function SettingsPage({
   searchParams: Promise<{ error?: string; saved?: string }>;
 }) {
   const params = await searchParams;
-  const settings = await apiFetch<SystemSetting[]>('/settings');
+  const [settings, provider] = await Promise.all([
+    apiFetch<SystemSetting[]>('/settings'),
+    apiFetch<ProviderStatus>('/data/provider-status'),
+  ]);
 
   return (
     <div>
@@ -36,7 +39,64 @@ export default async function SettingsPage({
         </div>
       ) : null}
 
-      <Card className="border-primary/20 bg-primary/5">
+      <Card className="border-border/70 bg-card/60">
+        <CardHeader>
+          <CardTitle>R2 provider and schedule state</CardTitle>
+          <CardDescription>Read-only operational state. Tokens are never returned.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-4">
+          <div>
+            <p className="text-muted-foreground text-xs">Network</p>
+            <p>{provider.networkEnabled ? 'enabled' : 'disabled'}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground text-xs">Token</p>
+            <p>{provider.tokenConfigured ? 'configured' : 'missing'}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground text-xs">Daily oracle</p>
+            <p>{provider.dailyOracleEnabled ? 'enabled' : 'disabled'}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground text-xs">Budget</p>
+            <p>
+              {provider.budget
+                ? `${provider.budget.availableSecond}/s · ${provider.budget.availableMinute}/m`
+                : 'unavailable'}
+            </p>
+          </div>
+          <div>
+            <p className="text-muted-foreground text-xs">Last instrument sync</p>
+            <p>
+              {provider.lastSuccessfulSyncAt
+                ? formatDateTime(provider.lastSuccessfulSyncAt)
+                : 'never'}
+            </p>
+          </div>
+          <div>
+            <p className="text-muted-foreground text-xs">Last finalize</p>
+            <p>
+              {provider.lastSuccessfulIntradayAt
+                ? formatDateTime(provider.lastSuccessfulIntradayAt)
+                : 'never'}
+            </p>
+          </div>
+          <div>
+            <p className="text-muted-foreground text-xs">Last validation</p>
+            <p>
+              {provider.lastSuccessfulValidationAt
+                ? formatDateTime(provider.lastSuccessfulValidationAt)
+                : 'never'}
+            </p>
+          </div>
+          <div>
+            <p className="text-muted-foreground text-xs">Raw payloads</p>
+            <p>{provider.payloadCount} rows</p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-primary/20 bg-primary/5 mt-4">
         <CardContent className="text-muted-foreground p-4 text-sm">
           <span className="text-foreground font-medium">Guardrail:</span> trading mode, risk limits
           and strategy parameters are not editable here. They live in{' '}

@@ -189,3 +189,97 @@ dashboard smoke test passes for all nine routes at 1440px and 390px with no page
   database and the Compose Redis service.
 - `.dockerignore` remains at the repository root because Docker only reads it from the build context root; the
   Dockerfiles still use the repository root as their build context.
+
+## R2 implementation notes
+
+The plan of record is `context/r2-implementation-plan.html`. R2 adds historical ingestion, strict
+coverage, the daily OHLCV oracle, the instrument catalog and the quality workflow without changing the
+modular monolith or the R1 lifecycle tables.
+
+### Database
+
+- **60 logical tables.** `0008_r2_ingestion_quality.sql` adds orchestration counters to
+  `market_data_ingestion_runs`, gap/validation fields to `market_data_coverage`, dedupe and lifecycle
+  fields to `data_quality_issues`, a unique raw-payload key, `instrument_data_status` and
+  `market_data_daily_validation`.
+- The migration is additive. It preflights duplicate raw payloads before creating the unique index and
+  preserves legacy resolved/ignored issues with an explicit migration note.
+- The seed creates the `nifty-50` universe with rank 1 = NIFTY 50 index, ranks 2–51 in reviewed
+  display order, one status row per member, a 2022–2027 NSE calendar, corrected tick sizes and a
+  research-mode account/system setting.
+- `pnpm db:verify` asserts 60 tables, the R2 tables and indexes, 51 ranked members, 51 status rows,
+  51 primary mappings, valid tick sizes, calendar coverage and zero orders.
+
+### Provider and pipeline
+
+- `packages/adapters` owns the read-only V3 historical, daily, intraday, holidays and timings calls,
+  error classification and the rate-limiter interface. It still has no order method.
+- `packages/market-data` owns tuple normalization, IST/UTC conversion, session windows, strict
+  coverage, gap runs, daily-oracle comparison, the 25-rule catalog, dedupe keys and catalog status
+  precedence.
+- `apps/worker` runs one child job per instrument, one ingestion run per month chunk, a Redis-backed
+  three-window provider budget, retry/backoff, cooperative cancellation, stale-run recovery and
+  parent-plan completion.
+- The daily oracle is fetched once per instrument range and archived as an extended raw payload. The
+  comparison is stored per instrument-day in `market_data_daily_validation`; daily candles are not a
+  stored timeframe.
+
+### API and dashboard
+
+- The catalog-first surface adds instrument status, fetch/retry/cancel, plans, coverage heatmap,
+  day detail, validation, run detail, issue detail, provider status, quality rules and reference
+  commands. Every write records an audit row.
+- A broker-contract test asserts that the API does not import order, position or trading modules, that
+  the Upstox adapter has no order method and that the placeholder order controller has no route.
+- Reference sync and corporate-action import require the global `admin` user role.
+- The dashboard adds `/instruments/[id]`, `/data/backfills/[id]`, `/data/runs/[id]`,
+  `/data/issues/[id]` and the coverage day detail. It polls only while a visible row is active.
+
+### Open checks
+
+The 18 checks in the R2 appendix remain open until a live token is available. The most important are:
+first/last bar labeling, response ordering, zero-volume index behavior, daily-versus-minute volume
+tolerance, 2022–2026 special-session windows, tick-size history, `Retry-After` behavior, BOD refresh
+time and the NIFTY index identity test. The checked-in fixtures are provisional where marked.
+
+### Verification performed
+
+```bash
+pnpm db:migrate
+pnpm db:seed
+pnpm db:verify
+pnpm nx run-many -t typecheck -p api web worker tests
+pnpm nx run-many -t test -p domain configuration market-data adapters api worker web
+```
+
+The external PostgreSQL migration 0008 applied successfully, the R2 seed completed and `db:verify`
+reported 60 logical tables, 1 materialized view, 63 candle partitions, 15 quote partitions, 51
+nifty-50 members with status rows and primary mappings, 2191 calendar days and zero orders.
+
+### Live read-only checks (2026-10-27)
+
+A live, read-only Upstox smoke test was run with the operator token. No order endpoint was called.
+
+| Check             | Result                                                                                                     |
+| ----------------- | ---------------------------------------------------------------------------------------------------------- |
+| Instrument master | 82,291 rows. RELIANCE tick 10 paise, HDFCBANK 5, MARUTI 100; NIFTY 50 index has no tick.                   |
+| Tick transform    | The paise-to-rupee transform produces 0.1000, 0.0500 and 1.0000 as required.                               |
+| Historical order  | January 2022 RELIANCE returned 7,500 minute bars in descending order. Sorting is required.                 |
+| Bar labeling      | After sorting, the first bar is 09:15 and the last is 15:29; 15:30 is excluded.                            |
+| Daily oracle      | 20 daily rows. Minute volume was 1.0583% below daily volume for the month.                                 |
+| Holidays          | The current-year endpoint returned 22 rows and revealed that the provisional 2026 fixture had wrong dates. |
+| Timings           | NSE on 2026-10-23 was 09:15–15:30 IST; the 2026 Muhurat session is 14:20–15:30 IST.                        |
+
+Consequences:
+
+- The provisional 2026 holiday fixture was replaced with the live list. Settlement holidays where NSE
+  remains open are not treated as market holidays.
+- Special sessions can fall on a weekend. The calendar now treats a reviewed special session as a
+  trading day even when the weekday is Saturday or Sunday. 2026-02-01 is a normal 09:15–15:30 Budget
+  Day session and 2026-11-08 is the 14:20–15:30 Muhurat session.
+- The daily-versus-minute volume tolerance default is provisionally 2% (`0.02`), not the plan's
+  0.5%, because the observed RELIANCE January 2022 difference was 1.0583%. The likely cause is
+  closing-auction or non-minute volume in the daily candle. Open check #4 remains open until the
+  auction treatment is decided.
+- A full backfill was **not** started. The plan's stop condition applies: resolve the daily volume
+  reconciliation before the full run.

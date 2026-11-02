@@ -314,6 +314,11 @@ export const rawProviderPayloads = pgTable(
     index('idx_raw_provider_payloads_provider_id').on(table.providerId),
     index('idx_raw_provider_payloads_request_fingerprint').on(table.requestFingerprint),
     index('idx_raw_provider_payloads_expires_at').on(table.expiresAt),
+    uniqueIndex('uq_raw_payload_request_hash').on(
+      table.providerId,
+      table.requestFingerprint,
+      table.payloadSha256,
+    ),
     check('chk_raw_provider_payloads_http_status_1', sql`${table.httpStatus} between 100 and 599`),
     check(
       'chk_raw_provider_payloads_retention_class_2',
@@ -340,14 +345,26 @@ export const dataQualityIssues = pgTable(
     detectedBy: varchar('detected_by', { length: 30 }).notNull(),
     detectedAt: timestamp('detected_at', { withTimezone: true }).defaultNow().notNull(),
     resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+    ruleId: varchar('rule_id', { length: 40 }),
+    dedupeKey: char('dedupe_key', { length: 64 }),
+    occurrenceCount: integer('occurrence_count').default(1).notNull(),
+    lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).defaultNow().notNull(),
+    acknowledgedBy: uuid('acknowledged_by'),
+    acknowledgedAt: timestamp('acknowledged_at', { withTimezone: true }),
+    resolvedBy: uuid('resolved_by'),
+    resolutionNote: text('resolution_note'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     index('idx_data_quality_issues_instrument_id').on(table.instrumentId),
     index('idx_data_quality_issues_trading_date').on(table.tradingDate),
+    index('idx_quality_last_seen').on(table.status, table.lastSeenAt),
+    uniqueIndex('uq_quality_open_dedupe')
+      .on(table.dedupeKey)
+      .where(sql`${table.status} in ('open','acknowledged') and ${table.dedupeKey} is not null`),
     check(
       'chk_data_quality_issues_issue_type_1',
-      sql`${table.issueType} in ('missing_bar', 'duplicate_bar', 'invalid_ohlc', 'stale_quote', 'gap', 'outlier', 'corporate_action_mismatch', 'mapping_missing', 'coverage_shortfall')`,
+      sql`${table.issueType} in ('missing_bar', 'duplicate_bar', 'invalid_ohlc', 'stale_quote', 'gap', 'outlier', 'corporate_action_mismatch', 'mapping_missing', 'coverage_shortfall', 'calendar_mismatch', 'provider_revision', 'volume_mismatch', 'volume_reconciled', 'stale_ingestion', 'schema_invalid', 'instrument_missing', 'tick_size_mismatch', 'rate_limit_exhausted', 'partial_bar', 'unsupported_instrument', 'duplicate_mapping')`,
     ),
     check(
       'chk_data_quality_issues_severity_2',
@@ -364,6 +381,11 @@ export const dataQualityIssues = pgTable(
     check(
       'chk_data_quality_issues_detected_by_5',
       sql`${table.detectedBy} in ('ingestion', 'validation', 'reconciliation', 'manual')`,
+    ),
+    check('chk_quality_occurrence', sql`${table.occurrenceCount} > 0`),
+    check(
+      'chk_quality_resolution',
+      sql`(${table.status} not in ('resolved','ignored')) or (${table.resolutionNote} is not null and length(trim(${table.resolutionNote})) > 0)`,
     ),
   ],
 );
@@ -387,14 +409,32 @@ export const marketDataIngestionRuns = pgTable(
     rawPayloadId: uuid('raw_payload_id'),
     startedAt: timestamp('started_at', { withTimezone: true }),
     finishedAt: timestamp('finished_at', { withTimezone: true }),
+    parentJobRunId: uuid('parent_job_run_id'),
+    chunkIndex: integer('chunk_index'),
+    chunkCount: integer('chunk_count'),
+    attempt: integer('attempt').default(1).notNull(),
+    requestFingerprint: char('request_fingerprint', { length: 64 }),
+    httpStatus: smallint('http_status'),
+    providerErrorCode: varchar('provider_error_code', { length: 40 }),
+    rowsSkipped: integer('rows_skipped').default(0).notNull(),
+    rowsUpdated: integer('rows_updated').default(0).notNull(),
+    durationMs: integer('duration_ms'),
+    rateLimitedUntil: timestamp('rate_limited_until', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     index('idx_market_data_ingestion_runs_provider_id').on(table.providerId),
     index('idx_market_data_ingestion_runs_instrument_id').on(table.instrumentId),
+    uniqueIndex('uq_ingestion_parent_chunk')
+      .on(table.parentJobRunId, table.instrumentId, table.chunkIndex)
+      .where(sql`${table.parentJobRunId} is not null`),
+    index('idx_ingestion_parent_status').on(table.parentJobRunId, table.status),
+    index('idx_ingestion_stale_running')
+      .on(table.status, table.startedAt)
+      .where(sql`${table.status} = 'running'`),
     check(
       'chk_market_data_ingestion_runs_run_type_1',
-      sql`${table.runType} in ('instrument_master', 'historical_backfill', 'intraday_sync', 'quote_snapshot', 'corporate_actions', 'calendar')`,
+      sql`${table.runType} in ('instrument_master', 'historical_backfill', 'historical_repair', 'intraday_sync', 'quote_snapshot', 'corporate_actions', 'calendar', 'daily_validation', 'quality_scan')`,
     ),
     check(
       'chk_market_data_ingestion_runs_timeframe_unit_2',
@@ -406,7 +446,7 @@ export const marketDataIngestionRuns = pgTable(
     ),
     check(
       'chk_market_data_ingestion_runs_status_4',
-      sql`${table.status} in ('queued', 'running', 'succeeded', 'partially_failed', 'failed')`,
+      sql`${table.status} in ('queued', 'running', 'succeeded', 'partially_failed', 'failed', 'cancelled')`,
     ),
     check('chk_market_data_ingestion_runs_rows_fetched_5', sql`${table.rowsFetched} >= 0`),
     check('chk_market_data_ingestion_runs_rows_written_6', sql`${table.rowsWritten} >= 0`),
@@ -414,6 +454,14 @@ export const marketDataIngestionRuns = pgTable(
     check(
       'chk_market_data_ingestion_runs_started_at_8',
       sql`${table.finishedAt} is null or ${table.startedAt} is null or ${table.finishedAt} >= ${table.startedAt}`,
+    ),
+    check(
+      'chk_runs_counters',
+      sql`${table.rowsFetched} >= 0 and ${table.rowsWritten} >= 0 and ${table.rowsRejected} >= 0 and ${table.rowsSkipped} >= 0 and ${table.rowsUpdated} >= 0 and (${table.durationMs} is null or ${table.durationMs} >= 0)`,
+    ),
+    check(
+      'chk_runs_chunk',
+      sql`(${table.chunkIndex} is null or ${table.chunkIndex} >= 0) and (${table.chunkCount} is null or ${table.chunkCount} > 0) and ${table.attempt} > 0 and (${table.httpStatus} is null or (${table.httpStatus} between 100 and 599))`,
     ),
   ],
 );

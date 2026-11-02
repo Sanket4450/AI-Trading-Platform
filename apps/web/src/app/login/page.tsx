@@ -1,6 +1,7 @@
 import { Activity, KeyRound, ShieldCheck } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { getPublicHealth } from '@/lib/api';
 import { LoginForm } from './login-form';
 
 export default async function LoginPage({
@@ -8,7 +9,8 @@ export default async function LoginPage({
 }: {
   searchParams: Promise<{ next?: string; error?: string }>;
 }) {
-  const params = await searchParams;
+  const [params, health] = await Promise.all([searchParams, getPublicHealth()]);
+  const mode = health?.mode ?? 'offline';
   const error =
     params.error === 'api'
       ? 'The sign-in service is unavailable right now. Please try again in a moment.'
@@ -49,7 +51,7 @@ export default async function LoginPage({
                 <h2>Sign in</h2>
               </CardTitle>
               <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
-                OFFLINE
+                {mode.toUpperCase()}
               </Badge>
             </div>
             <CardDescription>Use your operator credentials to open the cockpit.</CardDescription>
@@ -59,7 +61,10 @@ export default async function LoginPage({
             <div className="border-border/70 bg-muted/30 text-muted-foreground mt-6 space-y-2.5 rounded-lg border p-3 text-xs">
               <p className="flex items-start gap-2">
                 <ShieldCheck className="text-primary mt-px size-4 shrink-0" />
-                <span>Offline mode only. No live orders can be placed from this release.</span>
+                <span>
+                  {mode.charAt(0).toUpperCase() + mode.slice(1)} mode only. No live orders can be
+                  placed from this release.
+                </span>
               </p>
               <p className="flex items-start gap-2">
                 <KeyRound className="text-primary mt-px size-4 shrink-0" />

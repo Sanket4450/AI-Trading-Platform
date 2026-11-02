@@ -19,8 +19,22 @@ export class CoverageQueryDto {
   instrumentId?: string;
 
   @IsOptional()
-  @IsIn(['complete', 'partial', 'missing'])
+  @IsIn(['complete', 'partial', 'missing', 'not_applicable'])
   status?: string;
+
+  @IsOptional()
+  @IsIn([
+    'not_checked',
+    'pending',
+    'matched',
+    'volume_reconciled',
+    'volume_mismatch',
+    'ohlc_mismatch',
+    'daily_missing',
+    'minute_missing',
+    'error',
+  ])
+  validationStatus?: string;
 
   @IsOptional()
   @Type(() => Number)
@@ -32,7 +46,14 @@ export class CoverageQueryDto {
 
 export class IngestionRunsQueryDto {
   @IsOptional()
-  @IsIn(['queued', 'running', 'succeeded', 'partially_failed', 'failed'])
+  @IsIn([
+    'queued',
+    'running',
+    'succeeded',
+    'partially_failed',
+    'failed',
+    'cancelled',
+  ])
   status?: string;
 
   @IsOptional()

@@ -58,7 +58,6 @@ export class DataService {
   coverage(query: CoverageQueryDto) {
     return listCoverage(query);
   }
-
   coverageSummary(date?: string) {
     return getCoverageSummary(date);
   }
