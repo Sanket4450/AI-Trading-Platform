@@ -3,11 +3,11 @@ import { cn } from '@/lib/utils';
 
 const tones = {
   default: 'text-foreground',
-  green: 'text-primary',
-  cyan: 'text-[#38d9f5]',
-  amber: 'text-[#f5c451]',
-  red: 'text-[#ff7b7b]',
-  violet: 'text-[#b79cff]',
+  success: 'text-success',
+  info: 'text-info',
+  warning: 'text-warning',
+  danger: 'text-destructive',
+  highlight: 'text-highlight',
 } as const;
 
 export function StatCard({

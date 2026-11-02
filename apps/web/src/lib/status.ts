@@ -31,21 +31,21 @@ export function displayStatus(input: {
 export function statusTone(status: string): string {
   switch (status) {
     case 'Complete':
-      return 'border-primary/30 bg-primary/10 text-primary';
+      return 'border-success/30 bg-success/10 text-success';
     case 'Gaps · reconciled':
-      return 'border-[#f5c451]/30 bg-[#f5c451]/10 text-[#f5c451]';
+      return 'border-warning/30 bg-warning/10 text-warning';
     case 'Verifying':
     case 'Fetching':
     case 'Queued':
-      return 'border-[#38d9f5]/30 bg-[#38d9f5]/10 text-[#38d9f5]';
+      return 'border-info/30 bg-info/10 text-info';
     case 'Failed':
     case 'Stopped':
     case 'Needs review':
     case 'Missing':
     case 'Gaps · mismatch':
-      return 'border-[#ff7b7b]/30 bg-[#ff7b7b]/10 text-[#ff7b7b]';
+      return 'border-destructive/30 bg-destructive/10 text-destructive';
     case 'Stale':
-      return 'border-[#f5c451]/30 bg-[#f5c451]/10 text-[#f5c451]';
+      return 'border-warning/30 bg-warning/10 text-warning';
     default:
       return 'border-muted/30 bg-muted/10 text-muted-foreground';
   }

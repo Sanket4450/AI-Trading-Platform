@@ -55,25 +55,25 @@ export default async function AuditPage({
           label="Rows"
           value={formatNumber(rows.length)}
           hint="Filtered result"
-          tone="green"
+          tone="success"
         />
         <StatCard
           label="Actors"
           value={formatNumber(uniqueActors)}
           hint="Operators and system jobs"
-          tone="cyan"
+          tone="info"
         />
         <StatCard
           label="Entity types"
           value={formatNumber(uniqueEntities)}
           hint="Distinct domains touched"
-          tone="violet"
+          tone="highlight"
         />
         <StatCard
           label="Retention"
           value="Append-only"
           hint="No update or delete path"
-          tone="amber"
+          tone="warning"
         />
       </div>
 

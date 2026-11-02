@@ -66,31 +66,31 @@ export default async function RunDetailPage({ params }: { params: Promise<{ id: 
           label="Fetched"
           value={formatNumber(run.rowsFetched)}
           hint="Provider tuples"
-          tone="cyan"
+          tone="info"
         />
         <StatCard
           label="Written"
           value={formatNumber(run.rowsWritten)}
           hint="Inserted + updated"
-          tone="green"
+          tone="success"
         />
         <StatCard
           label="Rejected"
           value={formatNumber(run.rowsRejected)}
           hint="Evidence retained"
-          tone="red"
+          tone="danger"
         />
         <StatCard
           label="Skipped"
           value={formatNumber(run.rowsSkipped)}
           hint="Idempotent repeats"
-          tone="amber"
+          tone="warning"
         />
         <StatCard
           label="Duration"
           value={run.durationMs ? `${formatNumber(run.durationMs)} ms` : '—'}
           hint="Fetch + parse + write"
-          tone="violet"
+          tone="highlight"
         />
       </div>
 

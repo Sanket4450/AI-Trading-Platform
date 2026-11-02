@@ -59,25 +59,25 @@ export default async function StrategiesPage({
           label="Strategies"
           value={formatNumber(strategies.length)}
           hint="Logical registry"
-          tone="green"
+          tone="success"
         />
         <StatCard
           label="Versions"
           value={formatNumber(detail?.versions.length ?? 0)}
           hint="Immutable code releases"
-          tone="cyan"
+          tone="info"
         />
         <StatCard
           label="Universe members"
           value={formatNumber(detail?.versions[0]?.members.length ?? 0)}
           hint="Latest version"
-          tone="violet"
+          tone="highlight"
         />
         <StatCard
           label="Active activations"
           value={formatNumber(detail?.activeActivations ?? 0)}
           hint="None in R1"
-          tone="amber"
+          tone="warning"
         />
       </div>
 

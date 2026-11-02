@@ -44,10 +44,10 @@ function isoDaysAgo(days: number): string {
 
 function heatmapTone(cell: CoverageHeatmapCell): string {
   if (cell.status === 'not_applicable') return 'bg-muted/20';
-  if (cell.status === 'missing') return 'bg-[#ff7b7b]/80';
+  if (cell.status === 'missing') return 'bg-destructive/80';
   if (cell.status === 'complete') return 'bg-primary/80';
-  if (cell.validationStatus === 'volume_reconciled') return 'bg-[#f5c451]/80';
-  return 'bg-[#ff7b7b]/60';
+  if (cell.validationStatus === 'volume_reconciled') return 'bg-warning/80';
+  return 'bg-destructive/60';
 }
 
 export default async function DataPage({
@@ -138,31 +138,31 @@ export default async function DataPage({
           label="Complete"
           value={formatNumber(summary.complete)}
           hint="Strict zero-gap"
-          tone="green"
+          tone="success"
         />
         <StatCard
           label="Partial"
           value={formatNumber(summary.partial)}
           hint="Some minutes missing"
-          tone="amber"
+          tone="warning"
         />
         <StatCard
           label="Missing"
           value={formatNumber(summary.missing)}
           hint="Zero bars on a trading day"
-          tone="red"
+          tone="danger"
         />
         <StatCard
           label="Not applicable"
           value={formatNumber(summary.notApplicable)}
           hint="Holiday, suspension, pre-listing"
-          tone="cyan"
+          tone="info"
         />
         <StatCard
           label="Reconciled"
           value={formatNumber(summary.validation.volume_reconciled ?? 0)}
           hint="Daily volume proves no lost trades"
-          tone="violet"
+          tone="highlight"
         />
       </div>
 

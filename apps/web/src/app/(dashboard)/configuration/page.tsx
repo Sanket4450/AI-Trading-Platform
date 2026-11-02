@@ -86,25 +86,25 @@ export default async function ConfigurationPage({
           label="Versions"
           value={formatNumber(versions.length)}
           hint="Filtered result"
-          tone="green"
+          tone="success"
         />
         <StatCard
           label="Selected type"
           value={selected?.configType ?? '—'}
           hint={selected?.scopeKey ?? 'No scope'}
-          tone="cyan"
+          tone="info"
         />
         <StatCard
           label="Selected version"
           value={selected ? `v${selected.version}` : '—'}
           hint={selected ? formatDate(selected.effectiveFrom) : '—'}
-          tone="violet"
+          tone="highlight"
         />
         <StatCard
           label="Bindings"
           value={formatNumber(detail?.bindings?.length ?? 0)}
           hint="Strategy versions using it"
-          tone="amber"
+          tone="warning"
         />
       </div>
 

@@ -61,49 +61,51 @@ export default async function OverviewPage() {
           label="Component health"
           value={health.status.toUpperCase()}
           hint={`DB ${health.checks.database.latencyMs ?? '—'} ms · Redis ${health.checks.redis.latencyMs ?? '—'} ms`}
-          tone={health.status === 'ok' ? 'green' : health.status === 'degraded' ? 'amber' : 'red'}
+          tone={
+            health.status === 'ok' ? 'success' : health.status === 'degraded' ? 'warning' : 'danger'
+          }
         />
         <StatCard
           label="Active accounts"
           value={formatNumber(counts.accounts)}
           hint="One seeded Upstox account"
-          tone="cyan"
+          tone="info"
         />
         <StatCard
           label="Active instruments"
           value={formatNumber(counts.instruments)}
           hint="Cash equities and indices"
-          tone="violet"
+          tone="highlight"
         />
         <StatCard
           label="Open data issues"
           value={formatNumber(counts.openIssues)}
           hint={`${formatNumber(counts.criticalIssues)} critical`}
-          tone={Number(counts.criticalIssues ?? 0) > 0 ? 'red' : 'amber'}
+          tone={Number(counts.criticalIssues ?? 0) > 0 ? 'danger' : 'warning'}
         />
         <StatCard
           label="Universes"
           value={formatNumber(counts.universes)}
           hint="Weekly snapshots"
-          tone="green"
+          tone="success"
         />
         <StatCard
           label="Strategies"
           value={formatNumber(counts.strategies)}
           hint="Research and active registry"
-          tone="cyan"
+          tone="info"
         />
         <StatCard
           label="Stored 1-minute bars"
           value={formatNumber(counts.candles)}
           hint="Source of truth for every timeframe"
-          tone="violet"
+          tone="highlight"
         />
         <StatCard
           label="Coverage"
           value={`${coveragePct.toFixed(1)}%`}
           hint={`${formatNumber(coverageComplete)} of ${formatNumber(coverageTotal)} instrument-days complete`}
-          tone={coveragePct >= 99 ? 'green' : 'amber'}
+          tone={coveragePct >= 99 ? 'success' : 'warning'}
         />
       </div>
 

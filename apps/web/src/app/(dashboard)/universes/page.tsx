@@ -40,25 +40,25 @@ export default async function UniversesPage({
           label="Universes"
           value={formatNumber(universes.length)}
           hint="Selection definitions"
-          tone="green"
+          tone="success"
         />
         <StatCard
           label="Selected versions"
           value={formatNumber(detail?.versions.length ?? 0)}
           hint="Immutable snapshots"
-          tone="cyan"
+          tone="info"
         />
         <StatCard
           label="Latest members"
           value={formatNumber(detail?.latestMemberCount ?? 0)}
           hint="ORB target is 20"
-          tone="violet"
+          tone="highlight"
         />
         <StatCard
           label="Refresh"
           value={detail?.refreshCadence ?? '—'}
           hint="Weekly in the strategy spec"
-          tone="amber"
+          tone="warning"
         />
       </div>
 

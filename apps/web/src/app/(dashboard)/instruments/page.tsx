@@ -132,25 +132,25 @@ export default async function InstrumentsPage({ searchParams }: { searchParams: 
           label="Catalog rows"
           value={formatNumber(summary?.total ?? rows.length)}
           hint="nifty-50 active version"
-          tone="cyan"
+          tone="info"
         />
         <StatCard
           label="Complete"
           value={formatNumber(summary?.complete ?? 0)}
           hint="Coverage + oracle"
-          tone="green"
+          tone="success"
         />
         <StatCard
           label="Gaps"
           value={formatNumber((summary?.partialReconciled ?? 0) + (summary?.partialMismatch ?? 0))}
           hint="Reconciled or mismatch"
-          tone="amber"
+          tone="warning"
         />
         <StatCard
           label="Needs review"
           value={formatNumber((summary?.needsReview ?? 0) + (summary?.missing ?? 0))}
           hint="Blocking or missing"
-          tone="red"
+          tone="danger"
         />
       </div>
 

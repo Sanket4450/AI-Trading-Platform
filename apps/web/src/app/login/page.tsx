@@ -20,10 +20,7 @@ export default async function LoginPage({
 
   return (
     <main className="relative grid min-h-svh place-items-center overflow-hidden px-4 py-10 sm:px-6">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_8%,rgba(53,224,161,0.14),transparent_45%),radial-gradient(circle_at_82%_15%,rgba(56,217,245,0.1),transparent_42%)]"
-      />
+      <div aria-hidden className="login-aurora pointer-events-none absolute inset-0" />
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 opacity-[0.14] [background-image:linear-gradient(to_right,var(--border)_1px,transparent_1px),linear-gradient(to_bottom,var(--border)_1px,transparent_1px)] [background-size:64px_64px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_72%)]"

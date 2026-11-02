@@ -86,31 +86,31 @@ export default async function BackfillDetailPage({
           label="Succeeded"
           value={formatNumber(plan.progress.succeeded)}
           hint="Chunks"
-          tone="green"
+          tone="success"
         />
         <StatCard
           label="Running"
           value={formatNumber(plan.progress.running)}
           hint="In-flight chunks"
-          tone="cyan"
+          tone="info"
         />
         <StatCard
           label="Failed"
           value={formatNumber(plan.progress.failed)}
           hint="Retryable"
-          tone="red"
+          tone="danger"
         />
         <StatCard
           label="Rows written"
           value={formatNumber(plan.progress.rowsWritten)}
           hint="Inserted + updated"
-          tone="violet"
+          tone="highlight"
         />
         <StatCard
           label="Rows rejected"
           value={formatNumber(plan.progress.rowsRejected)}
           hint="Evidence retained"
-          tone="amber"
+          tone="warning"
         />
       </div>
 

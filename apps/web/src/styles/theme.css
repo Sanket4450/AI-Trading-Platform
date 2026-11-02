@@ -1,0 +1,130 @@
+/*
+ * Single source of truth for color.
+ *
+ * Raw palette values stay private (:root, not @theme) so components can only use
+ * semantic tokens. Change a color here instead of hardcoding it in a component.
+ */
+
+:root {
+  color-scheme: dark;
+
+  /* Raw palette */
+  --palette-green: #35e0a1;
+  --palette-cyan: #38d9f5;
+  --palette-amber: #f5c451;
+  --palette-red: #ff7b7b;
+  --palette-violet: #b79cff;
+
+  --palette-slate-950: #070b10;
+  --palette-slate-900: #0a0f16;
+  --palette-slate-850: #0d141d;
+  --palette-slate-800: #111a25;
+  --palette-slate-750: #162231;
+  --palette-slate-700: #1b2836;
+  --palette-slate-300: #8fa3b8;
+  --palette-slate-100: #dce8f5;
+  --palette-ink: #04110c;
+
+  /* Semantic tokens */
+  --background: var(--palette-slate-950);
+  --foreground: var(--palette-slate-100);
+  --card: var(--palette-slate-850);
+  --card-foreground: var(--palette-slate-100);
+  --popover: var(--palette-slate-850);
+  --popover-foreground: var(--palette-slate-100);
+  --primary: var(--palette-green);
+  --primary-foreground: var(--palette-ink);
+  --secondary: var(--palette-slate-800);
+  --secondary-foreground: var(--palette-slate-100);
+  --muted: var(--palette-slate-800);
+  --muted-foreground: var(--palette-slate-300);
+  --accent: var(--palette-slate-750);
+  --accent-foreground: var(--palette-slate-100);
+  --destructive: var(--palette-red);
+  --success: var(--palette-green);
+  --success-foreground: var(--palette-ink);
+  --warning: var(--palette-amber);
+  --warning-foreground: var(--palette-ink);
+  --info: var(--palette-cyan);
+  --info-foreground: var(--palette-ink);
+  --highlight: var(--palette-violet);
+  --highlight-foreground: var(--palette-ink);
+  --border: var(--palette-slate-700);
+  --input: var(--palette-slate-700);
+  --ring: var(--palette-cyan);
+
+  /* Ordered chart series */
+  --chart-1: var(--palette-green);
+  --chart-2: var(--palette-cyan);
+  --chart-3: var(--palette-violet);
+  --chart-4: var(--palette-amber);
+  --chart-5: var(--palette-red);
+
+  --sidebar: var(--palette-slate-900);
+  --sidebar-foreground: var(--palette-slate-100);
+  --sidebar-primary: var(--palette-green);
+  --sidebar-primary-foreground: var(--palette-ink);
+  --sidebar-accent: var(--palette-slate-800);
+  --sidebar-accent-foreground: var(--palette-slate-100);
+  --sidebar-border: var(--palette-slate-700);
+  --sidebar-ring: var(--palette-cyan);
+
+  /* Decorative login backdrop, kept out of components */
+  --login-aurora:
+    radial-gradient(
+      circle at 18% 8%,
+      color-mix(in oklab, var(--palette-green) 14%, transparent),
+      transparent 45%
+    ),
+    radial-gradient(
+      circle at 82% 15%,
+      color-mix(in oklab, var(--palette-cyan) 10%, transparent),
+      transparent 42%
+    );
+}
+
+.login-aurora {
+  background-image: var(--login-aurora);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-highlight: var(--highlight);
+  --color-highlight-foreground: var(--highlight-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}

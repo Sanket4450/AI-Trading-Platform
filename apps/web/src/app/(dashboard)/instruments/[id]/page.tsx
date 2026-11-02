@@ -126,25 +126,25 @@ export default async function InstrumentDetailPage({
           label="Expected days"
           value={formatNumber(detail.expectedDays ?? 0)}
           hint="Scheduled instrument-days"
-          tone="cyan"
+          tone="info"
         />
         <StatCard
           label="Complete days"
           value={formatNumber(detail.completeDays ?? 0)}
           hint="Strict zero-gap"
-          tone="green"
+          tone="success"
         />
         <StatCard
           label="Partial days"
           value={formatNumber(detail.partialDays ?? 0)}
           hint="Some minutes missing"
-          tone="amber"
+          tone="warning"
         />
         <StatCard
           label="Open critical"
           value={formatNumber(detail.openCriticalIssues ?? 0)}
           hint="Blocks preflight"
-          tone="red"
+          tone="danger"
         />
       </div>
 
@@ -167,10 +167,10 @@ export default async function InstrumentDetailPage({
                 {detail.months.map((month) => {
                   const tone =
                     month.missing > 0
-                      ? 'border-[#ff7b7b]/30 bg-[#ff7b7b]/10 text-[#ff7b7b]'
+                      ? 'border-destructive/30 bg-destructive/10 text-destructive'
                       : month.partial > 0
-                        ? 'border-[#f5c451]/30 bg-[#f5c451]/10 text-[#f5c451]'
-                        : 'border-primary/30 bg-primary/10 text-primary';
+                        ? 'border-warning/30 bg-warning/10 text-warning'
+                        : 'border-success/30 bg-success/10 text-success';
                   return (
                     <div key={month.month} className={`rounded-lg border p-2 text-xs ${tone}`}>
                       <p className="font-mono">{month.month}</p>

@@ -70,25 +70,25 @@ export default async function AccountsPage({
               label="Accounts"
               value={formatNumber(accounts.length)}
               hint="One active in R1"
-              tone="green"
+              tone="success"
             />
             <StatCard
               label="Mode"
               value={selected?.mode.toUpperCase() ?? '—'}
               hint="Every active account must be offline"
-              tone="cyan"
+              tone="info"
             />
             <StatCard
               label="Tradable instruments"
               value={formatNumber(selected?.permissionCount ?? 0)}
               hint="Account-level allowlist"
-              tone="violet"
+              tone="highlight"
             />
             <StatCard
               label="Open sessions"
               value={formatNumber(selected?.openSessionCount ?? 0)}
               hint="No session is opened in R1"
-              tone="amber"
+              tone="warning"
             />
           </div>
 
