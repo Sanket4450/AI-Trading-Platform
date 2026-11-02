@@ -2,13 +2,9 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { apiFetch } from '@/lib/api';
+import { apiErrorMessage, apiFetch } from '@/lib/api';
 import { formString } from '@/lib/form';
 import type { ConfigurationVersion } from '@/lib/types';
-
-function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : 'Request failed';
-}
 
 export async function createConfigurationAction(formData: FormData): Promise<void> {
   const configType = formString(formData, 'configType', '');
@@ -41,7 +37,7 @@ export async function createConfigurationAction(formData: FormData): Promise<voi
       }),
     });
   } catch (error) {
-    redirect(`/configuration?error=${encodeURIComponent(messageOf(error))}`);
+    redirect(`/configuration?error=${encodeURIComponent(apiErrorMessage(error))}`);
   }
 
   revalidatePath('/configuration');
@@ -60,7 +56,7 @@ export async function bindConfigurationAction(formData: FormData): Promise<void>
     });
   } catch (error) {
     redirect(
-      `/configuration?config=${configurationId}&error=${encodeURIComponent(messageOf(error))}`,
+      `/configuration?config=${configurationId}&error=${encodeURIComponent(apiErrorMessage(error))}`,
     );
   }
 

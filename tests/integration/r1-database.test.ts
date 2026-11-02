@@ -259,6 +259,18 @@ describe('R2 database lifecycle', () => {
       where e.code = 'NSE' and tc.trading_date = '2026-01-15'
     `;
     expect(holiday?.is_trading_day).toBe(false);
+
+    const weekdays = await sql<{ trading_date: string; is_trading_day: boolean }[]>`
+      select tc.trading_date::text as trading_date, tc.is_trading_day
+      from trading_calendar tc
+      join exchanges e on e.id = tc.exchange_id
+      where e.code = 'NSE' and tc.trading_date in ('2026-11-02', '2026-11-07')
+      order by tc.trading_date
+    `;
+    expect(weekdays).toEqual([
+      { trading_date: '2026-11-02', is_trading_day: true },
+      { trading_date: '2026-11-07', is_trading_day: false },
+    ]);
   });
 
   it('enforces one active manual backfill per instrument', async () => {

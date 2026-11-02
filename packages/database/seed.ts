@@ -346,7 +346,9 @@ export async function seedDatabase(options: SeedOptions) {
         const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
         for (let day = 1; day <= daysInMonth; day += 1) {
           const date = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-          const weekday = new Date(`${date}T00:00:00+05:30`).getUTCDay();
+          // The date is already an IST business date; reading it as IST midnight shifts the
+          // UTC weekday back by one, which would mark Mondays as weekends.
+          const weekday = new Date(`${date}T00:00:00Z`).getUTCDay();
           const special = nseSpecialSessions[date];
           const holiday = nseHolidays[date];
           const isTradingDay = Boolean(special) || (weekday >= 1 && weekday <= 5 && !holiday);

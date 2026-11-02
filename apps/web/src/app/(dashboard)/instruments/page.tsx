@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { apiFetch } from '@/lib/api';
+import { apiErrorMessage, apiFetch } from '@/lib/api';
 import type { BackfillPreview, InstrumentStatusRow } from '@/lib/types';
 import { formatDateTime, formatNumber } from '@/lib/format';
 import { displayStatus, statusTone } from '@/lib/status';
@@ -80,7 +80,7 @@ export default async function InstrumentsPage({ searchParams }: { searchParams: 
       preview = response.preview;
     } catch (error) {
       preview = null;
-      params.error = error instanceof Error ? error.message : 'Preview failed';
+      params.error = apiErrorMessage(error, 'Preview failed');
     }
   }
 

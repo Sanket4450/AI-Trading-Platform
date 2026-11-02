@@ -2,13 +2,9 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { apiFetch } from '@/lib/api';
+import { apiErrorMessage, apiFetch } from '@/lib/api';
 import { formString } from '@/lib/form';
 import type { JobRun } from '@/lib/types';
-
-function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : 'Request failed';
-}
 
 export async function backfillAction(formData: FormData): Promise<void> {
   const instrumentId = formString(formData, 'instrumentId', '');
@@ -22,7 +18,7 @@ export async function backfillAction(formData: FormData): Promise<void> {
       body: JSON.stringify({ instrumentId, from, to }),
     });
   } catch (error) {
-    redirect(`/data?error=${encodeURIComponent(messageOf(error))}`);
+    redirect(`/data?error=${encodeURIComponent(apiErrorMessage(error))}`);
   }
 
   revalidatePath('/data');
@@ -34,7 +30,7 @@ export async function refreshMaterializedViewAction(): Promise<void> {
   try {
     job = await apiFetch<JobRun>('/data/refresh-materialized-view', { method: 'POST' });
   } catch (error) {
-    redirect(`/data?error=${encodeURIComponent(messageOf(error))}`);
+    redirect(`/data?error=${encodeURIComponent(apiErrorMessage(error))}`);
   }
 
   revalidatePath('/data');
@@ -53,7 +49,7 @@ export async function acknowledgeIssueAction(formData: FormData): Promise<void> 
       body: JSON.stringify({ status, note: note || undefined }),
     });
   } catch (error) {
-    redirect(`${returnTo}?error=${encodeURIComponent(messageOf(error))}`);
+    redirect(`${returnTo}?error=${encodeURIComponent(apiErrorMessage(error))}`);
   }
 
   revalidatePath('/data');
@@ -67,7 +63,7 @@ export async function cancelPlanAction(formData: FormData): Promise<void> {
   try {
     await apiFetch(`/data/backfill-plans/${planId}/cancel`, { method: 'POST' });
   } catch (error) {
-    redirect(`${returnTo}?error=${encodeURIComponent(messageOf(error))}`);
+    redirect(`${returnTo}?error=${encodeURIComponent(apiErrorMessage(error))}`);
   }
   revalidatePath('/data');
   revalidatePath(`/data/backfills/${planId}`);
@@ -80,7 +76,7 @@ export async function retryPlanAction(formData: FormData): Promise<void> {
   try {
     await apiFetch(`/data/backfill-plans/${planId}/retry-failed`, { method: 'POST' });
   } catch (error) {
-    redirect(`${returnTo}?error=${encodeURIComponent(messageOf(error))}`);
+    redirect(`${returnTo}?error=${encodeURIComponent(apiErrorMessage(error))}`);
   }
   revalidatePath('/data');
   revalidatePath(`/data/backfills/${planId}`);
@@ -92,7 +88,7 @@ export async function syncInstrumentsAction(): Promise<void> {
   try {
     job = await apiFetch<JobRun>('/data/reference/instrument-sync', { method: 'POST' });
   } catch (error) {
-    redirect(`/data?error=${encodeURIComponent(messageOf(error))}`);
+    redirect(`/data?error=${encodeURIComponent(apiErrorMessage(error))}`);
   }
   revalidatePath('/data');
   redirect(`/data?job=${job.id}`);
@@ -103,7 +99,7 @@ export async function syncCalendarAction(): Promise<void> {
   try {
     job = await apiFetch<JobRun>('/data/reference/calendar-sync', { method: 'POST' });
   } catch (error) {
-    redirect(`/data?error=${encodeURIComponent(messageOf(error))}`);
+    redirect(`/data?error=${encodeURIComponent(apiErrorMessage(error))}`);
   }
   revalidatePath('/data');
   redirect(`/data?job=${job.id}`);
@@ -119,7 +115,7 @@ export async function importCorporateActionsAction(formData: FormData): Promise<
       body: JSON.stringify({ csv, source, dryRun }),
     });
   } catch (error) {
-    redirect(`/data?error=${encodeURIComponent(messageOf(error))}`);
+    redirect(`/data?error=${encodeURIComponent(apiErrorMessage(error))}`);
   }
   revalidatePath('/data');
   redirect(`/data?${dryRun ? 'previewed' : 'imported'}=1`);

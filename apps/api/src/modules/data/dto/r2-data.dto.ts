@@ -24,7 +24,7 @@ export class FetchInstrumentsDto {
   @IsArray()
   @ArrayMinSize(1)
   @ArrayMaxSize(100)
-  @IsUUID('4', { each: true })
+  @IsUUID('all', { each: true })
   instrumentIds?: string[];
 
   @IsOptional()
@@ -59,7 +59,7 @@ export class CreateBackfillPlanDto {
   @IsArray()
   @ArrayMinSize(1)
   @ArrayMaxSize(100)
-  @IsUUID('4', { each: true })
+  @IsUUID('all', { each: true })
   instrumentIds?: string[];
 
   @IsOptional()
@@ -95,7 +95,7 @@ export class InstrumentStatusQueryDto {
   @IsOptional()
   @IsArray()
   @ArrayMaxSize(100)
-  @IsUUID('4', { each: true })
+  @IsUUID('all', { each: true })
   instrumentIds?: string[];
 
   @IsOptional()
@@ -209,7 +209,7 @@ export class RecomputeStatusDto {
   @IsOptional()
   @IsArray()
   @ArrayMaxSize(100)
-  @IsUUID('4', { each: true })
+  @IsUUID('all', { each: true })
   instrumentIds?: string[];
 
   @IsOptional()

@@ -22,6 +22,32 @@ export class UnauthorizedError extends ApiError {
   }
 }
 
+/** Pulls the operator-facing message out of a Nest error body. */
+function messageFromBody(body: string): string | null {
+  try {
+    const parsed = JSON.parse(body) as { message?: unknown };
+    if (Array.isArray(parsed.message)) {
+      const lines = parsed.message.filter((line): line is string => typeof line === 'string');
+      return lines.length > 0 ? lines.join('; ') : null;
+    }
+    return typeof parsed.message === 'string' && parsed.message ? parsed.message : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Prefers the API's own explanation over the generic "API request failed: 400" text so
+ * validation errors reach the operator instead of a bare status code.
+ */
+export function apiErrorMessage(error: unknown, fallback = 'Request failed'): string {
+  if (!(error instanceof Error)) return fallback;
+  if (error instanceof ApiError) {
+    return messageFromBody(error.body) ?? error.message;
+  }
+  return error.message;
+}
+
 export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;
