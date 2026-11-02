@@ -14,7 +14,9 @@ export default async function LoginPage({
   const error =
     params.error === 'api'
       ? 'The sign-in service is unavailable right now. Please try again in a moment.'
-      : undefined;
+      : params.error === 'session'
+        ? 'Your session expired or was revoked. Please sign in again.'
+        : undefined;
 
   return (
     <main className="relative grid min-h-svh place-items-center overflow-hidden px-4 py-10 sm:px-6">

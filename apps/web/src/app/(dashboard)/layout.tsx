@@ -16,8 +16,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
     );
   } catch (error) {
     if (error instanceof UnauthorizedError) {
-      redirect('/login');
+      redirect('/api/auth/session-expired');
     }
-    redirect('/login?error=api');
+    redirect('/api/auth/session-expired?reason=api');
   }
 }
