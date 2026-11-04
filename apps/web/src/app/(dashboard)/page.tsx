@@ -1,15 +1,15 @@
 import Link from 'next/link';
 import { ArrowUpRight, ShieldCheck } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
-import type { HealthResponse, Overview, SystemStatus } from '@/lib/types';
+import type { HealthResponse, Overview } from '@/lib/types';
 import { formatDateTime, formatNumber } from '@/lib/format';
-import { PageHeader } from '@/components/dashboard/page-header';
-import { StatCard } from '@/components/dashboard/stat-card';
+import { label } from '@/lib/labels';
+import { PageMeta } from '@/components/shell/page-meta';
+import { StatCard, StatGrid } from '@/components/dashboard/stat-card';
+import { SectionCard } from '@/components/dashboard/section-card';
 import { StatusBadge } from '@/components/dashboard/status-badge';
 import { EmptyState } from '@/components/dashboard/empty-state';
-import { Badge } from '@/components/ui/badge';
 import { buttonVariants } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Table,
   TableBody,
@@ -20,9 +20,8 @@ import {
 } from '@/components/ui/table';
 
 export default async function OverviewPage() {
-  const [health, status, overview] = await Promise.all([
+  const [health, overview] = await Promise.all([
     apiFetch<HealthResponse>('/health'),
-    apiFetch<SystemStatus>('/system/status'),
     apiFetch<Overview>('/system/overview'),
   ]);
 
@@ -33,14 +32,9 @@ export default async function OverviewPage() {
 
   return (
     <div>
-      <PageHeader
-        title="System overview"
-        description="One screen for operating mode, component health, reference data, data coverage and recent jobs. R2 is read-only for trading."
+      <PageMeta
         actions={
           <>
-            <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
-              {status.mode.toUpperCase()}
-            </Badge>
             <Link
               href="/instruments"
               className={buttonVariants({ variant: 'outline', size: 'sm' })}
@@ -56,10 +50,10 @@ export default async function OverviewPage() {
         }
       />
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <StatGrid>
         <StatCard
           label="Component health"
-          value={health.status.toUpperCase()}
+          value={label(health.status)}
           hint={`DB ${health.checks.database.latencyMs ?? '—'} ms · Redis ${health.checks.redis.latencyMs ?? '—'} ms`}
           tone={
             health.status === 'ok' ? 'success' : health.status === 'degraded' ? 'warning' : 'danger'
@@ -107,109 +101,100 @@ export default async function OverviewPage() {
           hint={`${formatNumber(coverageComplete)} of ${formatNumber(coverageTotal)} instrument-days complete`}
           tone={coveragePct >= 99 ? 'success' : 'warning'}
         />
-      </div>
+      </StatGrid>
 
-      <div className="mt-6 grid gap-4 xl:grid-cols-[1.4fr_1fr]">
-        <Card className="border-border/70 bg-card/60">
-          <CardHeader>
-            <CardTitle>Recent jobs</CardTitle>
-            <CardDescription>
-              Worker runs, retries and skipped provider calls are all recorded.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {overview.recentJobs.length === 0 ? (
-              <EmptyState
-                title="No jobs yet"
-                description="Trigger a backfill or wait for a scheduled sync."
-              />
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Job</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Started</TableHead>
-                    <TableHead>Finished</TableHead>
+      <div className="mt-4 grid gap-4 xl:grid-cols-[1.4fr_1fr]">
+        <SectionCard
+          title="Recent jobs"
+          description="Worker runs, retries and skipped provider calls are all recorded."
+        >
+          {overview.recentJobs.length === 0 ? (
+            <EmptyState
+              title="No jobs yet"
+              description="Trigger a backfill or wait for a scheduled sync."
+            />
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Job</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Started</TableHead>
+                  <TableHead>Finished</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {overview.recentJobs.map((job) => (
+                  <TableRow key={job.id}>
+                    <TableCell>
+                      <p className="font-medium">{job.jobName}</p>
+                      <p className="text-muted-foreground text-xs">{label(job.jobType)}</p>
+                    </TableCell>
+                    <TableCell>
+                      <StatusBadge status={job.status} />
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {formatDateTime(job.startedAt)}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {formatDateTime(job.finishedAt)}
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {overview.recentJobs.map((job) => (
-                    <TableRow key={job.id}>
-                      <TableCell>
-                        <p className="font-medium">{job.jobName}</p>
-                        <p className="text-muted-foreground text-xs">{job.jobType}</p>
-                      </TableCell>
-                      <TableCell>
-                        <StatusBadge status={job.status} />
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {formatDateTime(job.startedAt)}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {formatDateTime(job.finishedAt)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="border-border/70 bg-card/60">
-          <CardHeader>
-            <CardTitle>Open quality issues</CardTitle>
-            <CardDescription>
-              Gaps, invalid bars and mapping problems that need review.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {overview.openIssues.length === 0 ? (
-              <EmptyState
-                title="No open issues"
-                description="The validation layer has not raised anything."
-              />
-            ) : (
-              <div className="space-y-3">
-                {overview.openIssues.map((issue) => (
-                  <div
-                    key={issue.id}
-                    className="border-border/70 bg-background/40 rounded-lg border p-3"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-medium">{issue.issueType.replaceAll('_', ' ')}</p>
-                      <StatusBadge status={issue.severity} />
-                    </div>
-                    <p className="text-muted-foreground mt-1 text-xs">
-                      {issue.tradingDate ?? 'No trading date'} · detected{' '}
-                      {formatDateTime(issue.detectedAt)}
-                    </p>
-                  </div>
                 ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              </TableBody>
+            </Table>
+          )}
+        </SectionCard>
+
+        <SectionCard
+          title="Open quality issues"
+          description="Gaps, invalid bars and mapping problems that need review."
+        >
+          {overview.openIssues.length === 0 ? (
+            <EmptyState
+              title="No open issues"
+              description="The validation layer has not raised anything."
+            />
+          ) : (
+            <div className="space-y-3">
+              {overview.openIssues.map((issue) => (
+                <Link
+                  key={issue.id}
+                  href={`/data/issues/${issue.id}`}
+                  className="border-border/70 bg-background/40 block rounded-lg border p-3"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-medium">{label(issue.issueType)}</p>
+                    <StatusBadge status={issue.severity} />
+                  </div>
+                  <p className="text-muted-foreground mt-1 text-xs">
+                    {issue.symbol ?? 'Provider-wide'} · {issue.tradingDate ?? 'No trading date'} ·
+                    detected {formatDateTime(issue.detectedAt)}
+                  </p>
+                </Link>
+              ))}
+            </div>
+          )}
+        </SectionCard>
       </div>
 
-      <Card className="border-primary/20 bg-primary/5 mt-4">
-        <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="border-primary/20 bg-primary/5 mt-4 rounded-xl border px-4 py-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-3">
-            <ShieldCheck className="text-primary mt-0.5 size-5" />
+            <ShieldCheck className="text-primary-strong mt-0.5 size-5" />
             <div>
               <p className="text-sm font-medium">Research is a capability boundary, not a label.</p>
               <p className="text-muted-foreground mt-1 text-xs leading-5">
-                The API and worker accept only TRADING_MODE=offline or research. No route writes to
-                orders, fills or positions, and the Upstox adapter has no order method.
+                The API and worker accept only offline or research mode. No route writes to orders,
+                fills or positions, and the Upstox adapter has no order method.
               </p>
             </div>
           </div>
           <Link href="/audit" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
             Review audit trail
           </Link>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

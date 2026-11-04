@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { Database, Upload } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import type {
   BackfillPlan,
@@ -9,16 +10,19 @@ import type {
   QualityIssue,
 } from '@/lib/types';
 import { formatDateTime, formatNumber } from '@/lib/format';
-import { PageHeader } from '@/components/dashboard/page-header';
-import { StatCard } from '@/components/dashboard/stat-card';
+import { label } from '@/lib/labels';
+import { StatCard, StatGrid } from '@/components/dashboard/stat-card';
+import { SectionCard } from '@/components/dashboard/section-card';
 import { StatusBadge } from '@/components/dashboard/status-badge';
 import { EmptyState } from '@/components/dashboard/empty-state';
 import { JsonBlock } from '@/components/dashboard/json-block';
+import { KeyValueGrid } from '@/components/dashboard/key-value-grid';
 import { AutoRefresh } from '@/components/dashboard/auto-refresh';
+import { FormDialog } from '@/components/dashboard/form-dialog';
+import { FormField, FormSelect } from '@/components/dashboard/form-field';
+import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Table,
   TableBody,
@@ -50,34 +54,12 @@ function heatmapTone(cell: CoverageHeatmapCell): string {
   return 'bg-destructive/60';
 }
 
-export default async function DataPage({
-  searchParams,
-}: {
-  searchParams: Promise<{
-    date?: string;
-    status?: string;
-    instrumentId?: string;
-    error?: string;
-    job?: string;
-    ack?: string;
-    queued?: string;
-    imported?: string;
-    previewed?: string;
-  }>;
-}) {
-  const params = await searchParams;
-  const coverageQuery = new URLSearchParams();
-  if (params.date) coverageQuery.set('date', params.date);
-  if (params.status) coverageQuery.set('status', params.status);
-  if (params.instrumentId) coverageQuery.set('instrumentId', params.instrumentId);
-  coverageQuery.set('limit', '500');
-
-  const summaryQuery = params.date ? `?date=${params.date}` : '';
+export default async function DataPage() {
   const heatmapFrom = isoDaysAgo(120);
   const heatmapTo = new Date().toISOString().slice(0, 10);
 
   const [summary, heatmap, plans, ingestionRuns, qualityIssues, provider] = await Promise.all([
-    apiFetch<CoverageSummary>(`/data/coverage/summary${summaryQuery}`),
+    apiFetch<CoverageSummary>('/data/coverage/summary'),
     apiFetch<CoverageHeatmapCell[]>(
       `/data/coverage/heatmap?from=${heatmapFrom}&to=${heatmapTo}&limit=5000`,
     ),
@@ -109,31 +91,8 @@ export default async function DataPage({
   return (
     <div>
       <AutoRefresh active={activePlans} />
-      <PageHeader
-        title="Data health"
-        description="Coverage is the preflight gate for every backtest. Strict completeness and the daily oracle are stored as separate verdicts."
-      />
 
-      {params.error ? (
-        <div className="border-destructive/30 bg-destructive/10 text-destructive mb-4 rounded-lg border px-4 py-3 text-sm">
-          {params.error}
-        </div>
-      ) : null}
-      {params.job ? (
-        <div className="border-primary/30 bg-primary/10 text-primary mb-4 rounded-lg border px-4 py-3 text-sm">
-          Job queued: <span className="font-mono text-xs">{params.job}</span>
-        </div>
-      ) : null}
-      {params.ack || params.queued || params.imported || params.previewed ? (
-        <div className="border-primary/30 bg-primary/10 text-primary mb-4 rounded-lg border px-4 py-3 text-sm">
-          {params.ack ? 'Quality issue updated. ' : ''}
-          {params.queued ? 'Reference job queued. ' : ''}
-          {params.imported ? 'Corporate actions imported. ' : ''}
-          {params.previewed ? 'Corporate-action dry run completed. ' : ''}
-        </div>
-      ) : null}
-
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <StatGrid columns={5}>
         <StatCard
           label="Complete"
           value={formatNumber(summary.complete)}
@@ -164,217 +123,201 @@ export default async function DataPage({
           hint="Daily volume proves no lost trades"
           tone="highlight"
         />
-      </div>
+      </StatGrid>
 
-      <Card className="border-border/70 bg-card/60 mt-4">
-        <CardHeader>
-          <CardTitle>Provider and budget</CardTitle>
-          <CardDescription>
-            The token is never returned. Reference sync and corporate-action import require the
-            admin role.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-4">
-          <div>
-            <p className="text-muted-foreground text-xs">Network</p>
-            <p>{provider.networkEnabled ? 'enabled' : 'disabled'}</p>
-          </div>
-          <div>
-            <p className="text-muted-foreground text-xs">Credentials</p>
-            <p>
-              API key {provider.apiKeyConfigured ? 'set' : 'missing'} · token{' '}
-              {provider.tokenConfigured ? 'set' : 'missing'}
-            </p>
-          </div>
-          <div>
-            <p className="text-muted-foreground text-xs">Budget</p>
-            <p>
-              {provider.budget
+      <SectionCard
+        className="mt-4"
+        title="Provider and budget"
+        description="The token is never returned. Reference sync and corporate-action import require the admin role."
+        actions={
+          <>
+            <form action={syncInstrumentsAction}>
+              <Button type="submit" size="sm" variant="outline">
+                Sync instruments
+              </Button>
+            </form>
+            <form action={syncCalendarAction}>
+              <Button type="submit" size="sm" variant="outline">
+                Reconcile calendar
+              </Button>
+            </form>
+            <form action={refreshMaterializedViewAction}>
+              <Button type="submit" size="sm" variant="outline">
+                Refresh daily stats
+              </Button>
+            </form>
+          </>
+        }
+      >
+        <KeyValueGrid
+          columns={4}
+          items={[
+            { label: 'Network', value: provider.networkEnabled ? 'Enabled' : 'Disabled' },
+            {
+              label: 'Credentials',
+              value: `API key ${provider.apiKeyConfigured ? 'set' : 'missing'} · token ${provider.tokenConfigured ? 'set' : 'missing'}`,
+            },
+            {
+              label: 'Budget',
+              value: provider.budget
                 ? `${provider.budget.availableSecond}/s · ${provider.budget.availableMinute}/m · ${provider.budget.available30Minutes}/30m`
-                : 'unavailable'}
-            </p>
-          </div>
-          <div>
-            <p className="text-muted-foreground text-xs">Last successful sync</p>
-            <p>
-              {provider.lastSuccessfulSyncAt
+                : 'Unavailable',
+            },
+            {
+              label: 'Last successful sync',
+              value: provider.lastSuccessfulSyncAt
                 ? formatDateTime(provider.lastSuccessfulSyncAt)
-                : 'never'}
-            </p>
-          </div>
-          <div>
-            <p className="text-muted-foreground text-xs">Raw payloads</p>
-            <p>
-              {formatNumber(Number(provider.payloadCount))} ·{' '}
-              {formatNumber(Number(provider.payloadBytes))} bytes
-            </p>
-          </div>
-          <div>
-            <p className="text-muted-foreground text-xs">Chunks</p>
-            <p>
-              {provider.runningChunks} running · {provider.queuedChunks} queued ·{' '}
-              {provider.failedRuns24h} failed 24h
-            </p>
-          </div>
-          <div className="sm:col-span-2 xl:col-span-2">
-            <div className="flex flex-wrap gap-2">
-              <form action={syncInstrumentsAction}>
-                <Button type="submit" size="sm" variant="outline">
-                  Sync instruments
-                </Button>
-              </form>
-              <form action={syncCalendarAction}>
-                <Button type="submit" size="sm" variant="outline">
-                  Reconcile calendar
-                </Button>
-              </form>
-              <form action={refreshMaterializedViewAction}>
-                <Button type="submit" size="sm" variant="outline">
-                  Refresh daily stats
-                </Button>
-              </form>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+                : 'Never',
+            },
+            {
+              label: 'Raw payloads',
+              value: `${formatNumber(Number(provider.payloadCount))} · ${formatNumber(Number(provider.payloadBytes))} bytes`,
+            },
+            {
+              label: 'Chunks',
+              value: `${provider.runningChunks} running · ${provider.queuedChunks} queued · ${provider.failedRuns24h} failed in 24h`,
+            },
+            {
+              label: 'Daily oracle',
+              value: provider.dailyOracleEnabled ? 'Enabled' : 'Disabled',
+            },
+            {
+              label: 'Last validation',
+              value: provider.lastSuccessfulValidationAt
+                ? formatDateTime(provider.lastSuccessfulValidationAt)
+                : 'Never',
+            },
+          ]}
+        />
+      </SectionCard>
 
-      <Card className="border-border/70 bg-card/60 mt-4">
-        <CardHeader>
-          <CardTitle>Coverage heatmap · last {dates.length} sessions</CardTitle>
-          <CardDescription>
-            Green complete · amber partial + volume reconciled · red partial/missing + mismatch.
-            Click a cell to open the day detail.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {heatmapRows.length === 0 ? (
-            <EmptyState
-              title="No coverage rows"
-              description="Fetch the nifty-50 catalog from the instruments screen."
-            />
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="border-separate border-spacing-0 text-[10px]">
-                <thead>
-                  <tr>
-                    <th className="bg-card sticky left-0 z-10 px-2 py-1 text-left">Instrument</th>
-                    {dates.map((date) => (
-                      <th key={date} className="text-muted-foreground px-1 py-1 font-normal">
-                        {date.slice(5)}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {heatmapRows.map(([instrumentId, entry]) => (
-                    <tr key={instrumentId}>
-                      <th className="bg-card sticky left-0 z-10 px-2 py-1 text-left font-medium">
-                        <Link href={`/instruments/${instrumentId}`} className="hover:text-primary">
-                          {entry.rank}. {entry.symbol}
-                        </Link>
-                      </th>
-                      {dates.map((date) => {
-                        const cell = entry.cells.get(date);
-                        if (!cell) {
-                          return <td key={date} className="bg-muted/10 size-4 rounded-sm" />;
-                        }
-                        return (
-                          <td key={date} className="p-0.5">
-                            <Link
-                              href={`/data/coverage/${instrumentId}/${date}`}
-                              title={`${entry.symbol} ${date}: ${cell.status} / ${cell.validationStatus}`}
-                              className={`block size-4 rounded-sm ${heatmapTone(cell)}`}
-                            />
-                          </td>
-                        );
-                      })}
-                    </tr>
+      <SectionCard
+        className="mt-4"
+        title={`Coverage heatmap · last ${dates.length} sessions`}
+        description="Green complete · amber partial + volume reconciled · red partial/missing + mismatch. Click a cell to open the day detail."
+      >
+        {heatmapRows.length === 0 ? (
+          <EmptyState
+            title="No coverage rows"
+            description="Fetch the nifty-50 catalog from the instruments screen."
+          />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="border-separate border-spacing-0 text-[10px]">
+              <thead>
+                <tr>
+                  <th className="bg-card sticky left-0 z-10 px-2 py-1 text-left">Instrument</th>
+                  {dates.map((date) => (
+                    <th key={date} className="text-muted-foreground px-1 py-1 font-normal">
+                      {date.slice(5)}
+                    </th>
                   ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                </tr>
+              </thead>
+              <tbody>
+                {heatmapRows.map(([instrumentId, entry]) => (
+                  <tr key={instrumentId}>
+                    <th className="bg-card sticky left-0 z-10 px-2 py-1 text-left font-medium">
+                      <Link
+                        href={`/instruments/${instrumentId}`}
+                        className="hover:text-primary-strong"
+                      >
+                        {entry.rank}. {entry.symbol}
+                      </Link>
+                    </th>
+                    {dates.map((date) => {
+                      const cell = entry.cells.get(date);
+                      if (!cell) {
+                        return <td key={date} className="bg-muted/10 size-4 rounded-sm" />;
+                      }
+                      return (
+                        <td key={date} className="p-0.5">
+                          <Link
+                            href={`/data/coverage/${instrumentId}/${date}`}
+                            title={`${entry.symbol} ${date}: ${label(cell.status)} / ${label(cell.validationStatus)}`}
+                            className={`block size-4 rounded-sm ${heatmapTone(cell)}`}
+                          />
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </SectionCard>
 
       <div className="mt-4 grid gap-4 xl:grid-cols-2">
-        <Card className="border-border/70 bg-card/60">
-          <CardHeader>
-            <CardTitle>Backfill plans</CardTitle>
-            <CardDescription>
-              One parent plan, one child job per instrument, one run per month.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {plans.length === 0 ? (
-              <EmptyState
-                title="No plans"
-                description="Launch a fetch from the instrument catalog."
-              />
-            ) : (
-              <div className="space-y-2">
-                {plans.map((plan) => (
-                  <Link
-                    key={plan.id}
-                    href={`/data/backfills/${plan.id}`}
-                    className="border-border/70 bg-background/40 block rounded-lg border p-3 text-sm"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className="font-mono text-xs">{plan.id.slice(0, 8)}</span>
-                      <StatusBadge status={plan.status} />
-                    </div>
-                    <p className="text-muted-foreground mt-1 text-xs">
-                      {plan.progress.instruments} instruments · {plan.progress.succeeded}/
-                      {plan.progress.chunks} chunks succeeded · {plan.progress.failed} failed ·{' '}
-                      {plan.progress.running} running
-                    </p>
-                    <p className="text-muted-foreground text-xs">
-                      {formatDateTime(plan.createdAt)} · {formatNumber(plan.progress.rowsWritten)}{' '}
-                      rows written
-                    </p>
-                  </Link>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        <SectionCard
+          title="Backfill plans"
+          description="One parent plan, one child job per instrument, one run per month."
+        >
+          {plans.length === 0 ? (
+            <EmptyState
+              title="No plans"
+              description="Launch a fetch from the instrument catalog."
+            />
+          ) : (
+            <div className="space-y-2">
+              {plans.map((plan) => (
+                <Link
+                  key={plan.id}
+                  href={`/data/backfills/${plan.id}`}
+                  className="border-border/70 bg-background/40 block rounded-lg border p-3 text-sm"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-mono text-xs">{plan.id.slice(0, 8)}</span>
+                    <StatusBadge status={plan.status} />
+                  </div>
+                  <p className="text-muted-foreground mt-1 text-xs">
+                    {plan.progress.instruments} instruments · {plan.progress.succeeded}/
+                    {plan.progress.chunks} chunks succeeded · {plan.progress.failed} failed ·{' '}
+                    {plan.progress.running} running
+                  </p>
+                  <p className="text-muted-foreground text-xs">
+                    {formatDateTime(plan.createdAt)} · {formatNumber(plan.progress.rowsWritten)}{' '}
+                    rows written
+                  </p>
+                </Link>
+              ))}
+            </div>
+          )}
+        </SectionCard>
 
-        <Card className="border-border/70 bg-card/60">
-          <CardHeader>
-            <CardTitle>Quality issues</CardTitle>
-            <CardDescription>
-              One real problem, one issue, with an auditable lifecycle.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {qualityIssues.length === 0 ? (
-              <EmptyState title="No quality issues" description="The validation layer is clean." />
-            ) : (
-              <div className="space-y-3">
-                {qualityIssues.slice(0, 10).map((issue) => (
-                  <div
-                    key={issue.id}
-                    className="border-border/70 bg-background/40 rounded-lg border p-3"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div>
-                        <Link
-                          href={`/data/issues/${issue.id}`}
-                          className="text-sm font-medium hover:underline"
-                        >
-                          {issue.ruleId ?? issue.issueType} · {issue.issueType.replaceAll('_', ' ')}
-                        </Link>
-                        <p className="text-muted-foreground text-xs">
-                          {issue.symbol ?? 'provider-wide'} · {issue.tradingDate ?? 'no date'} ·
-                          seen {issue.occurrenceCount}×
-                        </p>
-                      </div>
-                      <div className="flex gap-1">
-                        <StatusBadge status={issue.severity} />
-                        <StatusBadge status={issue.status} />
-                      </div>
+        <SectionCard
+          title="Quality issues"
+          description="One real problem, one issue, with an auditable lifecycle."
+        >
+          {qualityIssues.length === 0 ? (
+            <EmptyState title="No quality issues" description="The validation layer is clean." />
+          ) : (
+            <div className="space-y-3">
+              {qualityIssues.slice(0, 10).map((issue) => (
+                <div
+                  key={issue.id}
+                  className="border-border/70 bg-background/40 rounded-lg border p-3"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <Link
+                        href={`/data/issues/${issue.id}`}
+                        className="text-sm font-medium hover:underline"
+                      >
+                        {label(issue.issueType)}
+                      </Link>
+                      <p className="text-muted-foreground text-xs">
+                        {issue.ruleId ?? 'No rule'} · {issue.symbol ?? 'Provider-wide'} ·{' '}
+                        {issue.tradingDate ?? 'No date'} · seen {issue.occurrenceCount}×
+                      </p>
                     </div>
-                    <details className="mt-2">
+                    <div className="flex gap-1">
+                      <StatusBadge status={issue.severity} />
+                      <StatusBadge status={issue.status} />
+                    </div>
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <details className="min-w-0 flex-1">
                       <summary className="text-muted-foreground cursor-pointer text-xs">
                         Evidence
                       </summary>
@@ -382,159 +325,178 @@ export default async function DataPage({
                         <JsonBlock value={issue.details} />
                       </div>
                     </details>
-                    <form
+                    <FormDialog
+                      trigger={
+                        <Button type="button" size="sm" variant="outline">
+                          Update
+                        </Button>
+                      }
+                      title="Update issue lifecycle"
+                      description="Acknowledgement records ownership. Resolving or ignoring requires a note and is audited."
+                      submitLabel="Update issue"
                       action={acknowledgeIssueAction}
-                      className="mt-2 flex flex-wrap items-center gap-2"
                     >
                       <input type="hidden" name="issueId" value={issue.id} />
                       <input type="hidden" name="returnTo" value="/data" />
-                      <select
-                        name="status"
-                        defaultValue="acknowledged"
-                        className="border-input h-8 rounded-md border bg-transparent px-2 text-xs"
+                      <FormField label="Status" htmlFor={`status-${issue.id}`}>
+                        <FormSelect
+                          id={`status-${issue.id}`}
+                          name="status"
+                          defaultValue="acknowledged"
+                          options={[
+                            { value: 'acknowledged', label: 'Acknowledge' },
+                            { value: 'resolved', label: 'Resolve' },
+                            { value: 'ignored', label: 'Ignore' },
+                          ]}
+                        />
+                      </FormField>
+                      <FormField
+                        label="Note"
+                        htmlFor={`note-${issue.id}`}
+                        hint="Required to resolve or ignore."
                       >
-                        <option value="acknowledged">acknowledge</option>
-                        <option value="resolved">resolve</option>
-                        <option value="ignored">ignore</option>
-                      </select>
-                      <Input
-                        name="note"
-                        placeholder="Note (required to resolve/ignore)"
-                        className="h-8 max-w-xs text-xs"
-                      />
-                      <Button type="submit" size="sm" variant="outline">
-                        Update
-                      </Button>
-                    </form>
+                        <Input id={`note-${issue.id}`} name="note" placeholder="What changed?" />
+                      </FormField>
+                    </FormDialog>
                   </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                </div>
+              ))}
+            </div>
+          )}
+        </SectionCard>
       </div>
 
       <div className="mt-4 grid gap-4 xl:grid-cols-2">
-        <Card className="border-border/70 bg-card/60">
-          <CardHeader>
-            <CardTitle>Ingestion runs</CardTitle>
-            <CardDescription>
-              Every provider fetch, including skipped and failed runs.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {ingestionRuns.length === 0 ? (
-              <EmptyState
-                title="No ingestion runs"
-                description="Trigger a backfill to create one."
-              />
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Instrument</TableHead>
-                      <TableHead>Window</TableHead>
-                      <TableHead>Rows</TableHead>
-                      <TableHead>Status</TableHead>
+        <SectionCard
+          title="Ingestion runs"
+          description="Every provider fetch, including skipped and failed runs."
+        >
+          {ingestionRuns.length === 0 ? (
+            <EmptyState title="No ingestion runs" description="Trigger a backfill to create one." />
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Instrument</TableHead>
+                    <TableHead>Window</TableHead>
+                    <TableHead>Rows</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {ingestionRuns.map((run) => (
+                    <TableRow key={run.id}>
+                      <TableCell>{label(run.runType)}</TableCell>
+                      <TableCell>{run.symbol ?? '—'}</TableCell>
+                      <TableCell className="text-muted-foreground text-xs">
+                        {run.requestedFrom ?? '—'} → {run.requestedTo ?? '—'}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-xs">
+                        {run.rowsFetched}/{run.rowsWritten}/{run.rowsRejected}
+                      </TableCell>
+                      <TableCell>
+                        <Link href={`/data/runs/${run.id}`}>
+                          <StatusBadge status={run.status} />
+                        </Link>
+                      </TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {ingestionRuns.map((run) => (
-                      <TableRow key={run.id}>
-                        <TableCell>{run.runType}</TableCell>
-                        <TableCell>{run.symbol ?? '—'}</TableCell>
-                        <TableCell className="text-muted-foreground text-xs">
-                          {run.requestedFrom ?? '—'} → {run.requestedTo ?? '—'}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground text-xs">
-                          {run.rowsFetched}/{run.rowsWritten}/{run.rowsRejected}
-                        </TableCell>
-                        <TableCell>
-                          <Link href={`/data/runs/${run.id}`}>
-                            <StatusBadge status={run.status} />
-                          </Link>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </SectionCard>
 
-        <Card className="border-border/70 bg-card/60">
-          <CardHeader>
-            <CardTitle>Corporate actions import</CardTitle>
-            <CardDescription>
-              Reviewed CSV only. Dry run first; confirmed factors are used by read-time adjustment.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form action={importCorporateActionsAction} className="space-y-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="csv">CSV</Label>
-                <textarea
+        <SectionCard
+          title="Corporate actions import"
+          description="Reviewed CSV only. Dry run first; confirmed factors are used by read-time adjustment."
+          actions={
+            <FormDialog
+              trigger={
+                <Button type="button" size="sm" variant="outline">
+                  <Upload className="size-4" />
+                  Import CSV
+                </Button>
+              }
+              title="Import corporate actions"
+              description="Validated before any row is written. Confirmed factors are used by read-time adjustment."
+              submitLabel="Validate"
+              action={importCorporateActionsAction}
+              className="sm:max-w-2xl"
+            >
+              <FormField label="CSV" htmlFor="csv">
+                <Textarea
                   id="csv"
                   name="csv"
                   rows={6}
                   placeholder="isin,symbol,ex_date,action_type,ratio_numerator,ratio_denominator,dividend_per_share,price_factor,volume_factor,source,notes,status"
-                  className="border-input w-full rounded-md border bg-transparent p-2 font-mono text-xs"
+                  className="font-mono text-xs leading-5"
                 />
+              </FormField>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <FormField label="Source" htmlFor="source">
+                  <Input id="source" name="source" defaultValue="reviewed-csv" />
+                </FormField>
+                <FormField label="Mode" htmlFor="dryRun">
+                  <FormSelect
+                    id="dryRun"
+                    name="dryRun"
+                    defaultValue="true"
+                    options={[
+                      { value: 'true', label: 'Dry run' },
+                      { value: 'false', label: 'Import' },
+                    ]}
+                  />
+                </FormField>
               </div>
-              <div className="flex flex-wrap items-end gap-2">
-                <div className="space-y-1.5">
-                  <Label htmlFor="source">Source</Label>
-                  <Input id="source" name="source" defaultValue="reviewed-csv" className="h-8" />
-                </div>
-                <select
-                  name="dryRun"
-                  defaultValue="true"
-                  className="border-input h-8 rounded-md border bg-transparent px-2 text-xs"
-                >
-                  <option value="true">dry run</option>
-                  <option value="false">import</option>
-                </select>
-                <Button type="submit" size="sm" variant="outline">
-                  Validate
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
+            </FormDialog>
+          }
+        >
+          <p className="text-muted-foreground text-sm">
+            Import a reviewed CSV to record split, bonus and dividend factors. The dry run reports
+            what would change before any row is written.
+          </p>
+        </SectionCard>
       </div>
 
-      <Card className="border-border/70 bg-card/60 mt-4">
-        <CardHeader>
-          <CardTitle>Bounded single-instrument repair</CardTitle>
-          <CardDescription>
-            Legacy 31-day repair endpoint. The instrument catalog is the normal entry point.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form action={backfillAction} className="grid gap-3 sm:grid-cols-[1.4fr_1fr_1fr_auto]">
-            <div className="space-y-1.5">
-              <Label htmlFor="instrumentId">Instrument ID</Label>
-              <Input id="instrumentId" name="instrumentId" placeholder="UUID" required />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="from">From</Label>
-              <Input id="from" name="from" type="date" min="2022-01-01" required />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="to">To</Label>
-              <Input id="to" name="to" type="date" min="2022-01-01" required />
-            </div>
-            <div className="flex items-end">
-              <Button type="submit" variant="outline">
+      <SectionCard
+        className="mt-4"
+        title="Bounded single-instrument repair"
+        description="Legacy 31-day repair endpoint. The instrument catalog is the normal entry point."
+        actions={
+          <FormDialog
+            trigger={
+              <Button type="button" size="sm" variant="outline">
+                <Database className="size-4" />
                 Queue repair
               </Button>
+            }
+            title="Queue a single-instrument repair"
+            description="Bounded to the provider's documented window and the configured daily limit."
+            submitLabel="Queue repair"
+            action={backfillAction}
+          >
+            <FormField label="Instrument ID" htmlFor="repair-instrumentId">
+              <Input id="repair-instrumentId" name="instrumentId" placeholder="UUID" required />
+            </FormField>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <FormField label="From" htmlFor="repair-from">
+                <Input id="repair-from" name="from" type="date" min="2022-01-01" required />
+              </FormField>
+              <FormField label="To" htmlFor="repair-to">
+                <Input id="repair-to" name="to" type="date" min="2022-01-01" required />
+              </FormField>
             </div>
-          </form>
-        </CardContent>
-      </Card>
+          </FormDialog>
+        }
+      >
+        <p className="text-muted-foreground text-sm">
+          Use the instrument catalog for normal repairs. This bounded endpoint exists for a single
+          instrument and a short window.
+        </p>
+      </SectionCard>
     </div>
   );
 }

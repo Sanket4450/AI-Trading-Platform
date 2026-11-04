@@ -5,7 +5,7 @@ const tones = {
   default: 'text-foreground',
   success: 'text-success',
   info: 'text-info',
-  warning: 'text-warning',
+  warning: 'text-warning-strong',
   danger: 'text-destructive',
   highlight: 'text-highlight',
 } as const;
@@ -22,14 +22,46 @@ export function StatCard({
   tone?: keyof typeof tones;
 }) {
   return (
-    <Card className="border-border/70 bg-card/60">
-      <CardContent className="p-4">
+    <Card size="sm" className="border-border/70 bg-card/60">
+      <CardContent>
         <p className="text-muted-foreground text-[10px] font-medium uppercase tracking-[0.16em]">
           {label}
         </p>
-        <p className={cn('mt-2 text-2xl font-semibold tracking-tight', tones[tone])}>{value}</p>
-        {hint ? <p className="text-muted-foreground mt-1 text-xs">{hint}</p> : null}
+        <p className={cn('mt-1 text-xl font-semibold leading-none tracking-tight', tones[tone])}>
+          {value}
+        </p>
+        {hint ? (
+          <p className="text-muted-foreground mt-1 truncate text-[11px]" title={hint}>
+            {hint}
+          </p>
+        ) : null}
       </CardContent>
     </Card>
+  );
+}
+
+export const statGridColumnClasses = {
+  2: 'sm:grid-cols-2',
+  3: 'sm:grid-cols-2 xl:grid-cols-3',
+  4: 'sm:grid-cols-2 xl:grid-cols-4',
+  5: 'sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5',
+} as const;
+
+export type StatGridColumns = keyof typeof statGridColumnClasses;
+
+/** Keeps every page's summary row on the same compact rhythm. */
+export function StatGrid({
+  columns = 4,
+  className,
+  children,
+}: {
+  columns?: StatGridColumns;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className={cn('grid auto-rows-fr gap-3', statGridColumnClasses[columns], className)}>
+      {children}
+    </div>
   );
 }

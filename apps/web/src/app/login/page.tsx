@@ -28,7 +28,7 @@ export default async function LoginPage({
 
       <div className="relative w-full max-w-md">
         <header className="mb-7 flex items-center gap-3">
-          <span className="border-primary/30 bg-primary/10 text-primary grid size-11 place-items-center rounded-xl border">
+          <span className="border-primary/30 bg-primary/10 text-primary-strong grid size-11 place-items-center rounded-xl border">
             <Activity className="size-5" />
           </span>
           <div>
@@ -49,7 +49,10 @@ export default async function LoginPage({
               <CardTitle>
                 <h2>Sign in</h2>
               </CardTitle>
-              <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary">
+              <Badge
+                variant="outline"
+                className="border-primary/30 bg-primary/10 text-primary-strong"
+              >
                 {mode.toUpperCase()}
               </Badge>
             </div>
@@ -59,14 +62,14 @@ export default async function LoginPage({
             <LoginForm next={params.next} initialError={error} />
             <div className="border-border/70 bg-muted/30 text-muted-foreground mt-6 space-y-2.5 rounded-lg border p-3 text-xs">
               <p className="flex items-start gap-2">
-                <ShieldCheck className="text-primary mt-px size-4 shrink-0" />
+                <ShieldCheck className="text-primary-strong mt-px size-4 shrink-0" />
                 <span>
                   {mode.charAt(0).toUpperCase() + mode.slice(1)} mode only. No live orders can be
                   placed from this release.
                 </span>
               </p>
               <p className="flex items-start gap-2">
-                <KeyRound className="text-primary mt-px size-4 shrink-0" />
+                <KeyRound className="text-primary-strong mt-px size-4 shrink-0" />
                 <span>Sessions are HttpOnly and revocable, and expire automatically.</span>
               </p>
             </div>

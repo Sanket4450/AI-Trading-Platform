@@ -6,79 +6,159 @@
  */
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 
   /* Raw palette */
-  --palette-green: #35e0a1;
-  --palette-cyan: #38d9f5;
-  --palette-amber: #f5c451;
-  --palette-red: #ff7b7b;
-  --palette-violet: #b79cff;
+  --palette-white: #ffffff;
+  --palette-slate-50: #f8fafc;
+  --palette-slate-100: #f1f5f9;
+  --palette-slate-200: #e2e8f0;
+  --palette-slate-500: #64748b;
+  --palette-slate-900: #0f172a;
+  --palette-slate-950: #020617;
 
-  --palette-slate-950: #070b10;
-  --palette-slate-900: #0a0f16;
-  --palette-slate-850: #0d141d;
-  --palette-slate-800: #111a25;
-  --palette-slate-750: #162231;
-  --palette-slate-700: #1b2836;
-  --palette-slate-300: #8fa3b8;
-  --palette-slate-100: #dce8f5;
-  --palette-ink: #04110c;
+  --palette-emerald-600: #059669;
+  --palette-emerald-700: #047857;
+  --palette-emerald-900: #064e3b;
+  --palette-success: #198754;
+  --palette-amber: #ffc107;
+  --palette-amber-deep: #b45309;
+  --palette-danger: #dc3545;
+  --palette-info: #0d6efd;
+  --palette-violet: #7c3aed;
+
+  /* Dark-mode accents, lightened to keep contrast on dark surfaces */
+  --palette-emerald-400: #34d399;
+  --palette-emerald-500: #10b981;
+  --palette-success-dark: #34d399;
+  --palette-danger-dark: #f87171;
+  --palette-info-dark: #60a5fa;
+  --palette-violet-dark: #a78bfa;
+  --palette-slate-300: #cbd5e1;
+  --palette-slate-400: #94a3b8;
+  --palette-slate-700: #334155;
+  --palette-slate-800: #1e293b;
+  --palette-slate-850: #111c2e;
+  --palette-slate-900-dark: #0f172a;
+  --palette-slate-100-dark: #f1f5f9;
 
   /* Semantic tokens */
-  --background: var(--palette-slate-950);
-  --foreground: var(--palette-slate-100);
-  --card: var(--palette-slate-850);
-  --card-foreground: var(--palette-slate-100);
-  --popover: var(--palette-slate-850);
-  --popover-foreground: var(--palette-slate-100);
-  --primary: var(--palette-green);
-  --primary-foreground: var(--palette-ink);
-  --secondary: var(--palette-slate-800);
-  --secondary-foreground: var(--palette-slate-100);
-  --muted: var(--palette-slate-800);
-  --muted-foreground: var(--palette-slate-300);
-  --accent: var(--palette-slate-750);
-  --accent-foreground: var(--palette-slate-100);
-  --destructive: var(--palette-red);
-  --success: var(--palette-green);
-  --success-foreground: var(--palette-ink);
+  --background: var(--palette-slate-50);
+  --foreground: var(--palette-slate-900);
+  --card: var(--palette-white);
+  --card-foreground: var(--palette-slate-900);
+  --popover: var(--palette-white);
+  --popover-foreground: var(--palette-slate-900);
+  --primary: var(--palette-emerald-600);
+  --primary-foreground: var(--palette-white);
+  --primary-strong: var(--palette-emerald-700);
+  --secondary: var(--palette-slate-100);
+  --secondary-foreground: var(--palette-slate-900);
+  --muted: var(--palette-slate-100);
+  --muted-foreground: var(--palette-slate-500);
+  --accent: var(--palette-slate-100);
+  --accent-foreground: var(--palette-slate-900);
+  --destructive: var(--palette-danger);
+  --success: var(--palette-success);
+  --success-foreground: var(--palette-white);
   --warning: var(--palette-amber);
-  --warning-foreground: var(--palette-ink);
-  --info: var(--palette-cyan);
-  --info-foreground: var(--palette-ink);
+  --warning-foreground: var(--palette-slate-900);
+  --warning-strong: var(--palette-amber-deep);
+  --info: var(--palette-info);
+  --info-foreground: var(--palette-white);
   --highlight: var(--palette-violet);
-  --highlight-foreground: var(--palette-ink);
-  --border: var(--palette-slate-700);
-  --input: var(--palette-slate-700);
-  --ring: var(--palette-cyan);
+  --highlight-foreground: var(--palette-white);
+  --border: var(--palette-slate-200);
+  --input: var(--palette-slate-200);
+  --ring: var(--palette-emerald-600);
 
   /* Ordered chart series */
-  --chart-1: var(--palette-green);
-  --chart-2: var(--palette-cyan);
-  --chart-3: var(--palette-violet);
-  --chart-4: var(--palette-amber);
-  --chart-5: var(--palette-red);
+  --chart-1: var(--palette-success);
+  --chart-2: var(--palette-info);
+  --chart-3: var(--palette-amber-deep);
+  --chart-4: var(--palette-danger);
+  --chart-5: var(--palette-violet);
 
-  --sidebar: var(--palette-slate-900);
-  --sidebar-foreground: var(--palette-slate-100);
-  --sidebar-primary: var(--palette-green);
-  --sidebar-primary-foreground: var(--palette-ink);
-  --sidebar-accent: var(--palette-slate-800);
-  --sidebar-accent-foreground: var(--palette-slate-100);
-  --sidebar-border: var(--palette-slate-700);
-  --sidebar-ring: var(--palette-cyan);
+  --sidebar: var(--palette-white);
+  --sidebar-foreground: var(--palette-slate-900);
+  --sidebar-primary: var(--palette-emerald-600);
+  --sidebar-primary-foreground: var(--palette-white);
+  --sidebar-accent: var(--palette-slate-100);
+  --sidebar-accent-foreground: var(--palette-slate-900);
+  --sidebar-border: var(--palette-slate-200);
+  --sidebar-ring: var(--palette-emerald-600);
 
   /* Decorative login backdrop, kept out of components */
   --login-aurora:
     radial-gradient(
       circle at 18% 8%,
-      color-mix(in oklab, var(--palette-green) 14%, transparent),
+      color-mix(in oklab, var(--palette-emerald-600) 18%, transparent),
       transparent 45%
     ),
     radial-gradient(
       circle at 82% 15%,
-      color-mix(in oklab, var(--palette-cyan) 10%, transparent),
+      color-mix(in oklab, var(--palette-info) 14%, transparent),
+      transparent 42%
+    );
+}
+
+.dark {
+  color-scheme: dark;
+
+  --background: var(--palette-slate-950);
+  --foreground: var(--palette-slate-100-dark);
+  --card: var(--palette-slate-900-dark);
+  --card-foreground: var(--palette-slate-100-dark);
+  --popover: var(--palette-slate-850);
+  --popover-foreground: var(--palette-slate-100-dark);
+  --primary: var(--palette-emerald-500);
+  --primary-foreground: var(--palette-emerald-900);
+  --primary-strong: var(--palette-emerald-400);
+  --secondary: var(--palette-slate-800);
+  --secondary-foreground: var(--palette-slate-100-dark);
+  --muted: var(--palette-slate-800);
+  --muted-foreground: var(--palette-slate-400);
+  --accent: var(--palette-slate-700);
+  --accent-foreground: var(--palette-slate-100-dark);
+  --destructive: var(--palette-danger-dark);
+  --success: var(--palette-success-dark);
+  --success-foreground: var(--palette-slate-950);
+  --warning: var(--palette-amber);
+  --warning-foreground: var(--palette-slate-950);
+  --warning-strong: var(--palette-amber);
+  --info: var(--palette-info-dark);
+  --info-foreground: var(--palette-slate-950);
+  --highlight: var(--palette-violet-dark);
+  --highlight-foreground: var(--palette-slate-950);
+  --border: var(--palette-slate-700);
+  --input: var(--palette-slate-700);
+  --ring: var(--palette-emerald-400);
+
+  /* Ordered chart series */
+  --chart-1: var(--palette-success-dark);
+  --chart-2: var(--palette-info-dark);
+  --chart-3: var(--palette-amber);
+  --chart-4: var(--palette-danger-dark);
+  --chart-5: var(--palette-violet-dark);
+
+  --sidebar: var(--palette-slate-900-dark);
+  --sidebar-foreground: var(--palette-slate-100-dark);
+  --sidebar-primary: var(--palette-emerald-500);
+  --sidebar-primary-foreground: var(--palette-emerald-900);
+  --sidebar-accent: var(--palette-slate-800);
+  --sidebar-accent-foreground: var(--palette-slate-100-dark);
+  --sidebar-border: var(--palette-slate-700);
+  --sidebar-ring: var(--palette-emerald-400);
+
+  --login-aurora:
+    radial-gradient(
+      circle at 18% 8%,
+      color-mix(in oklab, var(--palette-emerald-500) 16%, transparent),
+      transparent 45%
+    ),
+    radial-gradient(
+      circle at 82% 15%,
+      color-mix(in oklab, var(--palette-info-dark) 12%, transparent),
       transparent 42%
     );
 }
@@ -96,6 +176,7 @@
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-primary-strong: var(--primary-strong);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
@@ -107,6 +188,7 @@
   --color-success-foreground: var(--success-foreground);
   --color-warning: var(--warning);
   --color-warning-foreground: var(--warning-foreground);
+  --color-warning-strong: var(--warning-strong);
   --color-info: var(--info);
   --color-info-foreground: var(--info-foreground);
   --color-highlight: var(--highlight);

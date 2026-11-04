@@ -1,21 +1,19 @@
+import { PencilLine } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import type { ProviderStatus, SystemSetting } from '@/lib/types';
-import { formatDateTime } from '@/lib/format';
-import { PageHeader } from '@/components/dashboard/page-header';
+import { formatDateTime, formatNumber } from '@/lib/format';
+import { formatSettingKey } from '@/lib/labels';
+import { SectionCard } from '@/components/dashboard/section-card';
 import { EmptyState } from '@/components/dashboard/empty-state';
+import { KeyValueGrid } from '@/components/dashboard/key-value-grid';
+import { FormDialog } from '@/components/dashboard/form-dialog';
+import { FormField } from '@/components/dashboard/form-field';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { updateSettingAction } from './actions';
 
-export default async function SettingsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ error?: string; saved?: string }>;
-}) {
-  const params = await searchParams;
+export default async function SettingsPage() {
   const [settings, provider] = await Promise.all([
     apiFetch<SystemSetting[]>('/settings'),
     apiFetch<ProviderStatus>('/data/provider-status'),
@@ -23,116 +21,91 @@ export default async function SettingsPage({
 
   return (
     <div>
-      <PageHeader
-        title="Settings"
-        description="Non-trading system settings. Strategy and risk settings belong in immutable configuration versions."
-      />
-
-      {params.error ? (
-        <div className="border-destructive/30 bg-destructive/10 text-destructive mb-4 rounded-lg border px-4 py-3 text-sm">
-          {params.error}
-        </div>
-      ) : null}
-      {params.saved ? (
-        <div className="border-primary/30 bg-primary/10 text-primary mb-4 rounded-lg border px-4 py-3 text-sm">
-          Setting saved and audited.
-        </div>
-      ) : null}
-
-      <Card className="border-border/70 bg-card/60">
-        <CardHeader>
-          <CardTitle>R2 provider and schedule state</CardTitle>
-          <CardDescription>Read-only operational state. Tokens are never returned.</CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-4">
-          <div>
-            <p className="text-muted-foreground text-xs">Network</p>
-            <p>{provider.networkEnabled ? 'enabled' : 'disabled'}</p>
-          </div>
-          <div>
-            <p className="text-muted-foreground text-xs">Token</p>
-            <p>{provider.tokenConfigured ? 'configured' : 'missing'}</p>
-          </div>
-          <div>
-            <p className="text-muted-foreground text-xs">Daily oracle</p>
-            <p>{provider.dailyOracleEnabled ? 'enabled' : 'disabled'}</p>
-          </div>
-          <div>
-            <p className="text-muted-foreground text-xs">Budget</p>
-            <p>
-              {provider.budget
+      <SectionCard
+        title="Provider and schedule state"
+        description="Read-only operational state. Tokens are never returned."
+      >
+        <KeyValueGrid
+          columns={4}
+          items={[
+            { label: 'Network', value: provider.networkEnabled ? 'Enabled' : 'Disabled' },
+            { label: 'Token', value: provider.tokenConfigured ? 'Configured' : 'Missing' },
+            { label: 'Daily oracle', value: provider.dailyOracleEnabled ? 'Enabled' : 'Disabled' },
+            {
+              label: 'Budget',
+              value: provider.budget
                 ? `${provider.budget.availableSecond}/s · ${provider.budget.availableMinute}/m`
-                : 'unavailable'}
-            </p>
-          </div>
-          <div>
-            <p className="text-muted-foreground text-xs">Last instrument sync</p>
-            <p>
-              {provider.lastSuccessfulSyncAt
+                : 'Unavailable',
+            },
+            {
+              label: 'Last instrument sync',
+              value: provider.lastSuccessfulSyncAt
                 ? formatDateTime(provider.lastSuccessfulSyncAt)
-                : 'never'}
-            </p>
-          </div>
-          <div>
-            <p className="text-muted-foreground text-xs">Last finalize</p>
-            <p>
-              {provider.lastSuccessfulIntradayAt
+                : 'Never',
+            },
+            {
+              label: 'Last intraday finalize',
+              value: provider.lastSuccessfulIntradayAt
                 ? formatDateTime(provider.lastSuccessfulIntradayAt)
-                : 'never'}
-            </p>
-          </div>
-          <div>
-            <p className="text-muted-foreground text-xs">Last validation</p>
-            <p>
-              {provider.lastSuccessfulValidationAt
+                : 'Never',
+            },
+            {
+              label: 'Last validation',
+              value: provider.lastSuccessfulValidationAt
                 ? formatDateTime(provider.lastSuccessfulValidationAt)
-                : 'never'}
-            </p>
-          </div>
-          <div>
-            <p className="text-muted-foreground text-xs">Raw payloads</p>
-            <p>{provider.payloadCount} rows</p>
-          </div>
-        </CardContent>
-      </Card>
+                : 'Never',
+            },
+            {
+              label: 'Raw payloads',
+              value: `${formatNumber(Number(provider.payloadCount))} rows`,
+            },
+          ]}
+        />
+      </SectionCard>
 
-      <Card className="border-primary/20 bg-primary/5 mt-4">
-        <CardContent className="text-muted-foreground p-4 text-sm">
+      <div className="border-primary/20 bg-primary/5 mt-4 rounded-xl border px-4 py-3 text-sm">
+        <p className="text-muted-foreground">
           <span className="text-foreground font-medium">Guardrail:</span> trading mode, risk limits
-          and strategy parameters are not editable here. They live in{' '}
-          <code className="bg-background rounded px-1 py-0.5">configuration_versions</code> so every
-          signal can point at the exact snapshot it used.
-        </CardContent>
-      </Card>
+          and strategy parameters are not editable here. They live in configuration versions so
+          every signal can point at the exact snapshot it used.
+        </p>
+      </div>
 
-      <div className="mt-4 space-y-3">
-        {settings.length === 0 ? (
-          <EmptyState
-            title="No settings"
-            description="Run the seed to create the default system settings."
-          />
-        ) : (
-          settings.map((setting) => (
-            <Card key={setting.key} className="border-border/70 bg-card/60">
-              <CardHeader>
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <CardTitle className="font-mono text-sm">{setting.key}</CardTitle>
-                    <CardDescription>{setting.description ?? 'No description'}</CardDescription>
-                  </div>
-                  <Badge variant="outline" className="text-[10px]">
-                    updated {formatDateTime(setting.updatedAt)}
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <form
+      {settings.length === 0 ? (
+        <EmptyState
+          className="mt-4"
+          title="No settings"
+          description="Run the seed to create the default system settings."
+        />
+      ) : (
+        <div className="mt-4 space-y-3">
+          {settings.map((setting) => (
+            <SectionCard
+              key={setting.key}
+              title={formatSettingKey(setting.key)}
+              description={
+                <>
+                  {setting.description ?? 'No description'}
+                  <span className="text-muted-foreground ml-2 font-mono text-[10px]">
+                    {setting.key}
+                  </span>
+                </>
+              }
+              actions={
+                <FormDialog
+                  trigger={
+                    <Button type="button" size="sm" variant="outline">
+                      <PencilLine className="size-4" />
+                      Edit
+                    </Button>
+                  }
+                  title={formatSettingKey(setting.key)}
+                  description="Changes are validated as JSON, written once and audited."
+                  submitLabel="Save"
                   action={updateSettingAction}
-                  className="grid gap-3 sm:grid-cols-[1fr_1.4fr_auto]"
                 >
                   <input type="hidden" name="key" value={setting.key} />
-                  <div className="space-y-1.5">
-                    <Label htmlFor={`value-${setting.key}`}>Value (JSON)</Label>
+                  <FormField label="Value (JSON)" htmlFor={`value-${setting.key}`}>
                     <Input
                       id={`value-${setting.key}`}
                       name="value"
@@ -140,26 +113,29 @@ export default async function SettingsPage({
                       className="font-mono text-xs"
                       required
                     />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor={`description-${setting.key}`}>Description</Label>
+                  </FormField>
+                  <FormField label="Description" htmlFor={`description-${setting.key}`}>
                     <Input
                       id={`description-${setting.key}`}
                       name="description"
                       defaultValue={setting.description ?? ''}
                     />
-                  </div>
-                  <div className="flex items-end">
-                    <Button type="submit" variant="outline">
-                      Save
-                    </Button>
-                  </div>
-                </form>
-              </CardContent>
-            </Card>
-          ))
-        )}
-      </div>
+                  </FormField>
+                </FormDialog>
+              }
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <code className="bg-muted/40 rounded-md px-2 py-1 font-mono text-xs">
+                  {JSON.stringify(setting.value)}
+                </code>
+                <Badge variant="outline" className="text-[10px]">
+                  Updated {formatDateTime(setting.updatedAt)}
+                </Badge>
+              </div>
+            </SectionCard>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

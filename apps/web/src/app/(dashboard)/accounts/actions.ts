@@ -1,8 +1,16 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { apiFetch } from '@/lib/api';
+import { redirect } from 'next/navigation';
+import { apiErrorMessage, apiFetch } from '@/lib/api';
 import { formString } from '@/lib/form';
+
+function accountsPath(accountId: string, flag: string, value: string): string {
+  const query = new URLSearchParams();
+  if (accountId) query.set('account', accountId);
+  query.set(flag, value);
+  return `/accounts?${query.toString()}`;
+}
 
 export async function rotateCredentialAction(formData: FormData): Promise<void> {
   const accountId = formString(formData, 'accountId', '');
@@ -12,18 +20,25 @@ export async function rotateCredentialAction(formData: FormData): Promise<void> 
   const expiresAt = formString(formData, 'expiresAt', '');
 
   if (!accountId || !providerId || !credentialType || !value) {
-    throw new Error('Account, provider, credential type and value are required');
+    redirect(
+      accountsPath(accountId, 'error', 'Account, provider, credential type and value are required'),
+    );
   }
 
-  await apiFetch(`/accounts/${accountId}/credentials`, {
-    method: 'POST',
-    body: JSON.stringify({
-      providerId,
-      credentialType,
-      value,
-      ...(expiresAt ? { expiresAt: new Date(expiresAt).toISOString() } : {}),
-    }),
-  });
+  try {
+    await apiFetch(`/accounts/${accountId}/credentials`, {
+      method: 'POST',
+      body: JSON.stringify({
+        providerId,
+        credentialType,
+        value,
+        ...(expiresAt ? { expiresAt: new Date(expiresAt).toISOString() } : {}),
+      }),
+    });
+  } catch (error) {
+    redirect(accountsPath(accountId, 'error', apiErrorMessage(error)));
+  }
 
   revalidatePath('/accounts');
+  redirect(accountsPath(accountId, 'credentialSaved', '1'));
 }

@@ -33,7 +33,7 @@ export function statusTone(status: string): string {
     case 'Complete':
       return 'border-success/30 bg-success/10 text-success';
     case 'Gaps · reconciled':
-      return 'border-warning/30 bg-warning/10 text-warning';
+      return 'border-warning/30 bg-warning/10 text-warning-strong';
     case 'Verifying':
     case 'Fetching':
     case 'Queued':
@@ -45,7 +45,7 @@ export function statusTone(status: string): string {
     case 'Gaps · mismatch':
       return 'border-destructive/30 bg-destructive/10 text-destructive';
     case 'Stale':
-      return 'border-warning/30 bg-warning/10 text-warning';
+      return 'border-warning/30 bg-warning/10 text-warning-strong';
     default:
       return 'border-muted/30 bg-muted/10 text-muted-foreground';
   }

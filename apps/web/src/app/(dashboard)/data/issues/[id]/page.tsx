@@ -1,152 +1,148 @@
 import Link from 'next/link';
+import { PencilLine } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import type { QualityIssue } from '@/lib/types';
 import { formatDateTime } from '@/lib/format';
-import { PageHeader } from '@/components/dashboard/page-header';
+import { label } from '@/lib/labels';
+import { PageMeta } from '@/components/shell/page-meta';
+import { SectionCard } from '@/components/dashboard/section-card';
+import { DetailHeader } from '@/components/dashboard/detail-header';
 import { StatusBadge } from '@/components/dashboard/status-badge';
 import { JsonBlock } from '@/components/dashboard/json-block';
+import { KeyValueGrid } from '@/components/dashboard/key-value-grid';
+import { FormDialog } from '@/components/dashboard/form-dialog';
+import { FormField, FormSelect } from '@/components/dashboard/form-field';
 import { Button, buttonVariants } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { acknowledgeIssueAction } from '../../actions';
 
-export default async function IssueDetailPage({
-  params,
-  searchParams,
-}: {
-  params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string; ack?: string }>;
-}) {
+export default async function IssueDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const query = await searchParams;
   const issue = await apiFetch<QualityIssue>(`/data/quality-issues/${id}`);
 
   return (
     <div>
-      <PageHeader
-        title={`${issue.ruleId ?? issue.issueType} · issue detail`}
-        description="Rule, severity, evidence and lifecycle. A critical issue blocks the backtest preflight until it is resolved or waived."
-      />
+      <PageMeta title={`${label(issue.issueType)} · issue detail`} />
 
-      {query.error ? (
-        <div className="border-destructive/30 bg-destructive/10 text-destructive mb-4 rounded-lg border px-4 py-3 text-sm">
-          {query.error}
-        </div>
-      ) : null}
-      {query.ack ? (
-        <div className="border-primary/30 bg-primary/10 text-primary mb-4 rounded-lg border px-4 py-3 text-sm">
-          Issue updated and audited.
-        </div>
-      ) : null}
-
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <StatusBadge status={issue.severity} />
-        <StatusBadge status={issue.status} />
-        <span className="text-muted-foreground text-xs">
-          {issue.symbol ?? 'provider-wide'} · {issue.tradingDate ?? 'no date'} · seen{' '}
-          {issue.occurrenceCount}×
-        </span>
-        <div className="ml-auto flex gap-2">
-          <Link href="/data" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
-            Data health
-          </Link>
-          {issue.instrumentId ? (
-            <Link
-              href={`/instruments/${issue.instrumentId}`}
-              className={buttonVariants({ variant: 'outline', size: 'sm' })}
-            >
-              Instrument
+      <DetailHeader
+        badges={
+          <>
+            <StatusBadge status={issue.severity} />
+            <StatusBadge status={issue.status} />
+          </>
+        }
+        meta={`${issue.symbol ?? 'Provider-wide'} · ${issue.tradingDate ?? 'No date'} · seen ${issue.occurrenceCount}×`}
+        actions={
+          <>
+            <Link href="/data" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+              Data health
             </Link>
-          ) : null}
-        </div>
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-2">
-        <Card className="border-border/70 bg-card/60">
-          <CardHeader>
-            <CardTitle>Finding</CardTitle>
-            <CardDescription>
-              {issue.issueType.replaceAll('_', ' ')} · detected by {issue.detectedBy}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            <p>
-              <span className="text-muted-foreground">Rule:</span> {issue.ruleId ?? '—'}
-            </p>
-            <p>
-              <span className="text-muted-foreground">Window:</span>{' '}
-              {issue.windowStart ? formatDateTime(issue.windowStart) : '—'} →{' '}
-              {issue.windowEnd ? formatDateTime(issue.windowEnd) : '—'}
-            </p>
-            <p>
-              <span className="text-muted-foreground">First seen:</span>{' '}
-              {formatDateTime(issue.detectedAt)}
-            </p>
-            <p>
-              <span className="text-muted-foreground">Last seen:</span>{' '}
-              {formatDateTime(issue.lastSeenAt)}
-            </p>
-            <p>
-              <span className="text-muted-foreground">Dedupe key:</span>{' '}
-              <span className="break-all font-mono text-xs">{issue.dedupeKey ?? '—'}</span>
-            </p>
-            {issue.resolutionNote ? (
-              <p>
-                <span className="text-muted-foreground">Resolution:</span> {issue.resolutionNote}
-              </p>
+            {issue.instrumentId ? (
+              <Link
+                href={`/instruments/${issue.instrumentId}`}
+                className={buttonVariants({ variant: 'outline', size: 'sm' })}
+              >
+                Instrument
+              </Link>
             ) : null}
-          </CardContent>
-        </Card>
-
-        <Card className="border-border/70 bg-card/60">
-          <CardHeader>
-            <CardTitle>Lifecycle</CardTitle>
-            <CardDescription>
-              Acknowledgement records ownership. Resolving or ignoring requires a note and is
-              audited.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form action={acknowledgeIssueAction} className="space-y-3">
+            <FormDialog
+              trigger={
+                <Button type="button" size="sm" variant="outline">
+                  <PencilLine className="size-4" />
+                  Update issue
+                </Button>
+              }
+              title="Update issue lifecycle"
+              description="Acknowledgement records ownership. Resolving or ignoring requires a note and is audited."
+              submitLabel="Update issue"
+              action={acknowledgeIssueAction}
+            >
               <input type="hidden" name="issueId" value={issue.id} />
               <input type="hidden" name="returnTo" value={`/data/issues/${issue.id}`} />
-              <div className="space-y-1.5">
-                <Label htmlFor="status">Status</Label>
-                <select
+              <FormField label="Status" htmlFor="status">
+                <FormSelect
                   id="status"
                   name="status"
                   defaultValue="acknowledged"
-                  className="border-input h-9 w-full rounded-md border bg-transparent px-3 text-sm"
-                >
-                  <option value="acknowledged">acknowledge</option>
-                  <option value="resolved">resolve</option>
-                  <option value="ignored">ignore</option>
-                </select>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="note">Note</Label>
-                <Input id="note" name="note" placeholder="Required for resolved or ignored" />
-              </div>
-              <Button type="submit" variant="outline">
-                Update issue
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+                  options={[
+                    { value: 'acknowledged', label: 'Acknowledge' },
+                    { value: 'resolved', label: 'Resolve' },
+                    { value: 'ignored', label: 'Ignore' },
+                  ]}
+                />
+              </FormField>
+              <FormField label="Note" htmlFor="note" hint="Required when resolving or ignoring.">
+                <Input id="note" name="note" placeholder="What changed?" />
+              </FormField>
+            </FormDialog>
+          </>
+        }
+      />
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <SectionCard
+          title="Finding"
+          description={`${label(issue.issueType)} · detected by ${label(issue.detectedBy)}`}
+        >
+          <KeyValueGrid
+            columns={2}
+            items={[
+              { label: 'Rule', value: issue.ruleId ?? '—' },
+              { label: 'Issue type', value: label(issue.issueType) },
+              {
+                label: 'Window',
+                value: `${issue.windowStart ? formatDateTime(issue.windowStart) : '—'} → ${
+                  issue.windowEnd ? formatDateTime(issue.windowEnd) : '—'
+                }`,
+              },
+              { label: 'First seen', value: formatDateTime(issue.detectedAt) },
+              { label: 'Last seen', value: formatDateTime(issue.lastSeenAt) },
+              {
+                label: 'Dedupe key',
+                value: (
+                  <span className="break-all font-mono text-xs">{issue.dedupeKey ?? '—'}</span>
+                ),
+              },
+            ]}
+          />
+        </SectionCard>
+
+        <SectionCard
+          title="Lifecycle"
+          description="Acknowledgement records ownership. Resolving or ignoring requires a note and is audited."
+        >
+          <KeyValueGrid
+            columns={2}
+            items={[
+              {
+                label: 'Acknowledged by',
+                value: issue.acknowledgedBy ?? 'Not acknowledged',
+              },
+              {
+                label: 'Acknowledged at',
+                value: issue.acknowledgedAt ? formatDateTime(issue.acknowledgedAt) : '—',
+              },
+              { label: 'Resolved by', value: issue.resolvedBy ?? 'Not resolved' },
+              {
+                label: 'Resolved at',
+                value: issue.resolvedAt ? formatDateTime(issue.resolvedAt) : '—',
+              },
+              {
+                label: 'Resolution note',
+                value: issue.resolutionNote ?? '—',
+              },
+            ]}
+          />
+        </SectionCard>
       </div>
 
-      <Card className="border-border/70 bg-card/60 mt-4">
-        <CardHeader>
-          <CardTitle>Evidence</CardTitle>
-          <CardDescription>
-            Raw payload and run lineage are retained; the issue never edits a candle.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <JsonBlock value={issue.details} />
-        </CardContent>
-      </Card>
+      <SectionCard
+        className="mt-4"
+        title="Evidence"
+        description="Raw payload and run lineage are retained; the issue never edits a candle."
+      >
+        <JsonBlock value={issue.details} />
+      </SectionCard>
     </div>
   );
 }

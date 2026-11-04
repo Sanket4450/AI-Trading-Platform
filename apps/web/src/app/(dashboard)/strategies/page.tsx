@@ -1,17 +1,24 @@
+import { Suspense } from 'react';
 import Link from 'next/link';
+import { Plus } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import type { Strategy, StrategyDetail } from '@/lib/types';
 import { formatDate, formatNumber } from '@/lib/format';
-import { PageHeader } from '@/components/dashboard/page-header';
-import { StatCard } from '@/components/dashboard/stat-card';
+import { label } from '@/lib/labels';
+import { StatCard, StatGrid } from '@/components/dashboard/stat-card';
+import { SectionCard } from '@/components/dashboard/section-card';
+import { DetailHeader } from '@/components/dashboard/detail-header';
+import { DetailSkeleton } from '@/components/dashboard/skeletons';
+import { SelectPrompt } from '@/components/dashboard/select-prompt';
+import { FormDialog } from '@/components/dashboard/form-dialog';
+import { FormField } from '@/components/dashboard/form-field';
 import { StatusBadge } from '@/components/dashboard/status-badge';
 import { EmptyState } from '@/components/dashboard/empty-state';
 import { JsonBlock } from '@/components/dashboard/json-block';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Table,
   TableBody,
@@ -44,17 +51,17 @@ export default async function StrategiesPage({
 }) {
   const params = await searchParams;
   const strategies = await apiFetch<Strategy[]>('/strategies');
-  const selectedId = params.strategy ?? strategies[0]?.id;
-  const detail = selectedId ? await apiFetch<StrategyDetail>(`/strategies/${selectedId}`) : null;
+  const selected = params.strategy
+    ? (strategies.find((strategy) => strategy.id === params.strategy) ?? null)
+    : null;
+
+  if (strategies.length === 0) {
+    return <EmptyState title="No strategies" description="Run the seed to create orb-15m." />;
+  }
 
   return (
     <div>
-      <PageHeader
-        title="Strategies"
-        description="Registry, immutable code versions, bound configuration snapshots, tradable universe and activations."
-      />
-
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <StatGrid>
         <StatCard
           label="Strategies"
           value={formatNumber(strategies.length)}
@@ -63,242 +70,272 @@ export default async function StrategiesPage({
         />
         <StatCard
           label="Versions"
-          value={formatNumber(detail?.versions.length ?? 0)}
+          value={selected ? formatNumber(selected.versionCount) : '—'}
           hint="Immutable code releases"
           tone="info"
         />
         <StatCard
-          label="Universe members"
-          value={formatNumber(detail?.versions[0]?.members.length ?? 0)}
-          hint="Latest version"
-          tone="highlight"
-        />
-        <StatCard
           label="Active activations"
-          value={formatNumber(detail?.activeActivations ?? 0)}
-          hint="None in R1"
+          value={selected ? formatNumber(selected.activeActivations) : '—'}
+          hint="None while research-only"
           tone="warning"
         />
-      </div>
+        <StatCard
+          label="Universes"
+          value={selected ? formatNumber(selected.universeCount) : '—'}
+          hint="Bound membership sets"
+          tone="highlight"
+        />
+      </StatGrid>
 
-      <Card className="border-border/70 bg-card/60 mt-6">
-        <CardHeader>
-          <CardTitle>Strategy registry</CardTitle>
-          <CardDescription>Select a strategy to inspect its versions and bindings.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {strategies.length === 0 ? (
-            <EmptyState title="No strategies" description="Run the seed to create orb-15m." />
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Code</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Latest version</TableHead>
-                  <TableHead>Versions</TableHead>
-                  <TableHead>Universe</TableHead>
-                  <TableHead>Activations</TableHead>
-                  <TableHead />
+      <SectionCard
+        className="mt-4"
+        title="Strategy registry"
+        description="Select a strategy to load its versions, bindings and activations."
+      >
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Code</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Latest version</TableHead>
+              <TableHead>Versions</TableHead>
+              <TableHead>Universes</TableHead>
+              <TableHead>Activations</TableHead>
+              <TableHead />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {strategies.map((strategy) => {
+              const isSelected = selected?.id === strategy.id;
+              return (
+                <TableRow key={strategy.id} data-state={isSelected ? 'selected' : undefined}>
+                  <TableCell>
+                    <p className="font-medium">{strategy.code}</p>
+                    <p className="text-muted-foreground text-xs">{strategy.name}</p>
+                  </TableCell>
+                  <TableCell>
+                    <StatusBadge status={strategy.status} />
+                  </TableCell>
+                  <TableCell>
+                    {strategy.latestVersion ? (
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline">v{strategy.latestVersion}</Badge>
+                        <span className="text-muted-foreground text-xs">
+                          {label(strategy.latestVersionStatus)}
+                        </span>
+                      </div>
+                    ) : (
+                      '—'
+                    )}
+                  </TableCell>
+                  <TableCell>{strategy.versionCount}</TableCell>
+                  <TableCell>{strategy.universeCount}</TableCell>
+                  <TableCell>{strategy.activeActivations}</TableCell>
+                  <TableCell className="text-right">
+                    <Link
+                      href={`/strategies?strategy=${strategy.id}`}
+                      className={buttonVariants({
+                        variant: isSelected ? 'secondary' : 'outline',
+                        size: 'sm',
+                      })}
+                    >
+                      {isSelected ? 'Inspecting' : 'Inspect'}
+                    </Link>
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {strategies.map((strategy) => (
-                  <TableRow key={strategy.id}>
-                    <TableCell>
-                      <p className="font-medium">{strategy.code}</p>
-                      <p className="text-muted-foreground text-xs">{strategy.name}</p>
-                    </TableCell>
-                    <TableCell>
-                      <StatusBadge status={strategy.status} />
-                    </TableCell>
-                    <TableCell>
-                      {strategy.latestVersion ? (
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline">v{strategy.latestVersion}</Badge>
-                          <span className="text-muted-foreground text-xs">
-                            {strategy.latestVersionStatus}
-                          </span>
-                        </div>
-                      ) : (
-                        '—'
-                      )}
-                    </TableCell>
-                    <TableCell>{strategy.versionCount}</TableCell>
-                    <TableCell>{strategy.universeCount}</TableCell>
-                    <TableCell>{strategy.activeActivations}</TableCell>
-                    <TableCell className="text-right">
-                      <Link
-                        href={`/strategies?strategy=${strategy.id}`}
-                        className={buttonVariants({ variant: 'outline', size: 'sm' })}
-                      >
-                        Inspect
-                      </Link>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </SectionCard>
 
-      {detail ? (
+      {selected ? (
+        <Suspense key={selected.id} fallback={<DetailSkeleton blocks={2} className="mt-4" />}>
+          <StrategyDetailPanel strategy={selected} />
+        </Suspense>
+      ) : (
+        <SelectPrompt
+          className="mt-4"
+          title="Select a strategy to inspect"
+          description="Versions, configuration bindings and activations load only after a strategy is selected."
+        />
+      )}
+    </div>
+  );
+}
+
+async function StrategyDetailPanel({ strategy }: { strategy: Strategy }) {
+  const detail = await apiFetch<StrategyDetail>(`/strategies/${strategy.id}`);
+
+  return (
+    <div>
+      <DetailHeader
+        className="mt-4"
+        badges={
+          <>
+            <Badge variant="outline">{detail.code}</Badge>
+            <StatusBadge status={detail.status} />
+          </>
+        }
+        meta={`${detail.versions.length} versions · ${detail.universeCount} universes`}
+        actions={
+          <FormDialog
+            trigger={
+              <Button type="button" size="sm" variant="outline">
+                <Plus className="size-4" />
+                New draft version
+              </Button>
+            }
+            title="Create a draft version"
+            description="Draft versions are insert-only. Bind a configuration snapshot after validation."
+            submitLabel="Create draft"
+            action={createStrategyVersionAction}
+            className="sm:max-w-2xl"
+          >
+            <input type="hidden" name="strategyId" value={detail.id} />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <FormField label="Code reference" htmlFor="codeRef">
+                <Input
+                  id="codeRef"
+                  name="codeRef"
+                  placeholder="Git commit or package version"
+                  required
+                />
+              </FormField>
+              <FormField label="Changelog" htmlFor="changelog">
+                <Input id="changelog" name="changelog" placeholder="What changed?" />
+              </FormField>
+            </div>
+            <FormField label="Parameter schema (JSON Schema)" htmlFor="parameterSchema">
+              <Textarea
+                id="parameterSchema"
+                name="parameterSchema"
+                defaultValue={defaultSchema}
+                rows={12}
+                className="font-mono text-xs leading-5"
+                required
+              />
+            </FormField>
+          </FormDialog>
+        }
+      />
+
+      <SectionCard title={detail.name} description={detail.description ?? 'No description'}>
+        <div className="text-muted-foreground text-sm">
+          {detail.latestVersion ? `Latest version v${detail.latestVersion}` : 'No released version'}{' '}
+          · {detail.versions.length} immutable versions · {detail.activeActivations} active
+          activations
+        </div>
+      </SectionCard>
+
+      {detail.versions.length === 0 ? (
+        <EmptyState
+          className="mt-4"
+          title="No versions"
+          description="Create the first draft version from the header."
+        />
+      ) : (
         <div className="mt-4 space-y-4">
-          <Card className="border-border/70 bg-card/60">
-            <CardHeader>
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <CardTitle>{detail.code}</CardTitle>
-                  <CardDescription>{detail.description}</CardDescription>
-                </div>
-                <StatusBadge status={detail.status} />
-              </div>
-            </CardHeader>
-          </Card>
-
           {detail.versions.map((version) => (
-            <Card key={version.id} className="border-border/70 bg-card/60">
-              <CardHeader>
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <CardTitle>Version {version.version}</CardTitle>
-                    <CardDescription>
-                      {version.codeRef} · released {formatDate(version.releasedAt)} ·{' '}
-                      {version.members.length} universe members
-                    </CardDescription>
-                  </div>
-                  <StatusBadge status={version.status} />
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-5">
-                <div>
-                  <h3 className="mb-2 text-sm font-medium">Configuration bindings</h3>
-                  {version.bindings.length === 0 ? (
-                    <EmptyState
-                      title="No bindings"
-                      description="Bind a parameters and risk snapshot."
-                    />
-                  ) : (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Role</TableHead>
-                          <TableHead>Configuration</TableHead>
-                          <TableHead>Version</TableHead>
-                          <TableHead>Hash</TableHead>
-                          <TableHead>Effective</TableHead>
+            <SectionCard
+              key={version.id}
+              title={`Version ${version.version}`}
+              description={`${version.codeRef} · released ${formatDate(version.releasedAt)} · ${version.members.length} universe members`}
+              actions={<StatusBadge status={version.status} />}
+              contentClassName="space-y-5"
+            >
+              <div>
+                <h3 className="mb-2 text-sm font-medium">Configuration bindings</h3>
+                {version.bindings.length === 0 ? (
+                  <EmptyState
+                    title="No bindings"
+                    description="Bind a parameters and risk snapshot."
+                  />
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Role</TableHead>
+                        <TableHead>Configuration</TableHead>
+                        <TableHead>Version</TableHead>
+                        <TableHead>Hash</TableHead>
+                        <TableHead>Effective</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {version.bindings.map((binding) => (
+                        <TableRow key={binding.id}>
+                          <TableCell>
+                            <Badge variant="outline">{label(binding.role)}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            {label(binding.configType)} / {binding.scopeKey}
+                          </TableCell>
+                          <TableCell>v{binding.configVersion}</TableCell>
+                          <TableCell className="text-muted-foreground max-w-48 truncate font-mono text-xs">
+                            {binding.payloadHash}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {formatDate(binding.effectiveFrom)}
+                          </TableCell>
                         </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {version.bindings.map((binding) => (
-                          <TableRow key={binding.id}>
-                            <TableCell>
-                              <Badge variant="outline">{binding.role}</Badge>
-                            </TableCell>
-                            <TableCell>
-                              {binding.configType} / {binding.scopeKey}
-                            </TableCell>
-                            <TableCell>v{binding.configVersion}</TableCell>
-                            <TableCell className="text-muted-foreground max-w-48 truncate font-mono text-xs">
-                              {binding.payloadHash}
-                            </TableCell>
-                            <TableCell className="text-muted-foreground">
-                              {formatDate(binding.effectiveFrom)}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  )}
-                </div>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </div>
 
-                <div>
-                  <h3 className="mb-2 text-sm font-medium">Tradable universe</h3>
+              <div>
+                <h3 className="mb-2 text-sm font-medium">Tradable universe</h3>
+                {version.members.length === 0 ? (
+                  <p className="text-muted-foreground text-sm">
+                    No instruments bound to this version.
+                  </p>
+                ) : (
                   <div className="flex flex-wrap gap-1.5">
                     {version.members.map((member) => (
-                      <Badge key={member.id} variant="outline" className="font-mono text-[10px]">
+                      <Badge key={member.id} variant="outline" className="text-[10px]">
                         {member.rank}. {member.symbol}
                       </Badge>
                     ))}
                   </div>
-                </div>
+                )}
+              </div>
 
-                <div className="grid gap-4 lg:grid-cols-2">
-                  <div>
-                    <h3 className="mb-2 text-sm font-medium">Activations</h3>
-                    {version.activations.length === 0 ? (
-                      <EmptyState
-                        title="No activations"
-                        description="R1 does not activate a live strategy."
-                      />
-                    ) : (
-                      <div className="space-y-2">
-                        {version.activations.map((activation) => (
-                          <div
-                            key={activation.id}
-                            className="border-border/70 bg-background/40 flex items-center justify-between rounded-lg border px-3 py-2"
-                          >
-                            <span className="text-sm">
-                              {activation.accountCode} · {activation.mode}
-                            </span>
-                            <StatusBadge status={activation.status} />
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <h3 className="mb-2 text-sm font-medium">Parameter schema</h3>
-                    <JsonBlock value={version.parameterSchema} />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-
-          <Card className="border-border/70 bg-card/60">
-            <CardHeader>
-              <CardTitle>Create a draft version</CardTitle>
-              <CardDescription>
-                Draft versions are insert-only. Bind a configuration snapshot after validation.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form action={createStrategyVersionAction} className="space-y-3">
-                <input type="hidden" name="strategyId" value={detail.id} />
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="codeRef">Code reference</Label>
-                    <Input
-                      id="codeRef"
-                      name="codeRef"
-                      placeholder="git commit or package version"
-                      required
+              <div className="grid gap-4 lg:grid-cols-2">
+                <div>
+                  <h3 className="mb-2 text-sm font-medium">Activations</h3>
+                  {version.activations.length === 0 ? (
+                    <EmptyState
+                      title="No activations"
+                      description="R2 does not activate a live strategy."
                     />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="changelog">Changelog</Label>
-                    <Input id="changelog" name="changelog" placeholder="What changed?" />
-                  </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {version.activations.map((activation) => (
+                        <div
+                          key={activation.id}
+                          className="border-border/70 bg-background/40 flex items-center justify-between rounded-lg border px-3 py-2"
+                        >
+                          <span className="text-sm">
+                            {activation.accountCode} · {label(activation.mode)}
+                          </span>
+                          <StatusBadge status={activation.status} />
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="parameterSchema">Parameter schema (JSON Schema)</Label>
-                  <textarea
-                    id="parameterSchema"
-                    name="parameterSchema"
-                    defaultValue={defaultSchema}
-                    rows={14}
-                    className="border-input w-full rounded-md border bg-transparent px-3 py-2 font-mono text-xs leading-5"
-                    required
-                  />
+                <div>
+                  <h3 className="mb-2 text-sm font-medium">Parameter schema</h3>
+                  <JsonBlock value={version.parameterSchema} />
                 </div>
-                <Button type="submit">Create draft</Button>
-              </form>
-            </CardContent>
-          </Card>
+              </div>
+            </SectionCard>
+          ))}
         </div>
-      ) : null}
+      )}
     </div>
   );
 }
