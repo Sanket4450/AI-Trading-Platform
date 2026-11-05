@@ -39,6 +39,16 @@ Current release is **R2**: research data platform. It cannot place orders.
 - Prefer clear names and small functions. Comment only the module/function objective or a
   non-obvious invariant, usually one or two lines. Do not narrate code or restate types.
 
+### Keep Swagger in sync
+
+- Every new or changed endpoint must update Swagger in the same change: request DTOs get
+  `@ApiProperty`, responses get a response DTO plus `@ApiOkResponse`/`@ApiCreatedResponse`, and
+  path/query params get `@ApiParam`/`@ApiQuery`.
+- The Swagger CLI plugin is not configured, so DTO properties are not inferred; add decorators
+  explicitly.
+- Protected controllers use `@ApiSessionAuth()`; only routes marked `@Public()` (currently
+  `GET /health` and `POST /auth/login`) may omit it.
+
 ## Repo shape
 
 - **16 Nx projects**: 3 apps (`web`, `api`, `worker`), 12 `packages/*`, and `tests`.
