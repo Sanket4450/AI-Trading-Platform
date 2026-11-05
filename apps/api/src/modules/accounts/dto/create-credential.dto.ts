@@ -1,3 +1,4 @@
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsIn,
   IsISO8601,
@@ -16,16 +17,24 @@ export const credentialTypes = [
 ] as const;
 
 export class CreateCredentialDto {
+  @ApiProperty({ format: 'uuid' })
   @IsUUID()
   providerId!: string;
 
+  @ApiProperty({ enum: [...credentialTypes] })
   @IsIn(credentialTypes)
   credentialType!: (typeof credentialTypes)[number];
 
+  @ApiProperty({
+    minLength: 1,
+    format: 'password',
+    description: 'Plaintext value; encrypted before persistence.',
+  })
   @IsString()
   @MinLength(1)
   value!: string;
 
+  @ApiPropertyOptional({ type: String, format: 'date-time' })
   @IsOptional()
   @IsISO8601()
   expiresAt?: string;
