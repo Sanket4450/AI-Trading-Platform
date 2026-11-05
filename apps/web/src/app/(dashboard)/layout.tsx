@@ -18,6 +18,6 @@ export default async function DashboardLayout({ children }: { children: React.Re
     if (error instanceof UnauthorizedError) {
       redirect('/api/auth/session-expired');
     }
-    redirect('/api/auth/session-expired?reason=api');
+    redirect('/service-unavailable');
   }
 }

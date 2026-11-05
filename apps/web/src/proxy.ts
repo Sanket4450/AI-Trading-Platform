@@ -6,6 +6,11 @@ export function proxy(request: NextRequest) {
   const token = request.cookies.get(SESSION_COOKIE)?.value;
   const { pathname, search } = request.nextUrl;
 
+  // The API is unreachable here, so this page must render without a session check.
+  if (pathname === '/service-unavailable') {
+    return NextResponse.next();
+  }
+
   if (pathname === '/login') {
     if (token) return NextResponse.redirect(new URL('/', request.url));
     return NextResponse.next();
