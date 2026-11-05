@@ -17,8 +17,8 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsup index.ts --format esm,cjs --dts --clean --sourcemap",
-    "dev": "tsup index.ts --format esm,cjs --dts --watch --sourcemap",
+    "build": "tsup index.ts --format esm,cjs --clean --sourcemap && tsc -p tsconfig.dts.json",
+    "dev": "tsc -w -p tsconfig.dts.json & tsup index.ts --format esm,cjs --watch --sourcemap",
     "typecheck": "tsc --noEmit",
     "lint": "oxlint --type-aware .",
     "test": "vitest run --passWithNoTests"
