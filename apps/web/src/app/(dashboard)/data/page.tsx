@@ -19,6 +19,7 @@ import { JsonBlock } from '@/components/dashboard/json-block';
 import { KeyValueGrid } from '@/components/dashboard/key-value-grid';
 import { AutoRefresh } from '@/components/dashboard/auto-refresh';
 import { FormDialog } from '@/components/dashboard/form-dialog';
+import { SubmitButton } from '@/components/dashboard/submit-button';
 import { FormField, FormSelect } from '@/components/dashboard/form-field';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
@@ -132,19 +133,19 @@ export default async function DataPage() {
         actions={
           <>
             <form action={syncInstrumentsAction}>
-              <Button type="submit" size="sm" variant="outline">
+              <SubmitButton size="sm" variant="outline" pendingLabel="Syncing…">
                 Sync instruments
-              </Button>
+              </SubmitButton>
             </form>
             <form action={syncCalendarAction}>
-              <Button type="submit" size="sm" variant="outline">
+              <SubmitButton size="sm" variant="outline" pendingLabel="Reconciling…">
                 Reconcile calendar
-              </Button>
+              </SubmitButton>
             </form>
             <form action={refreshMaterializedViewAction}>
-              <Button type="submit" size="sm" variant="outline">
+              <SubmitButton size="sm" variant="outline" pendingLabel="Refreshing…">
                 Refresh daily stats
-              </Button>
+              </SubmitButton>
             </form>
           </>
         }

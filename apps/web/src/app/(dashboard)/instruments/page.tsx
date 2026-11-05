@@ -1,7 +1,6 @@
 import Link from 'next/link';
-import { CalendarClock } from 'lucide-react';
-import { apiErrorMessage, apiFetch } from '@/lib/api';
-import type { BackfillPreview, InstrumentStatusRow } from '@/lib/types';
+import { apiFetch } from '@/lib/api';
+import type { InstrumentStatusRow } from '@/lib/types';
 import { formatDateTime, formatNumber } from '@/lib/format';
 import { label } from '@/lib/labels';
 import { displayStatus, statusTone } from '@/lib/status';
@@ -9,9 +8,8 @@ import { StatCard, StatGrid } from '@/components/dashboard/stat-card';
 import { SectionCard } from '@/components/dashboard/section-card';
 import { StatusBadge } from '@/components/dashboard/status-badge';
 import { EmptyState } from '@/components/dashboard/empty-state';
-import { KeyValueGrid } from '@/components/dashboard/key-value-grid';
 import { AutoRefresh } from '@/components/dashboard/auto-refresh';
-import { MountToast } from '@/components/dashboard/action-toast';
+import { SubmitButton } from '@/components/dashboard/submit-button';
 import {
   FilterField,
   FilterReset,
@@ -19,7 +17,7 @@ import {
   TableFilters,
 } from '@/components/dashboard/table-filters';
 import { Badge } from '@/components/ui/badge';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
   Table,
@@ -35,10 +33,6 @@ type SearchParams = Promise<{
   universeCode?: string;
   dataStatus?: string;
   search?: string;
-  preview?: string;
-  mode?: string;
-  from?: string;
-  to?: string;
 }>;
 
 const dataStatuses = [
@@ -65,29 +59,6 @@ export default async function InstrumentsPage({ searchParams }: { searchParams: 
     ),
   ]);
 
-  let preview: BackfillPreview | null = null;
-  let previewError: string | null = null;
-  if (params.preview === '1') {
-    try {
-      const response = await apiFetch<{ dryRun: true; preview: BackfillPreview }>(
-        '/data/instruments/fetch',
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            universeCode,
-            mode: params.mode ?? 'missing_only',
-            from: params.from || undefined,
-            to: params.to || undefined,
-            dryRun: true,
-          }),
-        },
-      );
-      preview = response.preview;
-    } catch (error) {
-      previewError = apiErrorMessage(error, 'Preview failed');
-    }
-  }
-
   const active = rows.some(
     (row) =>
       row.fetchStatus === 'queued' ||
@@ -99,7 +70,6 @@ export default async function InstrumentsPage({ searchParams }: { searchParams: 
   return (
     <div>
       <AutoRefresh active={active} />
-      {previewError ? <MountToast type="error" message={previewError} /> : null}
 
       <StatGrid>
         <StatCard
@@ -128,57 +98,12 @@ export default async function InstrumentsPage({ searchParams }: { searchParams: 
         />
       </StatGrid>
 
-      {preview ? (
-        <SectionCard
-          className="border-primary/25 bg-primary/5 mt-4"
-          title="Preview · nothing queued yet"
-          description={
-            <>
-              {preview.resolved} resolved of {preview.instrumentCount} · {preview.sessionCount}{' '}
-              sessions · {preview.requestCount} requests · {preview.skippedMonths} months skipped as
-              complete
-            </>
-          }
-        >
-          <KeyValueGrid
-            columns={4}
-            items={[
-              { label: 'Window', value: `${preview.from} → ${preview.to}` },
-              { label: 'Months', value: formatNumber(preview.monthCount) },
-              { label: 'Estimated bars', value: formatNumber(preview.estimatedBars) },
-              { label: 'Estimated bytes', value: formatNumber(preview.estimatedBytes) },
-            ]}
-          />
-          {preview.blocked.length > 0 ? (
-            <div className="border-destructive/30 bg-destructive/10 text-destructive mt-3 rounded-lg border px-3 py-2 text-sm">
-              Blocked by missing mapping: {preview.blocked.map((row) => row.symbol).join(', ')}
-            </div>
-          ) : null}
-          <form action={fetchInstrumentsAction} className="mt-3 flex flex-wrap items-center gap-2">
-            <input type="hidden" name="universeCode" value={universeCode} />
-            <input type="hidden" name="mode" value={params.mode ?? 'missing_only'} />
-            <input type="hidden" name="from" value={params.from ?? ''} />
-            <input type="hidden" name="to" value={params.to ?? ''} />
-            <input type="hidden" name="returnTo" value="/instruments" />
-            {(params.mode ?? 'missing_only') === 'force' ? (
-              <Input
-                name="reason"
-                placeholder="Reason for force refresh"
-                required
-                className="max-w-sm"
-              />
-            ) : null}
-            <Button type="submit">Confirm and launch</Button>
-          </form>
-        </SectionCard>
-      ) : null}
-
       <SectionCard
         className="mt-4"
         title="Ranked members"
         description={`${rows.length} rows · target window and both status axes are persisted by the worker.`}
         toolbar={
-          <TableFilters>
+          <TableFilters className="items-end">
             <input type="hidden" name="universeCode" value={universeCode} />
             <FilterField label="Search" htmlFor="search">
               <Input
@@ -206,32 +131,6 @@ export default async function InstrumentsPage({ searchParams }: { searchParams: 
               <FilterReset href={`/instruments?universeCode=${encodeURIComponent(universeCode)}`} />
             ) : null}
           </TableFilters>
-        }
-        actions={
-          <form method="get" action="/instruments" className="flex flex-nowrap items-center gap-2">
-            <input type="hidden" name="universeCode" value={universeCode} />
-            <input type="hidden" name="preview" value="1" />
-            <input type="hidden" name="from" value={params.from ?? ''} />
-            <input type="hidden" name="to" value={params.to ?? ''} />
-            <input type="hidden" name="search" value={params.search ?? ''} />
-            <input type="hidden" name="dataStatus" value={params.dataStatus ?? ''} />
-            <FilterField label="Fetch mode" htmlFor="mode">
-              <FilterSelect
-                id="mode"
-                name="mode"
-                defaultValue={params.mode ?? 'missing_only'}
-                className="w-36"
-                options={[
-                  { value: 'missing_only', label: 'Missing only' },
-                  { value: 'force', label: 'Force refresh' },
-                ]}
-              />
-            </FilterField>
-            <Button type="submit" size="sm" variant="outline">
-              <CalendarClock className="size-4" />
-              Preview fetch
-            </Button>
-          </form>
         }
       >
         {rows.length === 0 ? (
@@ -311,18 +210,26 @@ export default async function InstrumentsPage({ searchParams }: { searchParams: 
                             <form action={retryInstrumentAction}>
                               <input type="hidden" name="instrumentId" value={row.instrumentId} />
                               <input type="hidden" name="returnTo" value="/instruments" />
-                              <Button type="submit" size="sm" variant="outline">
+                              <SubmitButton
+                                size="sm"
+                                variant="outline"
+                                pendingLabel="Retrying…"
+                              >
                                 Retry
-                              </Button>
+                              </SubmitButton>
                             </form>
                           ) : null}
                           {row.fetchStatus === 'queued' || row.fetchStatus === 'fetching' ? (
                             <form action={cancelInstrumentAction}>
                               <input type="hidden" name="instrumentId" value={row.instrumentId} />
                               <input type="hidden" name="returnTo" value="/instruments" />
-                              <Button type="submit" size="sm" variant="outline">
+                              <SubmitButton
+                                size="sm"
+                                variant="outline"
+                                pendingLabel="Cancelling…"
+                              >
                                 Cancel
-                              </Button>
+                              </SubmitButton>
                             </form>
                           ) : null}
                           {row.fetchStatus !== 'queued' && row.fetchStatus !== 'fetching' ? (
@@ -330,11 +237,18 @@ export default async function InstrumentsPage({ searchParams }: { searchParams: 
                               <input type="hidden" name="instrumentIds" value={row.instrumentId} />
                               <input type="hidden" name="mode" value="missing_only" />
                               <input type="hidden" name="returnTo" value="/instruments" />
-                              <Button type="submit" size="sm">
+                              <SubmitButton
+                                size="sm"
+                                pendingLabel={
+                                  row.fetchStatus === 'not_requested' || !row.fetchStatus
+                                    ? 'Fetching…'
+                                    : 'Refreshing…'
+                                }
+                              >
                                 {row.fetchStatus === 'not_requested' || !row.fetchStatus
                                   ? 'Fetch'
                                   : 'Refresh'}
-                              </Button>
+                              </SubmitButton>
                             </form>
                           ) : null}
                         </div>

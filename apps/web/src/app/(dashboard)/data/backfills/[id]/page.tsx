@@ -9,7 +9,8 @@ import { DetailHeader } from '@/components/dashboard/detail-header';
 import { StatusBadge } from '@/components/dashboard/status-badge';
 import { EmptyState } from '@/components/dashboard/empty-state';
 import { AutoRefresh } from '@/components/dashboard/auto-refresh';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { SubmitButton } from '@/components/dashboard/submit-button';
+import { buttonVariants } from '@/components/ui/button';
 import {
   Table,
   TableBody,
@@ -42,17 +43,17 @@ export default async function BackfillDetailPage({ params }: { params: Promise<{
               <form action={cancelPlanAction}>
                 <input type="hidden" name="planId" value={plan.id} />
                 <input type="hidden" name="returnTo" value={`/data/backfills/${plan.id}`} />
-                <Button type="submit" size="sm" variant="outline">
+                <SubmitButton size="sm" variant="outline" pendingLabel="Cancelling…">
                   Cancel plan
-                </Button>
+                </SubmitButton>
               </form>
             ) : (
               <form action={retryPlanAction}>
                 <input type="hidden" name="planId" value={plan.id} />
                 <input type="hidden" name="returnTo" value={`/data/backfills/${plan.id}`} />
-                <Button type="submit" size="sm" variant="outline">
+                <SubmitButton size="sm" variant="outline" pendingLabel="Retrying…">
                   Retry failed
-                </Button>
+                </SubmitButton>
               </form>
             )}
           </>

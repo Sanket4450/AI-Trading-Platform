@@ -11,8 +11,9 @@ import { DetailHeader } from '@/components/dashboard/detail-header';
 import { StatusBadge } from '@/components/dashboard/status-badge';
 import { EmptyState } from '@/components/dashboard/empty-state';
 import { JsonBlock } from '@/components/dashboard/json-block';
+import { SubmitButton } from '@/components/dashboard/submit-button';
 import { Badge } from '@/components/ui/badge';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { buttonVariants } from '@/components/ui/button';
 import {
   Table,
   TableBody,
@@ -71,9 +72,9 @@ export default async function InstrumentDetailPage({
             <form action={recomputeStatusAction}>
               <input type="hidden" name="instrumentId" value={detail.instrumentId} />
               <input type="hidden" name="returnTo" value={`/instruments/${detail.instrumentId}`} />
-              <Button type="submit" size="sm" variant="outline">
+              <SubmitButton size="sm" variant="outline" pendingLabel="Recomputing…">
                 Recompute
-              </Button>
+              </SubmitButton>
             </form>
             {detail.fetchStatus === 'failed' || detail.fetchStatus === 'partial' ? (
               <form action={retryInstrumentAction}>
@@ -83,9 +84,9 @@ export default async function InstrumentDetailPage({
                   name="returnTo"
                   value={`/instruments/${detail.instrumentId}`}
                 />
-                <Button type="submit" size="sm" variant="outline">
+                <SubmitButton size="sm" variant="outline" pendingLabel="Retrying…">
                   Retry failed months
-                </Button>
+                </SubmitButton>
               </form>
             ) : null}
             {detail.fetchStatus === 'queued' || detail.fetchStatus === 'fetching' ? (
@@ -96,9 +97,9 @@ export default async function InstrumentDetailPage({
                   name="returnTo"
                   value={`/instruments/${detail.instrumentId}`}
                 />
-                <Button type="submit" size="sm" variant="outline">
+                <SubmitButton size="sm" variant="outline" pendingLabel="Cancelling…">
                   Cancel
-                </Button>
+                </SubmitButton>
               </form>
             ) : (
               <form action={fetchInstrumentsAction}>
@@ -109,9 +110,9 @@ export default async function InstrumentDetailPage({
                   name="returnTo"
                   value={`/instruments/${detail.instrumentId}`}
                 />
-                <Button type="submit" size="sm">
+                <SubmitButton size="sm" pendingLabel="Refreshing…">
                   Refresh missing months
-                </Button>
+                </SubmitButton>
               </form>
             )}
           </>
