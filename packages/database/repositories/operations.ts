@@ -126,7 +126,7 @@ export async function getSystemStatus() {
     .where(
       sql`${systemHealthSnapshots.capturedAt} = (
         select max(s2.captured_at) from system_health_snapshots s2
-        where s2.component = ${systemHealthSnapshots.component}
+        where s2.component = "system_health_snapshots"."component"
       )`,
     )
     .orderBy(asc(systemHealthSnapshots.component));

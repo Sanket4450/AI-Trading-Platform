@@ -58,7 +58,7 @@ export async function listInstruments(filters: {
       delistedOn: instruments.delistedOn,
       mappingCount: sql<number>`(
         select count(*)::int from instrument_provider_mappings m
-        where m.instrument_id = ${instruments.id}
+        where m.instrument_id = "instruments"."id"
       )`,
     })
     .from(instruments)
@@ -762,7 +762,7 @@ export async function listUniverseCatalog(filters: {
       computedAt: instrumentDataStatus.computedAt,
       mappingCount: sql<number>`(
         select count(*)::int from instrument_provider_mappings m
-        where m.instrument_id = ${instruments.id} and m.is_primary
+        where m.instrument_id = "instruments"."id" and m.is_primary
       )`,
     })
     .from(instrumentUniverses)
@@ -811,7 +811,7 @@ export async function getInstrumentStatusDetail(instrumentId: string) {
       computedAt: instrumentDataStatus.computedAt,
       mappingCount: sql<number>`(
         select count(*)::int from instrument_provider_mappings m
-        where m.instrument_id = ${instruments.id} and m.is_primary
+        where m.instrument_id = "instruments"."id" and m.is_primary
       )`,
     })
     .from(instruments)
@@ -1306,7 +1306,7 @@ export async function getInstrumentsByIds(ids: string[]) {
       isActive: instruments.isActive,
       externalKey: sql<string | null>`(
         select m.external_key from instrument_provider_mappings m
-        where m.instrument_id = ${instruments.id} and m.is_primary
+        where m.instrument_id = "instruments"."id" and m.is_primary
         order by m.valid_from desc limit 1
       )`,
     })

@@ -231,6 +231,26 @@ describe('R2 database lifecycle', () => {
     ]);
   });
 
+  it('resolves the primary provider external key for backfill planning', async () => {
+    const { getInstrumentsByIds, getUniverseMembersForBackfill } = await import(
+      '../../packages/database/index.js'
+    );
+    const members = await getUniverseMembersForBackfill('nifty-50');
+    expect(members).toHaveLength(51);
+    expect(members.every((member) => member.externalKey)).toBe(true);
+
+    const [reliance] = await sql<{ id: string }[]>`
+      select id from instruments where trading_symbol = 'RELIANCE' limit 1
+    `;
+    const [mapping] = await sql<{ external_key: string }[]>`
+      select external_key from instrument_provider_mappings
+      where instrument_id = ${reliance.id} and is_primary
+      limit 1
+    `;
+    const [instrument] = await getInstrumentsByIds([reliance.id]);
+    expect(instrument?.externalKey).toBe(mapping.external_key);
+  });
+
   it('covers every calendar date from 2022 through 2027', async () => {
     const [calendar] = await sql<{ days: number }[]>`
       select count(distinct tc.trading_date)::int as days

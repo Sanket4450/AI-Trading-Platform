@@ -204,7 +204,7 @@ export async function getBackfillPlanDetail(id: string) {
         select m.rank from instrument_universe_members m
         join instrument_universe_versions v on v.id = m.universe_version_id
         join instrument_universes u on u.id = v.universe_id
-        where m.instrument_id = ${marketDataIngestionRuns.instrumentId}
+        where m.instrument_id = "market_data_ingestion_runs"."instrument_id"
           and u.code = 'nifty-50'
           and v.effective_to is null
         limit 1
@@ -871,7 +871,7 @@ export async function getUniverseMembersForBackfill(universeCode = 'nifty-50') {
       isActive: instruments.isActive,
       externalKey: sql<string | null>`(
         select m.external_key from instrument_provider_mappings m
-        where m.instrument_id = ${instruments.id} and m.is_primary
+        where m.instrument_id = "instruments"."id" and m.is_primary
         order by m.valid_from desc limit 1
       )`,
     })
