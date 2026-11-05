@@ -39,6 +39,11 @@ const routes: Record<string, RouteMeta> = {
     description:
       'Data coverage, download runs, validation results and the quality issues that need attention.',
   },
+  '/processes': {
+    title: 'Processes',
+    description:
+      'Every scheduled and operator-triggered process with its stage, timestamped timeline and important figures.',
+  },
   '/audit': {
     title: 'Audit',
     description:
@@ -58,6 +63,14 @@ const detailRoutes: Array<{ prefix: string; meta: RouteMeta }> = [
       title: 'Instrument detail',
       description:
         'Symbol profile, fetch window, ingestion runs, provider mappings and outstanding data issues.',
+    },
+  },
+  {
+    prefix: '/processes/',
+    meta: {
+      title: 'Process detail',
+      description:
+        'Stage rail, timestamped steps, important figures and the payload or result of a single process run.',
     },
   },
   {

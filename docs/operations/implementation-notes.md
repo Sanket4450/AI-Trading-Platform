@@ -198,7 +198,7 @@ modular monolith or the R1 lifecycle tables.
 
 ### Database
 
-- **60 logical tables.** `0008_r2_ingestion_quality.sql` adds orchestration counters to
+- **60 logical tables at the end of 0008.** `0008_r2_ingestion_quality.sql` adds orchestration counters to
   `market_data_ingestion_runs`, gap/validation fields to `market_data_coverage`, dedupe and lifecycle
   fields to `data_quality_issues`, a unique raw-payload key, `instrument_data_status` and
   `market_data_daily_validation`.
@@ -207,7 +207,10 @@ modular monolith or the R1 lifecycle tables.
 - The seed creates the `nifty-50` universe with rank 1 = NIFTY 50 index, ranks 2–51 in reviewed
   display order, one status row per member, a 2022–2027 NSE calendar, corrected tick sizes and a
   research-mode account/system setting.
-- `pnpm db:verify` asserts 60 tables, the R2 tables and indexes, 51 ranked members, 51 status rows,
+- `0009_process_tracking.sql` adds stage columns to `job_runs` and the append-only
+  `job_run_events` stream behind `/processes`. Every worker job now records start, stage, step,
+  metric and terminal events with timestamps. The database ends at 61 logical tables.
+- `pnpm db:verify` asserts 61 tables, the R2 tables and indexes, 51 ranked members, 51 status rows,
   51 primary mappings, valid tick sizes, calendar coverage and zero orders.
 
 ### Provider and pipeline
@@ -253,7 +256,7 @@ pnpm nx run-many -t test -p domain configuration market-data adapters api worker
 ```
 
 The external PostgreSQL migration 0008 applied successfully, the R2 seed completed and `db:verify`
-reported 60 logical tables, 1 materialized view, 63 candle partitions, 15 quote partitions, 51
+reported 61 logical tables, 1 materialized view, 63 candle partitions, 15 quote partitions, 51
 nifty-50 members with status rows and primary mappings, 2191 calendar days and zero orders.
 
 ### Live read-only checks (2026-10-27)

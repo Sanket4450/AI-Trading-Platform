@@ -9,6 +9,7 @@
 
 import { sql } from 'drizzle-orm';
 import {
+  bigint,
   check,
   date,
   index,
@@ -16,6 +17,7 @@ import {
   jsonb,
   numeric,
   pgTable,
+  smallint,
   text,
   timestamp,
   uniqueIndex,
@@ -111,12 +113,20 @@ export const jobRuns = pgTable(
     result: jsonb('result'),
     errorMessage: text('error_message'),
     correlationId: uuid('correlation_id'),
+    currentStage: varchar('current_stage', { length: 60 }),
+    stageKeys: jsonb('stage_keys')
+      .default(sql`'[]'::jsonb`)
+      .notNull(),
+    stageTotal: smallint('stage_total'),
+    durationMs: integer('duration_ms'),
+    summary: text('summary'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     index('idx_job_runs_job_name').on(table.jobName),
     index('idx_job_runs_scheduled_for').on(table.scheduledFor),
     index('idx_job_runs_correlation_id').on(table.correlationId),
+    index('idx_job_runs_created').on(table.createdAt),
     check(
       'chk_job_runs_job_type_1',
       sql`${table.jobType} in ('ingestion', 'backtest', 'analytics', 'reconciliation', 'square_off', 'report', 'maintenance', 'credential_refresh')`,
@@ -130,6 +140,36 @@ export const jobRuns = pgTable(
       sql`${table.finishedAt} is null or ${table.startedAt} is null or ${table.finishedAt} >= ${table.startedAt}`,
     ),
     check('chk_job_runs_attempt_4', sql`${table.attempt} >= 0`),
+    check('chk_job_runs_duration', sql`${table.durationMs} is null or ${table.durationMs} >= 0`),
+    check('chk_job_runs_stage_total', sql`${table.stageTotal} is null or ${table.stageTotal} >= 0`),
+  ],
+);
+
+export const jobRunEvents = pgTable(
+  'job_run_events',
+  {
+    id: bigint('id', { mode: 'number' }).primaryKey().generatedByDefaultAsIdentity(),
+    jobRunId: uuid('job_run_id').notNull(),
+    occurredAt: timestamp('occurred_at', { withTimezone: true }).defaultNow().notNull(),
+    kind: varchar('kind', { length: 16 }).notNull(),
+    level: varchar('level', { length: 8 }).default('info').notNull(),
+    stageKey: varchar('stage_key', { length: 60 }),
+    message: text('message'),
+    data: jsonb('data')
+      .default(sql`'{}'::jsonb`)
+      .notNull(),
+    metricKey: varchar('metric_key', { length: 50 }),
+    metricValue: numeric('metric_value', { precision: 20, scale: 4 }),
+    metricUnit: varchar('metric_unit', { length: 16 }),
+  },
+  (table) => [
+    index('idx_job_run_events_run').on(table.jobRunId, table.id),
+    index('idx_job_run_events_time').on(table.occurredAt),
+    check(
+      'chk_job_run_events_kind',
+      sql`${table.kind} in ('lifecycle', 'stage', 'step', 'metric', 'warning', 'error')`,
+    ),
+    check('chk_job_run_events_level', sql`${table.level} in ('debug', 'info', 'warn', 'error')`),
   ],
 );
 

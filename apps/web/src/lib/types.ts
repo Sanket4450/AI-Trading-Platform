@@ -377,6 +377,76 @@ export interface JobRun {
   createdAt: string;
 }
 
+export interface ProcessSummary {
+  running: number;
+  failed24h: number;
+  succeeded24h: number;
+  p95DurationMs: number;
+}
+
+export interface ProcessRun {
+  id: string;
+  jobName: string;
+  queueName: string;
+  jobType: string;
+  status: string;
+  scheduledFor: string | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+  attempt: number;
+  maxAttempts: number;
+  payload?: Record<string, unknown>;
+  result?: Record<string, unknown> | null;
+  errorMessage: string | null;
+  correlationId: string | null;
+  currentStage: string | null;
+  stageKeys: string[];
+  stageTotal: number | null;
+  durationMs: number | null;
+  summary: string | null;
+  createdAt: string;
+}
+
+export interface ProcessListResponse {
+  summary: ProcessSummary;
+  items: ProcessRun[];
+}
+
+export interface ProcessStage {
+  key: string;
+  status: string;
+  enteredAt: string | null;
+  completedAt: string | null;
+  durationMs: number | null;
+}
+
+export interface ProcessMetric {
+  key: string;
+  value: number | null;
+  unit: string | null;
+  at: string;
+}
+
+export interface ProcessEvent {
+  id: number;
+  occurredAt: string;
+  kind: string;
+  level: string;
+  stageKey: string | null;
+  message: string | null;
+  data: Record<string, unknown>;
+  metricKey: string | null;
+  metricValue: number | null;
+  metricUnit: string | null;
+}
+
+export interface ProcessDetail {
+  run: ProcessRun;
+  stages: ProcessStage[];
+  metrics: ProcessMetric[];
+  events: ProcessEvent[];
+}
+
 export interface HealthCheck {
   status: 'healthy' | 'unhealthy';
   latencyMs: number | null;

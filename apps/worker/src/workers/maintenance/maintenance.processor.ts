@@ -6,10 +6,19 @@ import {
   refreshDailyStats,
   updateJobRun,
 } from '@ai-trading/database';
+import { ProcessTrackingService } from '../../observability/process-tracking.service.js';
 
 @Processor(QUEUES.maintenance)
 export class MaintenanceProcessor extends WorkerHost {
-  async process(job: Job): Promise<unknown> {
+  constructor(private readonly tracking: ProcessTrackingService) {
+    super();
+  }
+
+  process(job: Job): Promise<unknown> {
+    return this.tracking.run(job, () => this.execute(job));
+  }
+
+  private async execute(job: Job): Promise<unknown> {
     const jobRunId = String((job.data as Record<string, unknown>).jobRunId);
     await updateJobRun(jobRunId, {
       status: 'running',

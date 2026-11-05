@@ -44,6 +44,7 @@ import {
   upsertQualityIssue,
   writeCandles,
 } from '@ai-trading/database';
+import { ProcessTrackingService } from '../../observability/process-tracking.service.js';
 import { QualityService } from './quality.service.js';
 import { RedisRateLimiter } from './rate-limit.service.js';
 
@@ -68,6 +69,7 @@ export class IngestionService {
     private readonly config: ConfigService,
     private readonly limiter: RedisRateLimiter,
     private readonly quality: QualityService,
+    private readonly tracking: ProcessTrackingService,
   ) {}
 
   private client(): UpstoxClient {
@@ -156,6 +158,7 @@ export class IngestionService {
       startedAt: new Date(),
       attempt: 1,
     });
+    this.tracking.enterStage(childJobRunId, 'prepare');
     const client = this.client();
     const reason = client.configurationReason();
     if (reason) {
@@ -204,7 +207,14 @@ export class IngestionService {
     let cancelled = false;
     let lastRunId: string | null = null;
 
+    this.tracking.completeStage(childJobRunId, 'prepare');
+    this.tracking.enterStage(childJobRunId, 'chunks');
+
     for (const chunk of chunks) {
+      this.tracking.step(childJobRunId, `Chunk ${chunk.index + 1}/${chunks.length}`, {
+        from: chunk.from,
+        to: chunk.to,
+      });
       if (await this.isCancelled(parentJobRunId, childJobRunId)) {
         cancelled = true;
         break;
@@ -338,8 +348,22 @@ export class IngestionService {
         this.logger.warn(
           `Chunk failed for ${instrumentId} ${chunk.from}..${chunk.to}: ${classification.message}`,
         );
+        this.tracking.warn(childJobRunId, `Chunk failed: ${classification.message}`, {
+          chunkIndex: chunk.index,
+          from: chunk.from,
+          to: chunk.to,
+        });
       }
     }
+
+    this.tracking.metric(childJobRunId, 'chunks_total', chunks.length);
+    this.tracking.metric(childJobRunId, 'rows_fetched', fetched);
+    this.tracking.metric(childJobRunId, 'rows_written', written);
+    this.tracking.metric(childJobRunId, 'rows_rejected', rejected);
+    this.tracking.metric(childJobRunId, 'chunks_skipped', skippedChunks);
+    this.tracking.metric(childJobRunId, 'chunks_failed', failedChunks);
+    this.tracking.completeStage(childJobRunId, 'chunks');
+    this.tracking.enterStage(childJobRunId, 'close');
 
     await this.quality.recomputeCoverage(instrumentId, from, to);
     if (lastRunId) {
@@ -375,6 +399,7 @@ export class IngestionService {
       errorMessage: failedChunks > 0 ? `${failedChunks} chunk(s) failed` : null,
     });
     await this.maybeCloseParent(parentJobRunId);
+    this.tracking.completeStage(childJobRunId, 'close');
     return result;
   }
 

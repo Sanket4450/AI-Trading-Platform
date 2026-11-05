@@ -100,7 +100,7 @@ pnpm build
 pnpm db:verify
 ```
 
-`pnpm db:verify` expects 60 logical tables, the R2 tables and indexes, 51 nifty-50 members with status
+`pnpm db:verify` expects 61 logical tables, the R2 tables and indexes, 51 nifty-50 members with status
 rows and primary mappings, a 2022–2027 calendar, valid tick sizes and zero orders.
 
 The daily-versus-minute volume tolerance defaults to 2% (`0.02`) provisionally. A live RELIANCE

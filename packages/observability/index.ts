@@ -1,5 +1,15 @@
 /**
  * @ai-trading/observability
- * Public entry point. Keep framework-specific code out of this package.
+ * Structured process journal primitives. Framework-specific wiring lives in the apps.
  */
-export {};
+export { ProcessTracker } from './process-tracker.js';
+export type {
+  ProcessBeginInput,
+  ProcessEventInput,
+  ProcessEventKind,
+  ProcessEventLevel,
+  ProcessFinishInput,
+  ProcessStageStatus,
+  ProcessStore,
+  ProcessTrackerOptions,
+} from './types.js';
