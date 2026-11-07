@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Database, Upload } from 'lucide-react';
+import { Upload } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import type {
   BackfillPlan,
@@ -21,6 +21,11 @@ import { AutoRefresh } from '@/components/dashboard/auto-refresh';
 import { FormDialog } from '@/components/dashboard/form-dialog';
 import { SubmitButton } from '@/components/dashboard/submit-button';
 import { FormField, FormSelect } from '@/components/dashboard/form-field';
+import {
+  TableActionLink,
+  TableActions,
+  TableRefreshButton,
+} from '@/components/dashboard/table-actions';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,12 +39,11 @@ import {
 } from '@/components/ui/table';
 import {
   acknowledgeIssueAction,
-  backfillAction,
   importCorporateActionsAction,
   refreshMaterializedViewAction,
   syncCalendarAction,
   syncInstrumentsAction,
-} from './actions';
+} from '../actions';
 
 function isoDaysAgo(days: number): string {
   const date = new Date();
@@ -371,6 +375,7 @@ export default async function DataPage() {
         <SectionCard
           title="Ingestion runs"
           description="Every provider fetch, including skipped and failed runs."
+          actions={<TableRefreshButton />}
         >
           {ingestionRuns.length === 0 ? (
             <EmptyState title="No ingestion runs" description="Trigger a backfill to create one." />
@@ -384,6 +389,7 @@ export default async function DataPage() {
                     <TableHead>Window</TableHead>
                     <TableHead>Rows</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -398,10 +404,11 @@ export default async function DataPage() {
                         {run.rowsFetched}/{run.rowsWritten}/{run.rowsRejected}
                       </TableCell>
                       <TableCell>
-                        <Link href={`/data/runs/${run.id}`}>
-                          <StatusBadge status={run.status} />
-                        </Link>
+                        <StatusBadge status={run.status} />
                       </TableCell>
+                      <TableActions>
+                        <TableActionLink href={`/data/runs/${run.id}`} label="View ingestion run" />
+                      </TableActions>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -462,42 +469,6 @@ export default async function DataPage() {
         </SectionCard>
       </div>
 
-      <SectionCard
-        className="mt-4"
-        title="Bounded single-instrument repair"
-        description="Legacy 31-day repair endpoint. The instrument catalog is the normal entry point."
-        actions={
-          <FormDialog
-            trigger={
-              <Button type="button" size="sm" variant="outline">
-                <Database className="size-4" />
-                Queue repair
-              </Button>
-            }
-            title="Queue a single-instrument repair"
-            description="Bounded to the provider's documented window and the configured daily limit."
-            submitLabel="Queue repair"
-            action={backfillAction}
-          >
-            <FormField label="Instrument ID" htmlFor="repair-instrumentId">
-              <Input id="repair-instrumentId" name="instrumentId" placeholder="UUID" required />
-            </FormField>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <FormField label="From" htmlFor="repair-from">
-                <Input id="repair-from" name="from" type="date" min="2022-01-01" required />
-              </FormField>
-              <FormField label="To" htmlFor="repair-to">
-                <Input id="repair-to" name="to" type="date" min="2022-01-01" required />
-              </FormField>
-            </div>
-          </FormDialog>
-        }
-      >
-        <p className="text-muted-foreground text-sm">
-          Use the instrument catalog for normal repairs. This bounded endpoint exists for a single
-          instrument and a short window.
-        </p>
-      </SectionCard>
     </div>
   );
 }

@@ -21,8 +21,8 @@ import type { CreateCredentialDto } from './dto/create-credential.dto.js';
 export class AccountsService {
   constructor(private readonly encryption: CredentialEncryptionService) {}
 
-  list() {
-    return listAccounts();
+  list(search?: string) {
+    return listAccounts(search);
   }
 
   async permissions(accountId: string) {

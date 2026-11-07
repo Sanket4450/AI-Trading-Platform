@@ -5,96 +5,105 @@ export interface RouteMeta {
 
 const routes: Record<string, RouteMeta> = {
   '/': {
-    title: 'System overview',
+    title: 'Overview',
     description:
-      'Trading mode, component health, data coverage and the most recent system activity at a glance.',
+      'Trading mode, system health, data coverage and recent activity at a glance.',
   },
   '/accounts': {
     title: 'Accounts',
-    description:
-      'Broker accounts with equity snapshots, instrument permissions, session history and encrypted credentials.',
+    description: 'Broker accounts, their equity, tradable instruments and trading sessions.',
   },
   '/instruments': {
-    title: 'Instrument catalog',
+    title: 'Instruments',
     description:
-      'The canonical cash-equity catalog, ranked NIFTY 50 membership and provider mappings for every instrument.',
+      'Browse NSE cash equities, check NIFTY 50 membership and download missing data.',
   },
   '/universes': {
     title: 'Universes',
-    description:
-      'Curated instrument universes, their versioned membership snapshots and the strategies that use them.',
+    description: 'Reusable instrument groups with versioned membership and strategy links.',
   },
   '/strategies': {
     title: 'Strategies',
     description:
-      'Registered strategies, their versioned parameter sets, active bindings and promotion state.',
-  },
-  '/configuration': {
-    title: 'Configuration',
-    description:
-      'Immutable configuration snapshots with canonical hashes, effective dates and change history.',
+      'Registered strategies with their versions, parameter bindings and activation state.',
   },
   '/data': {
     title: 'Data health',
     description:
-      'Data coverage, download runs, validation results and the quality issues that need attention.',
+      'Coverage, downloads, validation results and the data issues that need attention.',
   },
   '/jobs': {
     title: 'Jobs',
-    description:
-      'Every scheduled and operator-triggered job with its stage, timestamped timeline and important figures.',
+    description: 'Scheduled and manual jobs with progress, timing and outcomes.',
   },
   '/audit': {
     title: 'Audit',
-    description:
-      'An append-only record of security, configuration and operational actions across the system.',
+    description: 'A permanent history of sign-ins, configuration changes and system actions.',
   },
   '/settings': {
     title: 'Settings',
-    description:
-      'Non-trading system preferences such as refresh behaviour, defaults and operator notifications.',
+    description: 'System preferences, configuration history and provider connection details.',
   },
 };
 
 const detailRoutes: Array<{ prefix: string; meta: RouteMeta }> = [
   {
+    prefix: '/accounts/',
+    meta: {
+      title: 'Account',
+      description:
+        'Account details, tradable instruments, equity snapshots and recent trading sessions.',
+    },
+  },
+  {
     prefix: '/instruments/',
     meta: {
-      title: 'Instrument detail',
+      title: 'Instrument',
       description:
-        'Symbol profile, fetch window, ingestion runs, provider mappings and outstanding data issues.',
+        'Download coverage, run history, provider mappings and data issues for this instrument.',
+    },
+  },
+  {
+    prefix: '/universes/',
+    meta: {
+      title: 'Universe',
+      description: 'Version history and current members of this universe.',
+    },
+  },
+  {
+    prefix: '/strategies/',
+    meta: {
+      title: 'Strategy',
+      description:
+        'Versions, parameter bindings, member universes and activation state for this strategy.',
     },
   },
   {
     prefix: '/jobs/',
     meta: {
-      title: 'Job detail',
-      description:
-        'Stage rail, timestamped steps, important figures and the payload or result of a single job run.',
+      title: 'Job',
+      description: 'Progress, timing and details for this job run.',
     },
   },
   {
     prefix: '/data/backfills/',
     meta: {
       title: 'Backfill plan',
-      description:
-        'Parent backfill plan, per-instrument jobs, monthly chunks and retry or cancel controls.',
+      description: 'Progress of this download plan across instruments and monthly chunks.',
     },
   },
   {
     prefix: '/data/runs/',
     meta: {
       title: 'Ingestion run',
-      description:
-        'Single ingestion request with provider, counts, duration, status and the archived raw payload.',
+      description: 'Counts, timing and the archived provider payload for this download.',
     },
   },
   {
     prefix: '/data/issues/',
     meta: {
       title: 'Quality issue',
-      description:
-        'Quality rule violation with severity, evidence, affected dates and its resolution lifecycle.',
+      description: 'What was detected, the affected dates and the resolution history.',
     },
   },
   {
@@ -102,7 +111,7 @@ const detailRoutes: Array<{ prefix: string; meta: RouteMeta }> = [
     meta: {
       title: 'Coverage day',
       description:
-        'Stored minute bars against expected bars for this day, with gaps and the daily validation oracle.',
+        'How many minute bars were stored versus expected for this day, with gaps highlighted.',
     },
   },
 ];

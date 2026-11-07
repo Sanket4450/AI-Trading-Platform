@@ -9,6 +9,11 @@ import { StatCard, StatGrid } from '@/components/dashboard/stat-card';
 import { SectionCard } from '@/components/dashboard/section-card';
 import { StatusBadge } from '@/components/dashboard/status-badge';
 import { EmptyState } from '@/components/dashboard/empty-state';
+import {
+  TableActionLink,
+  TableActions,
+  TableRefreshButton,
+} from '@/components/dashboard/table-actions';
 import { buttonVariants } from '@/components/ui/button';
 import {
   Table,
@@ -113,6 +118,7 @@ export default async function OverviewPage() {
               <ArrowUpRight className="size-4" />
             </Link>
           }
+          actions={<TableRefreshButton />}
         >
           {overview.recentJobs.length === 0 ? (
             <EmptyState
@@ -127,6 +133,7 @@ export default async function OverviewPage() {
                   <TableHead>Status</TableHead>
                   <TableHead>Started</TableHead>
                   <TableHead>Finished</TableHead>
+                  <TableHead />
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -145,6 +152,9 @@ export default async function OverviewPage() {
                     <TableCell className="text-muted-foreground">
                       {formatDateTime(job.finishedAt)}
                     </TableCell>
+                    <TableActions>
+                      <TableActionLink href={`/jobs/${job.id}`} label="View job" />
+                    </TableActions>
                   </TableRow>
                 ))}
               </TableBody>

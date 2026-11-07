@@ -12,8 +12,8 @@ import type { RequestMeta } from '../../common/http/request-meta.js';
 
 @Injectable()
 export class StrategiesService {
-  list() {
-    return listStrategies();
+  list(search?: string) {
+    return listStrategies(search);
   }
 
   async detail(id: string) {

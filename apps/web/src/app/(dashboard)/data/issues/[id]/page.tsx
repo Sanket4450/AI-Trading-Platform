@@ -22,7 +22,10 @@ export default async function IssueDetailPage({ params }: { params: Promise<{ id
 
   return (
     <div>
-      <PageMeta title={`${label(issue.issueType)} · issue detail`} />
+      <PageMeta
+        title={`${issue.symbol ?? 'Provider-wide'} · Data issue`}
+        description="What was detected, the affected dates and the resolution history."
+      />
 
       <DetailHeader
         badges={

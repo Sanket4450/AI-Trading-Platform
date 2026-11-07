@@ -1,14 +1,22 @@
-import Link from 'next/link';
 import { apiFetch } from '@/lib/api';
 import type { JobListResponse, JobRun } from '@/lib/types';
 import { formatDateTime, formatDuration, formatNumber } from '@/lib/format';
 import { label } from '@/lib/labels';
-import { StatCard, StatGrid } from '@/components/dashboard/stat-card';
-import { SectionCard } from '@/components/dashboard/section-card';
+import { TableCard } from '@/components/dashboard/table-card';
+import { TableSummary } from '@/components/dashboard/table-summary';
 import { StatusBadge } from '@/components/dashboard/status-badge';
 import { EmptyState } from '@/components/dashboard/empty-state';
 import { AutoRefresh } from '@/components/dashboard/auto-refresh';
-import { buttonVariants } from '@/components/ui/button';
+import {
+  MultiSelectFilter,
+  SearchFilter,
+  TableFilters,
+} from '@/components/dashboard/table-filters';
+import {
+  TableActionLink,
+  TableActions,
+  TableRefreshButton,
+} from '@/components/dashboard/table-actions';
 import {
   Table,
   TableBody,
@@ -20,11 +28,13 @@ import {
 
 const ACTIVE_STATUSES = new Set(['queued', 'running', 'retrying']);
 
-const STATUS_FILTERS = [
-  { value: '', label: 'All' },
+const STATUS_OPTIONS = [
+  { value: 'queued', label: 'Queued' },
   { value: 'running', label: 'Running' },
-  { value: 'failed', label: 'Failed' },
+  { value: 'retrying', label: 'Retrying' },
   { value: 'succeeded', label: 'Succeeded' },
+  { value: 'failed', label: 'Failed' },
+  { value: 'cancelled', label: 'Cancelled' },
 ] as const;
 
 function durationOf(run: JobRun): number | null {
@@ -44,76 +54,89 @@ function stageProgress(run: JobRun): string {
 export default async function JobsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{ status?: string | string[]; search?: string }>;
 }) {
   const params = await searchParams;
+  const statuses = params.status
+    ? Array.isArray(params.status)
+      ? params.status
+      : [params.status]
+    : [];
   const query = new URLSearchParams();
-  if (params.status) query.set('status', params.status);
+  for (const status of statuses) query.append('status', status);
+  if (params.search) query.set('search', params.search);
   query.set('limit', '60');
 
   const data = await apiFetch<JobListResponse>(`/jobs?${query.toString()}`);
   const active = data.items.some((run) => ACTIVE_STATUSES.has(run.status));
+  const hasFilters = Boolean(params.search || statuses.length > 0);
 
   return (
-    <div>
+    <div className="flex h-full min-h-0 flex-col">
       <AutoRefresh active={active} />
 
-      <StatGrid>
-        <StatCard
-          label="Running"
-          value={formatNumber(data.summary.running)}
-          hint="In flight right now"
-          tone="info"
-        />
-        <StatCard
-          label="Failed 24h"
-          value={formatNumber(data.summary.failed24h)}
-          hint="Terminal failures"
-          tone="danger"
-        />
-        <StatCard
-          label="Succeeded 24h"
-          value={formatNumber(data.summary.succeeded24h)}
-          hint="Completed normally"
-          tone="success"
-        />
-        <StatCard
-          label="p95 duration"
-          value={formatDuration(data.summary.p95DurationMs)}
-          hint="Last 24 hours"
-          tone="highlight"
-        />
-      </StatGrid>
-
-      <SectionCard
-        className="mt-4"
-        title="Jobs"
-        description={`${data.items.length} recent runs · newest first. The detail view carries the stage rail and timestamped timeline.`}
-        toolbar={
-          <div className="flex flex-wrap items-center gap-1">
-            {STATUS_FILTERS.map((filter) => (
-              <Link
-                key={filter.value || 'all'}
-                href={filter.value ? `/jobs?status=${filter.value}` : '/jobs'}
-                className={buttonVariants({
-                  variant: params.status === filter.value ? 'secondary' : 'ghost',
-                  size: 'sm',
-                })}
-              >
-                {filter.label}
-              </Link>
-            ))}
-          </div>
+      <TableCard
+        summary={
+          <TableSummary
+            items={[
+              {
+                label: 'Running',
+                value: formatNumber(data.summary.running),
+                hint: 'In flight right now',
+                tone: 'info',
+              },
+              {
+                label: 'Failed 24h',
+                value: formatNumber(data.summary.failed24h),
+                hint: 'Terminal failures',
+                tone: 'danger',
+              },
+              {
+                label: 'Succeeded 24h',
+                value: formatNumber(data.summary.succeeded24h),
+                hint: 'Completed normally',
+                tone: 'success',
+              },
+              {
+                label: 'p95 duration',
+                value: formatDuration(data.summary.p95DurationMs),
+                hint: 'Last 24 hours',
+                tone: 'highlight',
+              },
+            ]}
+          />
         }
+        filters={
+          <TableFilters>
+            <SearchFilter
+              defaultValue={params.search ?? ''}
+              placeholder="Search job, type or ID…"
+            />
+            <MultiSelectFilter
+              id="status"
+              name="status"
+              defaultValue={statuses}
+              options={STATUS_OPTIONS}
+              placeholder="All statuses"
+            />
+          </TableFilters>
+        }
+        actions={<TableRefreshButton />}
       >
         {data.items.length === 0 ? (
-          <EmptyState
-            title="No jobs yet"
-            description="Scheduled jobs and operator-triggered commands appear here as soon as they run."
-          />
+          <div className="p-4">
+            <EmptyState
+              title="No jobs match"
+              description={
+                hasFilters
+                  ? 'Clear the filters to see every run.'
+                  : 'Scheduled jobs and operator-triggered commands appear here as soon as they run.'
+              }
+            />
+          </div>
         ) : (
-          <Table>
-            <TableHeader>
+          <Table containerClassName="h-full overflow-auto">
+            <TableHeader className="bg-card sticky top-0 z-10">
               <TableRow>
                 <TableHead>Job</TableHead>
                 <TableHead>Type</TableHead>
@@ -121,15 +144,14 @@ export default async function JobsPage({
                 <TableHead>Started</TableHead>
                 <TableHead>Duration</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead />
               </TableRow>
             </TableHeader>
             <TableBody>
               {data.items.map((run) => (
                 <TableRow key={run.id}>
                   <TableCell>
-                    <Link href={`/jobs/${run.id}`} className="font-medium hover:underline">
-                      {label(run.jobName)}
-                    </Link>
+                    <p className="font-medium">{label(run.jobName)}</p>
                     <p className="text-muted-foreground mt-0.5 font-mono text-[10px]">
                       {run.id.slice(0, 8)}
                     </p>
@@ -149,12 +171,15 @@ export default async function JobsPage({
                   <TableCell>
                     <StatusBadge status={run.status} />
                   </TableCell>
+                  <TableActions>
+                    <TableActionLink href={`/jobs/${run.id}`} label="View job" />
+                  </TableActions>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         )}
-      </SectionCard>
+      </TableCard>
     </div>
   );
 }

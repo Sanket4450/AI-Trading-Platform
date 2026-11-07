@@ -3,8 +3,8 @@ import { getUniverse, listUniverses } from '@ai-trading/database';
 
 @Injectable()
 export class UniversesService {
-  list() {
-    return listUniverses();
+  list(search?: string) {
+    return listUniverses(search);
   }
 
   async detail(id: string) {

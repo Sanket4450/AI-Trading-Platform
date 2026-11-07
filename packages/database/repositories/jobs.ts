@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, ilike, inArray, or, sql } from 'drizzle-orm';
 import { db } from '../client.js';
 import { jobRunEvents, jobRuns } from '../schema/index.js';
 
@@ -87,12 +87,26 @@ export async function appendJobRunEvents(events: JobRunEventRecord[]): Promise<v
 
 export async function listTrackedJobRuns(filters: {
   limit: number;
-  status?: string;
+  status?: string[];
   jobType?: string;
+  search?: string;
 }) {
   const conditions = [];
-  if (filters.status) conditions.push(eq(jobRuns.status, filters.status));
+  if (filters.status && filters.status.length > 0) {
+    conditions.push(inArray(jobRuns.status, filters.status));
+  }
   if (filters.jobType) conditions.push(eq(jobRuns.jobType, filters.jobType));
+  if (filters.search) {
+    const term = `%${filters.search}%`;
+    const searchCondition = or(
+      ilike(jobRuns.jobName, term),
+      ilike(jobRuns.jobType, term),
+      ilike(jobRuns.status, term),
+      ilike(jobRuns.summary, term),
+      sql`${jobRuns.id}::text ilike ${term}`,
+    );
+    if (searchCondition) conditions.push(searchCondition);
+  }
 
   return db
     .select({

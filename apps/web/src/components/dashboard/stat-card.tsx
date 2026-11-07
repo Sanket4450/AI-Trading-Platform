@@ -1,7 +1,7 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
-const tones = {
+export const statToneClasses = {
   default: 'text-foreground',
   success: 'text-success',
   info: 'text-info',
@@ -9,6 +9,8 @@ const tones = {
   danger: 'text-destructive',
   highlight: 'text-highlight',
 } as const;
+
+export type StatTone = keyof typeof statToneClasses;
 
 export function StatCard({
   label,
@@ -19,7 +21,7 @@ export function StatCard({
   label: string;
   value: React.ReactNode;
   hint?: string;
-  tone?: keyof typeof tones;
+  tone?: StatTone;
 }) {
   return (
     <Card size="sm" className="border-border/70 bg-card/60">
@@ -27,7 +29,12 @@ export function StatCard({
         <p className="text-muted-foreground text-[10px] font-medium uppercase tracking-[0.16em]">
           {label}
         </p>
-        <p className={cn('mt-1 text-xl font-semibold leading-none tracking-tight', tones[tone])}>
+        <p
+          className={cn(
+            'mt-1 text-xl font-semibold leading-none tracking-tight',
+            statToneClasses[tone],
+          )}
+        >
           {value}
         </p>
         {hint ? (

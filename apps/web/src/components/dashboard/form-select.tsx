@@ -27,6 +27,8 @@ type SelectFieldProps = {
   disabled?: boolean;
   submitOnChange?: boolean;
   onValueChange?: (value: string) => void;
+  ariaLabel?: string;
+  leadingIcon?: ReactNode;
 };
 
 /**
@@ -43,6 +45,8 @@ export function SelectField({
   disabled,
   submitOnChange,
   onValueChange,
+  ariaLabel,
+  leadingIcon,
 }: SelectFieldProps) {
   const [value, setValue] = useState(defaultValue);
   const hiddenRef = useRef<HTMLInputElement>(null);
@@ -69,7 +73,8 @@ export function SelectField({
           onValueChange?.(nextValue);
         }}
       >
-        <SelectTrigger id={id} className={cn('w-full', className)}>
+        <SelectTrigger id={id} aria-label={ariaLabel} className={cn('w-full', className)}>
+          {leadingIcon}
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent>

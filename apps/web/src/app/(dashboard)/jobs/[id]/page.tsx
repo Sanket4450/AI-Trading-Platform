@@ -37,7 +37,10 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
   return (
     <div>
       <AutoRefresh active={active} />
-      <PageMeta title={`Job ${run.id.slice(0, 8)}`} />
+      <PageMeta
+        title={`Job · ${label(run.jobName)}`}
+        description="Progress, timing and details for this job run."
+      />
 
       <DetailHeader
         badges={<StatusBadge status={run.status} />}

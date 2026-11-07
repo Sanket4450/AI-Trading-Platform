@@ -1007,43 +1007,6 @@ export class FetchInstrumentsResponseDto {
   existingRunIds?: ExistingRunDto[];
 }
 
-export class RetryFailedResponseDto {
-  @ApiProperty({
-    type: 'array',
-    items: {
-      type: 'object',
-      properties: {
-        instrumentId: { type: 'string', format: 'uuid' },
-        jobRunId: { type: 'string', format: 'uuid' },
-      },
-      required: ['instrumentId', 'jobRunId'],
-    },
-  })
-  queued!: { instrumentId: string; jobRunId: string }[];
-}
-
-export class RetryInstrumentResponseDto {
-  @ApiProperty({
-    type: JobRunDto,
-    nullable: true,
-    required: false,
-    description: 'Active run returned instead of launching a duplicate.',
-  })
-  existing?: JobRunDto | null;
-
-  @ApiProperty({ type: JobRunDto, nullable: true, required: false })
-  plan?: JobRunDto | null;
-
-  @ApiProperty({ type: BackfillPreviewDto, required: false })
-  preview?: BackfillPreviewDto;
-
-  @ApiProperty({ type: [QueuedInstrumentDto], required: false })
-  queued?: QueuedInstrumentDto[];
-
-  @ApiProperty({ type: [ExistingRunDto], required: false })
-  existingRunIds?: ExistingRunDto[];
-}
-
 export class CancelInstrumentResponseDto {
   @ApiProperty({ format: 'uuid' })
   planId!: string;

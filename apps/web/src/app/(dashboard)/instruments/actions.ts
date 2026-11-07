@@ -40,19 +40,6 @@ export async function fetchInstrumentsAction(formData: FormData): Promise<void> 
   redirect(`${returnTo}?queued=1`);
 }
 
-export async function retryInstrumentAction(formData: FormData): Promise<void> {
-  const instrumentId = formString(formData, 'instrumentId', '');
-  const returnTo = formString(formData, 'returnTo', `/instruments/${instrumentId}`);
-  try {
-    await apiFetch(`/data/instruments/${instrumentId}/retry`, { method: 'POST' });
-  } catch (error) {
-    redirect(`${returnTo}?error=${encodeURIComponent(apiErrorMessage(error))}`);
-  }
-  revalidatePath('/instruments');
-  revalidatePath(`/instruments/${instrumentId}`);
-  redirect(`${returnTo}?queued=1`);
-}
-
 export async function cancelInstrumentAction(formData: FormData): Promise<void> {
   const instrumentId = formString(formData, 'instrumentId', '');
   const returnTo = formString(formData, 'returnTo', `/instruments/${instrumentId}`);

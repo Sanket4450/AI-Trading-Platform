@@ -12,7 +12,6 @@ import {
   LineChart,
   ScrollText,
   Settings,
-  SlidersHorizontal,
   Wallet,
 } from 'lucide-react';
 import { badgeVariants } from '@/components/ui/badge';
@@ -32,7 +31,6 @@ const navigation = [
   { href: '/instruments', label: 'Instruments', icon: LineChart },
   { href: '/universes', label: 'Universes', icon: Layers },
   { href: '/strategies', label: 'Strategies', icon: FlaskConical },
-  { href: '/configuration', label: 'Configuration', icon: SlidersHorizontal },
   { href: '/data', label: 'Data health', icon: Database },
   { href: '/jobs', label: 'Jobs', icon: Activity },
   { href: '/audit', label: 'Audit', icon: ScrollText },
@@ -141,7 +139,7 @@ export function AppShell({
 
           <div className="flex h-full min-w-0 flex-1 flex-col">
             <header className="border-border/70 bg-background/85 z-20 shrink-0 border-b backdrop-blur">
-              <div className="flex items-center gap-3 px-4 py-4 sm:px-6 lg:px-8">
+              <div className="flex items-center gap-3 px-4 py-4 sm:px-6">
                 <div className="flex min-w-0 flex-1 items-center gap-3">
                   <span className="border-primary/30 bg-primary/10 text-primary-strong grid size-8 shrink-0 place-items-center rounded-lg border lg:hidden">
                     <Activity className="size-4" />
@@ -211,7 +209,7 @@ export function AppShell({
               </div>
             </header>
 
-            <main className="flex-1 overflow-y-auto px-4 py-6 sm:px-6 lg:px-8">{children}</main>
+            <main className="flex-1 overflow-y-auto px-4 py-6 sm:px-6">{children}</main>
           </div>
         </div>
       </div>

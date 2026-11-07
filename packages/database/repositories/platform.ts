@@ -89,7 +89,12 @@ export async function touchSession(sessionId: string) {
     .where(eq(userSessions.id, sessionId));
 }
 
-export async function listAccounts() {
+export async function listAccounts(search?: string) {
+  const term = search ? `%${search}%` : null;
+  const conditions = term
+    ? [or(ilike(accounts.code, term), ilike(accounts.displayName, term))]
+    : [];
+
   return db
     .select({
       id: accounts.id,
@@ -128,6 +133,7 @@ export async function listAccounts() {
       )`,
     })
     .from(accounts)
+    .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(asc(accounts.code));
 }
 
@@ -153,6 +159,7 @@ export async function listAuditLog(filters: {
   actorUserId?: string;
   entityType?: string;
   action?: string;
+  search?: string;
   from?: Date;
   to?: Date;
   limit?: number;
@@ -163,6 +170,19 @@ export async function listAuditLog(filters: {
   if (filters.action) conditions.push(ilike(auditLog.action, `%${filters.action}%`));
   if (filters.from) conditions.push(gte(auditLog.createdAt, filters.from));
   if (filters.to) conditions.push(lte(auditLog.createdAt, filters.to));
+  if (filters.search) {
+    const term = `%${filters.search}%`;
+    const searchCondition = or(
+      ilike(auditLog.action, term),
+      ilike(auditLog.entityType, term),
+      sql`${auditLog.entityId}::text ilike ${term}`,
+      sql`${auditLog.actorUserId}::text ilike ${term}`,
+      ilike(users.email, term),
+      ilike(auditLog.ipAddress, term),
+      sql`${auditLog.requestId}::text ilike ${term}`,
+    );
+    if (searchCondition) conditions.push(searchCondition);
+  }
 
   return db
     .select({

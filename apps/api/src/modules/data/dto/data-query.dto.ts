@@ -130,19 +130,6 @@ export class AcknowledgeIssueDto {
   status!: 'acknowledged' | 'resolved' | 'ignored';
 }
 
-export class BackfillDto {  @ApiProperty({ format: 'uuid' })
-  @IsUUID()
-  instrumentId!: string;
-
-  @ApiProperty({ format: 'date' })
-  @Matches(DATE)
-  from!: string;
-
-  @ApiProperty({ format: 'date' })
-  @Matches(DATE)
-  to!: string;
-}
-
 export class DailyStatsQueryDto {
   @ApiPropertyOptional({ format: 'uuid' })
   @IsOptional()

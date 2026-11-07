@@ -9,6 +9,7 @@ export class AuditService {
       actorUserId: query.actorUserId,
       entityType: query.entityType,
       action: query.action,
+      search: query.search,
       from: query.from ? new Date(query.from) : undefined,
       to: query.to ? new Date(query.to) : undefined,
       limit: query.limit,

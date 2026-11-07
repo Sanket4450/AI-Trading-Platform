@@ -31,7 +31,10 @@ export default async function RunDetailPage({ params }: { params: Promise<{ id: 
 
   return (
     <div>
-      <PageMeta title={`Run ${run.id.slice(0, 8)}`} />
+      <PageMeta
+        title={`Download · ${run.symbol ?? label(run.runType)}`}
+        description="Counts, timing and the archived provider payload for this download."
+      />
 
       <DetailHeader
         badges={<StatusBadge status={run.status} />}

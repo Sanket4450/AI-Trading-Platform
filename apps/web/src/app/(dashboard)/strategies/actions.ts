@@ -6,10 +6,8 @@ import { apiErrorMessage, apiFetch } from '@/lib/api';
 import { formString } from '@/lib/form';
 
 function strategiesPath(strategyId: string, flag: string, value: string): string {
-  const query = new URLSearchParams();
-  if (strategyId) query.set('strategy', strategyId);
-  query.set(flag, value);
-  return `/strategies?${query.toString()}`;
+  const path = strategyId ? `/strategies/${strategyId}` : '/strategies';
+  return `${path}?${new URLSearchParams({ [flag]: value }).toString()}`;
 }
 
 export async function createStrategyVersionAction(formData: FormData): Promise<void> {

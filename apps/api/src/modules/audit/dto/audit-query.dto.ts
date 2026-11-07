@@ -7,6 +7,7 @@ import {
   IsString,
   IsUUID,
   Max,
+  MaxLength,
   Min,
 } from 'class-validator';
 
@@ -29,6 +30,17 @@ export class AuditQueryDto {
   @IsOptional()
   @IsString()
   action?: string;
+
+  @ApiPropertyOptional({
+    maxLength: 120,
+    description:
+      'Case-insensitive match across action, entity, actor, IP address and request ID.',
+    example: 'configuration',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  search?: string;
 
   @ApiPropertyOptional({ type: String, format: 'date-time' })
   @IsOptional()

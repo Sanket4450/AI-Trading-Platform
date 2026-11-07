@@ -77,7 +77,8 @@ network latency, dominates: at 1,600 requests per 30 minutes the floor is about 
 ## Resume and recovery
 
 - **Worker killed mid-backfill**: run `ingestion-reconcile` from the scheduler or the data console.
-  Runs older than 15 minutes are marked failed; retry the parent plan. Completed chunks are skipped.
+  Runs older than 15 minutes are marked failed; launch a new missing-month fetch from the catalog.
+  Completed chunks are skipped.
 - **Redis unavailable**: queue and limiter fail. Start Redis, restart the worker and retry queued or
   failed jobs. No database state is lost.
 - **Database unavailable**: restore PostgreSQL and restart the worker. In-flight batches roll back;

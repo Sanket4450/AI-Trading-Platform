@@ -229,7 +229,7 @@ modular monolith or the R1 lifecycle tables.
 
 ### API and dashboard
 
-- The catalog-first surface adds instrument status, fetch/retry/cancel, plans, coverage heatmap,
+- The catalog-first surface adds instrument status, fetch/cancel, plans, coverage heatmap,
   day detail, validation, run detail, issue detail, provider status, quality rules and reference
   commands. Every write records an audit row.
 - A broker-contract test asserts that the API does not import order, position or trading modules, that

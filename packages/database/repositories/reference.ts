@@ -141,7 +141,12 @@ export async function listCorporateActions(instrumentId?: string) {
     .limit(200);
 }
 
-export async function listUniverses() {
+export async function listUniverses(search?: string) {
+  const term = search ? `%${search}%` : null;
+  const conditions = term
+    ? [or(ilike(instrumentUniverses.code, term), ilike(instrumentUniverses.name, term))]
+    : [];
+
   return db
     .select({
       id: instrumentUniverses.id,
@@ -173,6 +178,7 @@ export async function listUniverses() {
       )`,
     })
     .from(instrumentUniverses)
+    .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(asc(instrumentUniverses.code));
 }
 

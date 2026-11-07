@@ -6,10 +6,8 @@ import { apiErrorMessage, apiFetch } from '@/lib/api';
 import { formString } from '@/lib/form';
 
 function accountsPath(accountId: string, flag: string, value: string): string {
-  const query = new URLSearchParams();
-  if (accountId) query.set('account', accountId);
-  query.set(flag, value);
-  return `/accounts?${query.toString()}`;
+  const path = accountId ? `/accounts/${accountId}` : '/accounts';
+  return `${path}?${new URLSearchParams({ [flag]: value }).toString()}`;
 }
 
 export async function rotateCredentialAction(formData: FormData): Promise<void> {

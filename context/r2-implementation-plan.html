@@ -3021,7 +3021,7 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
     <table class="data-table">
       <thead><tr><th>Incident</th><th>First check</th><th>Recovery</th></tr></thead>
       <tbody>
-        <tr><td>Worker killed mid-backfill</td><td>Oldest <code>running</code> run; heartbeat age.</td><td>Run <code>ingestion-reconcile</code>, then retry the parent plan. Completed chunks are skipped.</td></tr>
+        <tr><td>Worker killed mid-backfill</td><td>Oldest <code>running</code> run; heartbeat age.</td><td>Run <code>ingestion-reconcile</code>, then refresh missing months from the catalog. Completed chunks are skipped.</td></tr>
         <tr><td>Redis unavailable</td><td><code>/health</code> shows Redis degraded; queue add fails.</td><td>Start Redis, restart the worker, retry queued/failed jobs. No database state is lost.</td></tr>
         <tr><td>Database unavailable</td><td>API/worker health; connection errors.</td><td>Restore PostgreSQL, restart worker, resume from the run ledger. In-flight batches roll back.</td></tr>
         <tr><td>Provider schema change</td><td>Repeated <code>schema_invalid</code> on fresh responses.</td><td>Stop the plan, archive the payload, update the contract fixture and parser, replay from raw.</td></tr>
@@ -3081,7 +3081,6 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
             <tr><td>GET</td><td><code>/data/quality-issues</code></td><td>Adds rule ID, occurrence count, last seen and acknowledgement fields.</td></tr>
             <tr><td>GET</td><td><code>/data/daily-stats</code></td><td>Unchanged; still reads the materialized view.</td></tr>
             <tr><td>POST</td><td><code>/data/quality-issues/:id/acknowledge</code></td><td>Requires a note for resolved/ignored; records the actor and timestamp.</td></tr>
-            <tr><td>POST</td><td><code>/data/backfill</code></td><td>Remains the bounded 31-day single-instrument repair; the plan API is the new full-history path.</td></tr>
             <tr><td>POST</td><td><code>/data/refresh-materialized-view</code></td><td>Unchanged.</td></tr>
           </tbody>
         </table>
@@ -3105,13 +3104,11 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
             <tr><td>GET</td><td><code>/data/instrument-status/:instrumentId</code></td><td>Instrument status detail with the month grid, counters and target window.</td><td>No</td></tr>
             <tr><td>POST</td><td><code>/data/instrument-status/recompute</code></td><td>Recompute one or a list of rollups after a reviewed fix.</td><td>Yes · <code>data.instrument_status_recomputed</code></td></tr>
             <tr><td>POST</td><td><code>/data/instruments/fetch</code></td><td>Preview or launch a fetch for an instrument selection; creates the plan internally.</td><td>Yes · <code>data.instruments_fetch_requested</code></td></tr>
-            <tr><td>POST</td><td><code>/data/instruments/:instrumentId/retry</code></td><td>Retry failed or partial months for one instrument.</td><td>Yes · <code>data.instrument_retried</code></td></tr>
             <tr><td>POST</td><td><code>/data/instruments/:instrumentId/cancel</code></td><td>Cooperative cancel of that instrument’s active run.</td><td>Yes · <code>data.instrument_cancelled</code></td></tr>
             <tr><td>POST</td><td><code>/data/backfill-plans</code></td><td>Create a plan or return a dry-run preview. Still the engine behind the catalog actions.</td><td>Yes · <code>data.backfill_plan_created</code></td></tr>
             <tr><td>GET</td><td><code>/data/backfill-plans</code></td><td>List recent plans with progress.</td><td>No</td></tr>
             <tr><td>GET</td><td><code>/data/backfill-plans/:id</code></td><td>Plan detail, per-instrument progress and failed chunks.</td><td>No</td></tr>
             <tr><td>POST</td><td><code>/data/backfill-plans/:id/cancel</code></td><td>Cooperative cancellation between chunks.</td><td>Yes · <code>data.backfill_plan_cancelled</code></td></tr>
-            <tr><td>POST</td><td><code>/data/backfill-plans/:id/retry-failed</code></td><td>Requeue failed instruments/chunks only.</td><td>Yes · <code>data.backfill_plan_retried</code></td></tr>
             <tr><td>GET</td><td><code>/data/coverage/heatmap</code></td><td>Instrument × session matrix for a date range and universe.</td><td>No</td></tr>
             <tr><td>GET</td><td><code>/data/coverage/:instrumentId/:date</code></td><td>Day detail: gaps, runs, oracle values and evidence.</td><td>No</td></tr>
             <tr><td>GET</td><td><code>/data/validation</code></td><td>Daily-versus-minute comparison rows.</td><td>No</td></tr>
@@ -3197,10 +3194,10 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
     <table class="data-table">
       <thead><tr><th>Route</th><th>Screen</th><th>Reads</th><th>Primary action</th></tr></thead>
       <tbody>
-        <tr><td><code>/instruments</code></td><td>Instrument catalog</td><td>Universe members in rank order, both statuses, coverage counts, last fetch, open issues</td><td>Fetch, refresh, retry or cancel for one row or a selection</td></tr>
-        <tr><td><code>/instruments/[id]</code></td><td>Instrument detail</td><td>Target window, month grid, runs, issues, mappings, tick size</td><td>Retry failed months; inspect evidence</td></tr>
+        <tr><td><code>/instruments</code></td><td>Instrument catalog</td><td>Universe members in rank order, both statuses, coverage counts, last fetch, open issues</td><td>Fetch, refresh or cancel for one row or a selection</td></tr>
+        <tr><td><code>/instruments/[id]</code></td><td>Instrument detail</td><td>Target window, month grid, runs, issues, mappings, tick size</td><td>Refresh missing months; inspect evidence</td></tr>
         <tr><td><code>/data</code></td><td>Data health</td><td>Coverage summary, heatmap, active plans, runs, issues, provider status</td><td>Inspect a plan or acknowledge an issue</td></tr>
-        <tr><td><code>/data/backfills/[id]</code></td><td>Backfill detail</td><td>Plan progress, per-instrument chunks, failures, ETA</td><td>Cancel or retry failed instruments</td></tr>
+        <tr><td><code>/data/backfills/[id]</code></td><td>Backfill detail</td><td>Plan progress, per-instrument chunks, failures, ETA</td><td>Cancel the plan</td></tr>
         <tr><td><code>/data/runs/[id]</code></td><td>Run detail</td><td>Request, HTTP, counts, duration, raw payload, issues</td><td>Open the raw payload or retry the chunk</td></tr>
         <tr><td><code>/data/issues/[id]</code></td><td>Issue detail</td><td>Rule, severity, evidence, lifecycle, affected window</td><td>Acknowledge, resolve or ignore with a note</td></tr>
         <tr><td><code>/settings</code></td><td>Settings</td><td>Provider mode, retention, quality thresholds, schedule state</td><td>View operational configuration</td></tr>
@@ -3472,7 +3469,7 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
     <div class="step"><p class="meta">Phase 2 · Library</p><h3>Adapter, normalization and validation</h3><p>Add the V3 client, rate limiter, error classifier, tuple parser, IST/UTC conversion, session windows, row validator and gap math. Prove each with unit and contract fixtures before any database write.</p></div>
     <div class="step"><p class="meta">Phase 3 · Engine</p><h3>Chunked backfill, dedupe and status projection</h3><p>Build the parent/child job model, monthly chunks, raw archive, batch upsert, revision recording, cancellation and stale-run recovery. Add the one-active-run index, job priority and the status rollup recompute. Run the kill/resume and duplicate-replay drills.</p></div>
     <div class="step"><p class="meta">Phase 4 · Quality</p><h3>Coverage, oracle and issues</h3><p>Implement strict coverage, gap runs, daily OHLCV validation, the validation table, the rule catalog, dedupe, lifecycle and the R4 preflight contract. Run the targeted and full scans.</p></div>
-    <div class="step"><p class="meta">Phase 5 · Surface</p><h3>Catalog, API and dashboard</h3><p>Add the index-ranked catalog, per-instrument fetch/retry/cancel and status recompute, then planning, preview, progress, heatmap, day detail, run detail, issue detail, reference commands and provider status. Wire the catalog and data console with the existing components.</p></div>
+    <div class="step"><p class="meta">Phase 5 · Surface</p><h3>Catalog, API and dashboard</h3><p>Add the index-ranked catalog, per-instrument fetch/cancel and status recompute, then planning, preview, progress, heatmap, day detail, run detail, issue detail, reference commands and provider status. Wire the catalog and data console with the existing components.</p></div>
     <div class="step"><p class="meta">Phase 6 · Prove</p><h3>Pilot, full backfill and fault drills</h3><p>Contract probe on RELIANCE, oracle probe on one year, five-instrument pilot, then all 51 instruments. Inject 429, timeout, token expiry and a worker kill. Run the full quality scan.</p></div>
     <div class="step"><p class="meta">Phase 7 · Handover</p><h3>Acceptance report and runbook</h3><p>Publish the backfill report, update the data-quality rule reference, the runbook, <code>AGENTS.md</code> and <code>README.md</code>. Record every open check and every waiver.</p></div>
   </div>

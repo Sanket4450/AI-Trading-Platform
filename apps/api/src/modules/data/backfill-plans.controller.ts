@@ -37,8 +37,6 @@ import {
   BackfillPreviewDto,
   CancelInstrumentResponseDto,
   FetchInstrumentsResponseDto,
-  RetryFailedResponseDto,
-  RetryInstrumentResponseDto,
 } from './dto/data-response.dto.js';
 import {
   CreateBackfillPlanDto,
@@ -65,22 +63,6 @@ export class BackfillPlansController {
     @Req() request: Request,
   ) {
     return this.plans.fetchInstruments(body, user.id, requestMeta(request));
-  }
-
-  @Post('instruments/:instrumentId/retry')
-  @ApiOperation({ summary: 'Retry the latest missing window for one instrument' })
-  @ApiParam({ name: 'instrumentId', format: 'uuid' })
-  @ApiCreatedResponse({ type: RetryInstrumentResponseDto })
-  retryInstrument(
-    @Param('instrumentId', ParseUUIDPipe) instrumentId: string,
-    @CurrentUser() user: AuthenticatedUser,
-    @Req() request: Request,
-  ) {
-    return this.plans.retryInstrument(
-      instrumentId,
-      user.id,
-      requestMeta(request),
-    );
   }
 
   @Post('instruments/:instrumentId/cancel')
@@ -167,17 +149,5 @@ export class BackfillPlansController {
     @Req() request: Request,
   ) {
     return this.plans.cancelPlan(id, user.id, requestMeta(request));
-  }
-
-  @Post('backfill-plans/:id/retry-failed')
-  @ApiOperation({ summary: 'Requeue failed chunks of a backfill plan' })
-  @ApiParam({ name: 'id', format: 'uuid' })
-  @ApiCreatedResponse({ type: RetryFailedResponseDto })
-  retryFailed(
-    @Param('id', ParseUUIDPipe) id: string,
-    @CurrentUser() user: AuthenticatedUser,
-    @Req() request: Request,
-  ) {
-    return this.plans.retryFailed(id, user.id, requestMeta(request));
   }
 }

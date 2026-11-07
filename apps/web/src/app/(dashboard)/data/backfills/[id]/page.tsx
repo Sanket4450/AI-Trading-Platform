@@ -10,6 +10,11 @@ import { StatusBadge } from '@/components/dashboard/status-badge';
 import { EmptyState } from '@/components/dashboard/empty-state';
 import { AutoRefresh } from '@/components/dashboard/auto-refresh';
 import { SubmitButton } from '@/components/dashboard/submit-button';
+import {
+  TableActionLink,
+  TableActions,
+  TableRefreshButton,
+} from '@/components/dashboard/table-actions';
 import { buttonVariants } from '@/components/ui/button';
 import {
   Table,
@@ -19,7 +24,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { cancelPlanAction, retryPlanAction } from '../../actions';
+import { cancelPlanAction } from '../../actions';
 
 export default async function BackfillDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -29,7 +34,12 @@ export default async function BackfillDetailPage({ params }: { params: Promise<{
   return (
     <div>
       <AutoRefresh active={active} />
-      <PageMeta title={`Backfill plan ${plan.id.slice(0, 8)}`} />
+      <PageMeta
+        title={`Backfill plan · ${plan.progress.instruments} ${
+          plan.progress.instruments === 1 ? 'instrument' : 'instruments'
+        }`}
+        description="Progress of this download plan across instruments and monthly chunks."
+      />
 
       <DetailHeader
         badges={<StatusBadge status={plan.status} />}
@@ -47,15 +57,7 @@ export default async function BackfillDetailPage({ params }: { params: Promise<{
                   Cancel plan
                 </SubmitButton>
               </form>
-            ) : (
-              <form action={retryPlanAction}>
-                <input type="hidden" name="planId" value={plan.id} />
-                <input type="hidden" name="returnTo" value={`/data/backfills/${plan.id}`} />
-                <SubmitButton size="sm" variant="outline" pendingLabel="Retrying…">
-                  Retry failed
-                </SubmitButton>
-              </form>
-            )}
+            ) : null}
           </>
         }
       />
@@ -76,7 +78,7 @@ export default async function BackfillDetailPage({ params }: { params: Promise<{
         <StatCard
           label="Failed"
           value={formatNumber(plan.progress.failed)}
-          hint="Retryable"
+          hint="Chunks"
           tone="danger"
         />
         <StatCard
@@ -97,6 +99,7 @@ export default async function BackfillDetailPage({ params }: { params: Promise<{
         className="mt-4"
         title="Chunk ledger"
         description="A succeeded chunk is not a complete day. Coverage and the daily oracle decide usability."
+        actions={<TableRefreshButton />}
       >
         {plan.chunks.length === 0 ? (
           <EmptyState title="No chunks" description="The plan has not queued any instrument yet." />
@@ -112,6 +115,7 @@ export default async function BackfillDetailPage({ params }: { params: Promise<{
                   <TableHead>Rows</TableHead>
                   <TableHead>HTTP</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead />
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -120,18 +124,7 @@ export default async function BackfillDetailPage({ params }: { params: Promise<{
                     <TableCell className="text-muted-foreground font-mono text-xs">
                       {chunk.rank ?? '—'}
                     </TableCell>
-                    <TableCell>
-                      {chunk.instrumentId ? (
-                        <Link
-                          href={`/instruments/${chunk.instrumentId}`}
-                          className="hover:underline"
-                        >
-                          {chunk.symbol ?? chunk.instrumentId}
-                        </Link>
-                      ) : (
-                        '—'
-                      )}
-                    </TableCell>
+                    <TableCell>{chunk.symbol ?? chunk.instrumentId ?? '—'}</TableCell>
                     <TableCell className="text-muted-foreground text-xs">
                       {(chunk.chunkIndex ?? 0) + 1}/{chunk.chunkCount ?? '—'} · attempt{' '}
                       {chunk.attempt}
@@ -152,15 +145,16 @@ export default async function BackfillDetailPage({ params }: { params: Promise<{
                       ) : null}
                     </TableCell>
                     <TableCell>
-                      <Link href={`/data/runs/${chunk.id}`}>
-                        <StatusBadge status={chunk.status} />
-                      </Link>
+                      <StatusBadge status={chunk.status} />
                       {chunk.errorMessage ? (
                         <p className="text-destructive mt-1 max-w-56 truncate text-[10px]">
                           {chunk.errorMessage}
                         </p>
                       ) : null}
                     </TableCell>
+                    <TableActions>
+                      <TableActionLink href={`/data/runs/${chunk.id}`} label="View run" />
+                    </TableActions>
                   </TableRow>
                 ))}
               </TableBody>

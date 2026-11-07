@@ -37,7 +37,9 @@ function numericValue(value: string | null): number | null {
   return Number.isFinite(number) ? number : null;
 }
 
-function mapListRun(run: Awaited<ReturnType<typeof listTrackedJobRuns>>[number]) {
+function mapListRun(
+  run: Awaited<ReturnType<typeof listTrackedJobRuns>>[number],
+) {
   return {
     ...run,
     stageKeys: stageKeysOf(run.stageKeys),
@@ -136,6 +138,7 @@ export class JobsService {
         limit: query.limit ?? 50,
         status: query.status,
         jobType: query.jobType,
+        search: query.search,
       }),
     ]);
 

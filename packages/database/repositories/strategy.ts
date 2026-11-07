@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, isNull, lte, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, ilike, inArray, isNull, lte, or, sql } from 'drizzle-orm';
 import { uuidv7 } from 'uuidv7';
 import { db } from '../client.js';
 import {
@@ -14,7 +14,10 @@ import {
   tradingSessions,
 } from '../schema/index.js';
 
-export async function listStrategies() {
+export async function listStrategies(search?: string) {
+  const term = search ? `%${search}%` : null;
+  const conditions = term ? [or(ilike(strategies.code, term), ilike(strategies.name, term))] : [];
+
   return db
     .select({
       id: strategies.id,
@@ -48,6 +51,7 @@ export async function listStrategies() {
       )`,
     })
     .from(strategies)
+    .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(asc(strategies.code));
 }
 

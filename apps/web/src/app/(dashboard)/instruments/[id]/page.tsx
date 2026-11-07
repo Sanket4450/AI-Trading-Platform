@@ -11,7 +11,15 @@ import { DetailHeader } from '@/components/dashboard/detail-header';
 import { StatusBadge } from '@/components/dashboard/status-badge';
 import { EmptyState } from '@/components/dashboard/empty-state';
 import { JsonBlock } from '@/components/dashboard/json-block';
+import { KeyValueGrid } from '@/components/dashboard/key-value-grid';
+import { DetailDialog } from '@/components/dashboard/detail-dialog';
 import { SubmitButton } from '@/components/dashboard/submit-button';
+import {
+  TableActionButton,
+  TableActionLink,
+  TableActions,
+  TableRefreshButton,
+} from '@/components/dashboard/table-actions';
 import { Badge } from '@/components/ui/badge';
 import { buttonVariants } from '@/components/ui/button';
 import {
@@ -26,7 +34,6 @@ import {
   cancelInstrumentAction,
   fetchInstrumentsAction,
   recomputeStatusAction,
-  retryInstrumentAction,
 } from '../actions';
 
 export default async function InstrumentDetailPage({
@@ -44,7 +51,10 @@ export default async function InstrumentDetailPage({
 
   return (
     <div>
-      <PageMeta title={`${detail.symbol} · instrument detail`} />
+      <PageMeta
+        title={`${detail.symbol} · Instrument`}
+        description="Coverage, download history, mappings and open issues for this instrument."
+      />
 
       <DetailHeader
         badges={
@@ -76,19 +86,6 @@ export default async function InstrumentDetailPage({
                 Recompute
               </SubmitButton>
             </form>
-            {detail.fetchStatus === 'failed' || detail.fetchStatus === 'partial' ? (
-              <form action={retryInstrumentAction}>
-                <input type="hidden" name="instrumentId" value={detail.instrumentId} />
-                <input
-                  type="hidden"
-                  name="returnTo"
-                  value={`/instruments/${detail.instrumentId}`}
-                />
-                <SubmitButton size="sm" variant="outline" pendingLabel="Retrying…">
-                  Retry failed months
-                </SubmitButton>
-              </form>
-            ) : null}
             {detail.fetchStatus === 'queued' || detail.fetchStatus === 'fetching' ? (
               <form action={cancelInstrumentAction}>
                 <input type="hidden" name="instrumentId" value={detail.instrumentId} />
@@ -185,6 +182,7 @@ export default async function InstrumentDetailPage({
         <SectionCard
           title="Provider mappings"
           description="Upstox keys live only here; the canonical UUID never changes."
+          actions={<TableRefreshButton />}
         >
           {mappings.length === 0 ? (
             <EmptyState title="No mappings" description="Run instrument sync." />
@@ -196,6 +194,7 @@ export default async function InstrumentDetailPage({
                   <TableHead>External key</TableHead>
                   <TableHead>Primary</TableHead>
                   <TableHead>Valid from</TableHead>
+                  <TableHead />
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -207,6 +206,38 @@ export default async function InstrumentDetailPage({
                     <TableCell className="text-muted-foreground">
                       {formatDate(mapping.validFrom)}
                     </TableCell>
+                    <TableActions>
+                      <DetailDialog
+                        title={`${label(mapping.providerCode)} mapping`}
+                        description={mapping.externalKey}
+                        trigger={<TableActionButton label="View mapping" />}
+                      >
+                        <KeyValueGrid
+                          columns={2}
+                          items={[
+                            { label: 'Provider', value: label(mapping.providerCode) },
+                            { label: 'Provider name', value: mapping.providerName },
+                            {
+                              label: 'External key',
+                              value: (
+                                <span className="break-all font-mono text-xs">
+                                  {mapping.externalKey}
+                                </span>
+                              ),
+                            },
+                            { label: 'Exchange token', value: mapping.exchangeToken ?? '—' },
+                            { label: 'Provider symbol', value: mapping.providerSymbol ?? '—' },
+                            { label: 'Provider segment', value: mapping.providerSegment ?? '—' },
+                            { label: 'Primary', value: mapping.isPrimary ? 'Yes' : 'No' },
+                            { label: 'Valid from', value: formatDate(mapping.validFrom) },
+                            {
+                              label: 'Valid to',
+                              value: mapping.validTo ? formatDate(mapping.validTo) : 'Open',
+                            },
+                          ]}
+                        />
+                      </DetailDialog>
+                    </TableActions>
                   </TableRow>
                 ))}
               </TableBody>
@@ -219,6 +250,7 @@ export default async function InstrumentDetailPage({
         <SectionCard
           title="Recent runs"
           description="Every chunk records its request, HTTP status, counts and duration."
+          actions={<TableRefreshButton />}
         >
           {detail.runs.length === 0 ? (
             <EmptyState title="No runs" description="Queue a fetch from the catalog." />
@@ -231,6 +263,7 @@ export default async function InstrumentDetailPage({
                     <TableHead>Window</TableHead>
                     <TableHead>Rows</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -244,10 +277,11 @@ export default async function InstrumentDetailPage({
                         {run.rowsFetched}/{run.rowsWritten}/{run.rowsRejected}
                       </TableCell>
                       <TableCell>
-                        <Link href={`/data/runs/${run.id}`}>
-                          <StatusBadge status={run.status} />
-                        </Link>
+                        <StatusBadge status={run.status} />
                       </TableCell>
+                      <TableActions>
+                        <TableActionLink href={`/data/runs/${run.id}`} label="View run" />
+                      </TableActions>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -289,6 +323,7 @@ export default async function InstrumentDetailPage({
         className="mt-4"
         title="Corporate actions"
         description="Confirmed actions carry adjustment factors; candles stay raw."
+        actions={<TableRefreshButton />}
       >
         {actions.length === 0 ? (
           <EmptyState
@@ -305,6 +340,7 @@ export default async function InstrumentDetailPage({
                   <TableHead>Status</TableHead>
                   <TableHead>Price factor</TableHead>
                   <TableHead>Volume factor</TableHead>
+                  <TableHead />
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -317,6 +353,33 @@ export default async function InstrumentDetailPage({
                     </TableCell>
                     <TableCell>{action.priceAdjustmentFactor}</TableCell>
                     <TableCell>{action.volumeAdjustmentFactor}</TableCell>
+                    <TableActions>
+                      <DetailDialog
+                        title={`${label(action.actionType)} · ${action.exDate}`}
+                        description={action.symbol}
+                        trigger={<TableActionButton label="View corporate action" />}
+                      >
+                        <KeyValueGrid
+                          columns={2}
+                          items={[
+                            { label: 'Type', value: label(action.actionType) },
+                            { label: 'Ex-date', value: action.exDate },
+                            { label: 'Record date', value: action.recordDate ?? '—' },
+                            { label: 'Status', value: label(action.status) },
+                            { label: 'Ratio numerator', value: action.ratioNumerator ?? '—' },
+                            { label: 'Ratio denominator', value: action.ratioDenominator ?? '—' },
+                            {
+                              label: 'Dividend per share',
+                              value: action.dividendPerShare ?? '—',
+                            },
+                            { label: 'Price factor', value: action.priceAdjustmentFactor },
+                            { label: 'Volume factor', value: action.volumeAdjustmentFactor },
+                            { label: 'Source', value: label(action.source) },
+                            { label: 'Notes', value: action.notes ?? '—' },
+                          ]}
+                        />
+                      </DetailDialog>
+                    </TableActions>
                   </TableRow>
                 ))}
               </TableBody>

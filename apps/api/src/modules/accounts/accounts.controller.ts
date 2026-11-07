@@ -5,6 +5,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Query,
   Req,
 } from '@nestjs/common';
 import {
@@ -21,6 +22,7 @@ import {
   type AuthenticatedUser,
 } from '../../common/auth/current-user.decorator.js';
 import { ErrorResponseDto } from '../../common/dto/error-response.dto.js';
+import { SearchQueryDto } from '../../common/dto/search-query.dto.js';
 import { requestMeta } from '../../common/http/request-meta.js';
 import { ApiSessionAuth } from '../../common/swagger/api-session-auth.decorator.js';
 import { AccountsService } from './accounts.service.js';
@@ -41,23 +43,32 @@ export class AccountsController {
   constructor(private readonly accounts: AccountsService) {}
 
   @Get()
-  @ApiOperation({ summary: 'List broker accounts with current equity and permission counts' })
+  @ApiOperation({
+    summary: 'List broker accounts with current equity and permission counts',
+  })
   @ApiOkResponse({ type: AccountDto, isArray: true })
-  list() {
-    return this.accounts.list();
+  list(@Query() query: SearchQueryDto) {
+    return this.accounts.list(query.search);
   }
 
   @Get(':id/permissions')
-  @ApiOperation({ summary: 'List tradable instrument permissions for an account' })
+  @ApiOperation({
+    summary: 'List tradable instrument permissions for an account',
+  })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiOkResponse({ type: AccountPermissionDto, isArray: true })
-  @ApiNotFoundResponse({ type: ErrorResponseDto, description: 'Account not found' })
+  @ApiNotFoundResponse({
+    type: ErrorResponseDto,
+    description: 'Account not found',
+  })
   permissions(@Param('id', ParseUUIDPipe) id: string) {
     return this.accounts.permissions(id);
   }
 
   @Get(':id/credentials')
-  @ApiOperation({ summary: 'List stored credential metadata (never the secret value)' })
+  @ApiOperation({
+    summary: 'List stored credential metadata (never the secret value)',
+  })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiOkResponse({ type: BrokerCredentialDto, isArray: true })
   credentials(@Param('id', ParseUUIDPipe) id: string) {
@@ -96,7 +107,10 @@ export class AccountsController {
   })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiCreatedResponse({ type: BrokerCredentialDto })
-  @ApiNotFoundResponse({ type: ErrorResponseDto, description: 'Account not found' })
+  @ApiNotFoundResponse({
+    type: ErrorResponseDto,
+    description: 'Account not found',
+  })
   storeCredential(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: CreateCredentialDto,

@@ -1,4 +1,4 @@
-import { Controller, Get, Param, ParseUUIDPipe } from '@nestjs/common';
+import { Controller, Get, Param, ParseUUIDPipe, Query } from '@nestjs/common';
 import {
   ApiNotFoundResponse,
   ApiOkResponse,
@@ -7,6 +7,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { ErrorResponseDto } from '../../common/dto/error-response.dto.js';
+import { SearchQueryDto } from '../../common/dto/search-query.dto.js';
 import { ApiSessionAuth } from '../../common/swagger/api-session-auth.decorator.js';
 import {
   UniverseDetailDto,
@@ -24,15 +25,18 @@ export class UniversesController {
   @Get()
   @ApiOperation({ summary: 'List instrument universes' })
   @ApiOkResponse({ type: UniverseDto, isArray: true })
-  list() {
-    return this.universes.list();
+  list(@Query() query: SearchQueryDto) {
+    return this.universes.list(query.search);
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Return a universe with all versions and members' })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiOkResponse({ type: UniverseDetailDto })
-  @ApiNotFoundResponse({ type: ErrorResponseDto, description: 'Universe not found' })
+  @ApiNotFoundResponse({
+    type: ErrorResponseDto,
+    description: 'Universe not found',
+  })
   detail(@Param('id', ParseUUIDPipe) id: string) {
     return this.universes.detail(id);
   }

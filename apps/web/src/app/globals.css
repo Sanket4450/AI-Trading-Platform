@@ -32,6 +32,10 @@
   html {
     @apply font-sans;
   }
+  input[type='search']::-webkit-search-cancel-button {
+    -webkit-appearance: none;
+    appearance: none;
+  }
 }
 
 @theme inline {

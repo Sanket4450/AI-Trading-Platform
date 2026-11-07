@@ -22,6 +22,7 @@ import {
   type AuthenticatedUser,
 } from '../../common/auth/current-user.decorator.js';
 import { ErrorResponseDto } from '../../common/dto/error-response.dto.js';
+import { SearchQueryDto } from '../../common/dto/search-query.dto.js';
 import { requestMeta } from '../../common/http/request-meta.js';
 import { ApiSessionAuth } from '../../common/swagger/api-session-auth.decorator.js';
 import { CreateStrategyVersionDto } from './dto/create-strategy-version.dto.js';
@@ -41,17 +42,24 @@ export class StrategiesController {
   constructor(private readonly strategies: StrategiesService) {}
 
   @Get()
-  @ApiOperation({ summary: 'List strategies with version and activation counts' })
+  @ApiOperation({
+    summary: 'List strategies with version and activation counts',
+  })
   @ApiOkResponse({ type: StrategyDto, isArray: true })
-  list() {
-    return this.strategies.list();
+  list(@Query() query: SearchQueryDto) {
+    return this.strategies.list(query.search);
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Return a strategy with versions, bindings and activations' })
+  @ApiOperation({
+    summary: 'Return a strategy with versions, bindings and activations',
+  })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiOkResponse({ type: StrategyDetailDto })
-  @ApiNotFoundResponse({ type: ErrorResponseDto, description: 'Strategy not found' })
+  @ApiNotFoundResponse({
+    type: ErrorResponseDto,
+    description: 'Strategy not found',
+  })
   detail(@Param('id', ParseUUIDPipe) id: string) {
     return this.strategies.detail(id);
   }
@@ -92,7 +100,10 @@ export class StrategiesController {
   @ApiOperation({ summary: 'Create a draft strategy version' })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiCreatedResponse({ type: StrategyVersionDto })
-  @ApiNotFoundResponse({ type: ErrorResponseDto, description: 'Strategy not found' })
+  @ApiNotFoundResponse({
+    type: ErrorResponseDto,
+    description: 'Strategy not found',
+  })
   createVersion(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() body: CreateStrategyVersionDto,

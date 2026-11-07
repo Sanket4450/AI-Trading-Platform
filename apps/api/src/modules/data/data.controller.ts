@@ -30,7 +30,6 @@ import { ApiSessionAuth } from '../../common/swagger/api-session-auth.decorator.
 import { CatalogService } from './catalog.service.js';
 import { DataService } from './data.service.js';
 import {
-  BackfillDto,
   CoverageQueryDto,
   DailyStatsQueryDto,
   IngestionRunsQueryDto,
@@ -178,21 +177,6 @@ export class DataController {
   @ApiOkResponse({ type: QualityRuleDto, isArray: true })
   qualityRules() {
     return this.catalog.qualityRules();
-  }
-
-  @Post('backfill')
-  @ApiOperation({
-    summary: 'Queue a bounded legacy single-instrument backfill',
-    description:
-      'Limited to the configured maximum window (31 days by default). Prefer the instrument catalog.',
-  })
-  @ApiCreatedResponse({ type: JobRunDto })
-  backfill(
-    @Body() body: BackfillDto,
-    @CurrentUser() user: AuthenticatedUser,
-    @Req() request: Request,
-  ) {
-    return this.data.backfill(body, user.id, requestMeta(request));
   }
 
   @Post('refresh-materialized-view')
