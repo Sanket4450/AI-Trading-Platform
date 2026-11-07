@@ -69,7 +69,7 @@ async function bootstrap() {
     .addTag('strategies', 'Strategies, versions and effective configuration lookup.')
     .addTag('configuration', 'Versioned strategy, risk and system configuration.')
     .addTag('data', 'Reference ingestion, backfills, coverage, validation and catalog.')
-    .addTag('processes', 'Background job runs, stages, metrics and events.')
+    .addTag('jobs', 'Background job runs, stages, metrics and events.')
     .addTag('audit', 'Immutable operator audit trail.')
     .addTag('settings', 'Runtime system settings.')
     .addTag('system', 'System status, dashboard overview and operational feeds.')

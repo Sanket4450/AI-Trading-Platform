@@ -1,4 +1,4 @@
-import type { ProcessEvent } from '@/lib/types';
+import type { JobEvent } from '@/lib/types';
 import { formatClock, formatDateTime, formatNumber } from '@/lib/format';
 import { label } from '@/lib/labels';
 import { Badge } from '@/components/ui/badge';
@@ -21,12 +21,12 @@ const levelText: Record<string, string> = {
 };
 
 /** Timestamped, append-only event list. Lifecycle and stage events stay visible but quiet. */
-export function EventTimeline({ events }: { events: ProcessEvent[] }) {
+export function EventTimeline({ events }: { events: JobEvent[] }) {
   if (events.length === 0) {
     return (
       <EmptyState
         title="No events yet"
-        description="Steps appear here as soon as the process starts reporting."
+        description="Steps appear here as soon as the job starts reporting."
       />
     );
   }

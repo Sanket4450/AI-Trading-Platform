@@ -2,7 +2,7 @@ import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import { db } from '../client.js';
 import { jobRunEvents, jobRuns } from '../schema/index.js';
 
-export interface ProcessEventRecord {
+export interface JobRunEventRecord {
   jobRunId: string;
   kind: 'lifecycle' | 'stage' | 'step' | 'metric' | 'warning' | 'error';
   level?: 'debug' | 'info' | 'warn' | 'error';
@@ -63,7 +63,7 @@ export async function finishJobRunTracking(input: {
     .where(eq(jobRuns.id, input.jobRunId));
 }
 
-export async function appendJobRunEvents(events: ProcessEventRecord[]): Promise<void> {
+export async function appendJobRunEvents(events: JobRunEventRecord[]): Promise<void> {
   if (events.length === 0) return;
 
   await db.insert(jobRunEvents).values(
@@ -85,7 +85,7 @@ export async function appendJobRunEvents(events: ProcessEventRecord[]): Promise<
   );
 }
 
-export async function listProcessRuns(filters: {
+export async function listTrackedJobRuns(filters: {
   limit: number;
   status?: string;
   jobType?: string;
@@ -121,13 +121,13 @@ export async function listProcessRuns(filters: {
     .limit(filters.limit);
 }
 
-export async function getProcessRun(id: string) {
+export async function getJobRun(id: string) {
   const rows = await db.select().from(jobRuns).where(eq(jobRuns.id, id)).limit(1);
   return rows[0] ?? null;
 }
 
 /** Returns the newest events in chronological order so the timeline reads top to bottom. */
-export async function getProcessEvents(jobRunId: string, limit: number) {
+export async function getJobRunEvents(jobRunId: string, limit: number) {
   const rows = await db
     .select()
     .from(jobRunEvents)
@@ -137,7 +137,7 @@ export async function getProcessEvents(jobRunId: string, limit: number) {
   return rows.reverse();
 }
 
-export async function getProcessSummary() {
+export async function getJobRunSummary() {
   const [row] = await db
     .select({
       running: sql<number>`count(*) filter (where ${jobRuns.status} = 'running')::int`,
@@ -150,8 +150,8 @@ export async function getProcessSummary() {
   return row;
 }
 
-/** Used by the process detail endpoint to expose metrics in the order they were recorded. */
-export async function getProcessMetrics(jobRunId: string) {
+/** Used by the job detail endpoint to expose metrics in the order they were recorded. */
+export async function getJobRunMetrics(jobRunId: string) {
   return db
     .select({
       metricKey: jobRunEvents.metricKey,

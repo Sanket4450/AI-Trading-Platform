@@ -1,7 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { JobRunDto } from '../../../common/dto/job-run.dto.js';
 
-export class ProcessSummaryDto {
+export class JobSummaryDto {
   @ApiProperty()
   running!: number;
 
@@ -15,17 +15,15 @@ export class ProcessSummaryDto {
   p95DurationMs!: number;
 }
 
-export class ProcessRunDto extends JobRunDto {}
+export class JobListResponseDto {
+  @ApiProperty({ type: JobSummaryDto })
+  summary!: JobSummaryDto;
 
-export class ProcessListResponseDto {
-  @ApiProperty({ type: ProcessSummaryDto })
-  summary!: ProcessSummaryDto;
-
-  @ApiProperty({ type: [ProcessRunDto] })
-  items!: ProcessRunDto[];
+  @ApiProperty({ type: [JobRunDto] })
+  items!: JobRunDto[];
 }
 
-export class ProcessStageDto {
+export class JobStageDto {
   @ApiProperty()
   key!: string;
 
@@ -44,7 +42,7 @@ export class ProcessStageDto {
   durationMs!: number | null;
 }
 
-export class ProcessMetricDto {
+export class JobMetricDto {
   @ApiProperty()
   key!: string;
 
@@ -58,7 +56,7 @@ export class ProcessMetricDto {
   at!: string;
 }
 
-export class ProcessEventDto {
+export class JobEventDto {
   @ApiProperty()
   id!: number;
 
@@ -92,16 +90,16 @@ export class ProcessEventDto {
   metricUnit!: string | null;
 }
 
-export class ProcessDetailDto {
-  @ApiProperty({ type: ProcessRunDto })
-  run!: ProcessRunDto;
+export class JobDetailResponseDto {
+  @ApiProperty({ type: JobRunDto })
+  run!: JobRunDto;
 
-  @ApiProperty({ type: [ProcessStageDto] })
-  stages!: ProcessStageDto[];
+  @ApiProperty({ type: [JobStageDto] })
+  stages!: JobStageDto[];
 
-  @ApiProperty({ type: [ProcessMetricDto] })
-  metrics!: ProcessMetricDto[];
+  @ApiProperty({ type: [JobMetricDto] })
+  metrics!: JobMetricDto[];
 
-  @ApiProperty({ type: [ProcessEventDto] })
-  events!: ProcessEventDto[];
+  @ApiProperty({ type: [JobEventDto] })
+  events!: JobEventDto[];
 }

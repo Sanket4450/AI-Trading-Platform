@@ -1,4 +1,4 @@
-import type { ProcessStage } from '@/lib/types';
+import type { JobStage } from '@/lib/types';
 import { formatClock, formatDuration } from '@/lib/format';
 import { label } from '@/lib/labels';
 import { cn } from '@/lib/utils';
@@ -11,8 +11,8 @@ const stageTones: Record<string, string> = {
   pending: 'border-border/60 bg-background/40 text-muted-foreground',
 };
 
-/** Ordered rail of a run's stages, including stages not reached yet. */
-export function StageRail({ stages }: { stages: ProcessStage[] }) {
+/** Ordered rail of a job run's stages, including stages not reached yet. */
+export function StageRail({ stages }: { stages: JobStage[] }) {
   if (stages.length === 0) {
     return (
       <p className="text-muted-foreground text-sm">

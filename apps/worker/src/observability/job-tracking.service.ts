@@ -1,8 +1,8 @@
 import { Injectable, Logger, type OnModuleDestroy } from '@nestjs/common';
 import type { Job } from 'bullmq';
-import { ProcessTracker } from '@ai-trading/observability';
-import { processStore } from './process-store.js';
-import { isInstrumentedJob, stagesForJob } from './process-stages.js';
+import { JobTracker } from '@ai-trading/observability';
+import { jobStore } from './job-store.js';
+import { isInstrumentedJob, stagesForJob } from './job-stages.js';
 
 type TrackedJob = Pick<Job, 'name' | 'data' | 'attemptsMade'>;
 
@@ -13,16 +13,16 @@ function jobRunIdOf(data: unknown): string | null {
 }
 
 /**
- * Owns the process journal for worker jobs. The processor wrapper starts and
+ * Owns the job journal for worker jobs. The processor wrapper starts and
  * closes every run; services may add domain stages, steps and metrics.
  */
 @Injectable()
-export class ProcessTrackingService implements OnModuleDestroy {
-  private readonly logger = new Logger(ProcessTrackingService.name);
-  private readonly tracker = new ProcessTracker(processStore, {
+export class JobTrackingService implements OnModuleDestroy {
+  private readonly logger = new Logger(JobTrackingService.name);
+  private readonly tracker = new JobTracker(jobStore, {
     onError: (error) =>
       this.logger.warn(
-        `Process tracking degraded: ${error instanceof Error ? error.message : String(error)}`,
+        `Job tracking degraded: ${error instanceof Error ? error.message : String(error)}`,
       ),
   });
 

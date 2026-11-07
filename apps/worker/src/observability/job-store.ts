@@ -4,10 +4,10 @@ import {
   finishJobRunTracking,
   setJobRunStage,
 } from '@ai-trading/database';
-import type { ProcessStore } from '@ai-trading/observability';
+import type { JobStore } from '@ai-trading/observability';
 
 /** Bridges the framework-free tracker to Drizzle repositories. */
-export const processStore: ProcessStore = {
+export const jobStore: JobStore = {
   beginRun: beginJobRunTracking,
   setStage: setJobRunStage,
   finishRun: finishJobRunTracking,

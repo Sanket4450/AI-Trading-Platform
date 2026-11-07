@@ -1,7 +1,7 @@
 import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
 import { QUEUES } from '@ai-trading/domain';
-import { ProcessObservabilityModule } from '../../observability/observability.module.js';
+import { JobObservabilityModule } from '../../observability/observability.module.js';
 import { HistoricalDataProcessor } from './historical-data.processor.js';
 import { HistoricalDataService } from './historical-data.service.js';
 import { IngestionService } from './ingestion.service.js';
@@ -12,7 +12,7 @@ import { ReferenceSyncService } from './reference-sync.service.js';
 @Module({
   imports: [
     BullModule.registerQueue({ name: QUEUES.historicalData }),
-    ProcessObservabilityModule,
+    JobObservabilityModule,
   ],
   providers: [
     ReferenceSyncService,

@@ -10,7 +10,7 @@ import { AuthModule } from './modules/auth/auth.module.js';
 import { ConfigurationModule } from './modules/configuration/configuration.module.js';
 import { DataModule } from './modules/data/data.module.js';
 import { InstrumentsModule } from './modules/instruments/instruments.module.js';
-import { ProcessesModule } from './modules/processes/processes.module.js';
+import { JobsModule } from './modules/jobs/jobs.module.js';
 import { SettingsModule } from './modules/settings/settings.module.js';
 import { StrategiesModule } from './modules/strategies/strategies.module.js';
 import { SystemControlModule } from './modules/system-control/system-control.module.js';
@@ -46,7 +46,7 @@ import { UniversesModule } from './modules/universes/universes.module.js';
     StrategiesModule,
     ConfigurationModule,
     DataModule,
-    ProcessesModule,
+    JobsModule,
     AuditModule,
     SettingsModule,
     SystemControlModule,

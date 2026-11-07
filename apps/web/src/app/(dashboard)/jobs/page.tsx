@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { apiFetch } from '@/lib/api';
-import type { ProcessListResponse, ProcessRun } from '@/lib/types';
+import type { JobListResponse, JobRun } from '@/lib/types';
 import { formatDateTime, formatDuration, formatNumber } from '@/lib/format';
 import { label } from '@/lib/labels';
 import { StatCard, StatGrid } from '@/components/dashboard/stat-card';
@@ -27,13 +27,13 @@ const STATUS_FILTERS = [
   { value: 'succeeded', label: 'Succeeded' },
 ] as const;
 
-function durationOf(run: ProcessRun): number | null {
+function durationOf(run: JobRun): number | null {
   if (run.durationMs !== null) return run.durationMs;
   if (!run.startedAt) return null;
   return Date.now() - new Date(run.startedAt).getTime();
 }
 
-function stageProgress(run: ProcessRun): string {
+function stageProgress(run: JobRun): string {
   if (!run.currentStage) return '—';
   const index = run.stageKeys.indexOf(run.currentStage);
   if (index < 0) return label(run.currentStage);
@@ -41,7 +41,7 @@ function stageProgress(run: ProcessRun): string {
   return `${label(run.currentStage)} · ${index + 1}/${total}`;
 }
 
-export default async function ProcessesPage({
+export default async function JobsPage({
   searchParams,
 }: {
   searchParams: Promise<{ status?: string }>;
@@ -51,7 +51,7 @@ export default async function ProcessesPage({
   if (params.status) query.set('status', params.status);
   query.set('limit', '60');
 
-  const data = await apiFetch<ProcessListResponse>(`/processes?${query.toString()}`);
+  const data = await apiFetch<JobListResponse>(`/jobs?${query.toString()}`);
   const active = data.items.some((run) => ACTIVE_STATUSES.has(run.status));
 
   return (
@@ -87,14 +87,14 @@ export default async function ProcessesPage({
 
       <SectionCard
         className="mt-4"
-        title="Processes"
+        title="Jobs"
         description={`${data.items.length} recent runs · newest first. The detail view carries the stage rail and timestamped timeline.`}
         toolbar={
           <div className="flex flex-wrap items-center gap-1">
             {STATUS_FILTERS.map((filter) => (
               <Link
                 key={filter.value || 'all'}
-                href={filter.value ? `/processes?status=${filter.value}` : '/processes'}
+                href={filter.value ? `/jobs?status=${filter.value}` : '/jobs'}
                 className={buttonVariants({
                   variant: params.status === filter.value ? 'secondary' : 'ghost',
                   size: 'sm',
@@ -108,14 +108,14 @@ export default async function ProcessesPage({
       >
         {data.items.length === 0 ? (
           <EmptyState
-            title="No processes yet"
+            title="No jobs yet"
             description="Scheduled jobs and operator-triggered commands appear here as soon as they run."
           />
         ) : (
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Process</TableHead>
+                <TableHead>Job</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Stage</TableHead>
                 <TableHead>Started</TableHead>
@@ -127,7 +127,7 @@ export default async function ProcessesPage({
               {data.items.map((run) => (
                 <TableRow key={run.id}>
                   <TableCell>
-                    <Link href={`/processes/${run.id}`} className="font-medium hover:underline">
+                    <Link href={`/jobs/${run.id}`} className="font-medium hover:underline">
                       {label(run.jobName)}
                     </Link>
                     <p className="text-muted-foreground mt-0.5 font-mono text-[10px]">

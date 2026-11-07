@@ -198,8 +198,8 @@ export default async function InstrumentsPage({ searchParams }: { searchParams: 
                       <TableCell className="text-muted-foreground text-xs">
                         {row.lastSuccessAt ? formatDateTime(row.lastSuccessAt) : 'Never'}
                       </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap items-center justify-end gap-1">
+                      <TableCell className="w-px">
+                        <div className="flex items-center justify-end gap-1">
                           <Link
                             href={`/instruments/${row.instrumentId}`}
                             className={buttonVariants({ variant: 'outline', size: 'sm' })}

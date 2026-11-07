@@ -1,10 +1,10 @@
 import type {
-  ProcessBeginInput,
-  ProcessEventInput,
-  ProcessFinishInput,
-  ProcessStageStatus,
-  ProcessStore,
-  ProcessTrackerOptions,
+  JobBeginInput,
+  JobEventInput,
+  JobFinishInput,
+  JobStageStatus,
+  JobStore,
+  JobTrackerOptions,
 } from './types.js';
 
 interface RunState {
@@ -12,7 +12,7 @@ interface RunState {
   stages: string[];
   startedAt: number;
   currentStage: string | null;
-  buffer: ProcessEventInput[];
+  buffer: JobEventInput[];
   timer: ReturnType<typeof setTimeout> | null;
   flushing: boolean;
   pendingFlush: boolean;
@@ -26,7 +26,7 @@ const secretKeyPattern = /token|secret|password|authorization|api[-_]?key/i;
 function errorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   if (typeof error === 'string' && error.length > 0) return error;
-  return 'Process failed';
+  return 'Job failed';
 }
 
 function redact(value: unknown, depth = 0): unknown {
@@ -46,9 +46,9 @@ function redact(value: unknown, depth = 0): unknown {
 
 /**
  * Framework-agnostic run journal. Writes are buffered and best-effort: a
- * tracking failure is reported once and never interrupts the process.
+ * tracking failure is reported once and never interrupts the job.
  */
-export class ProcessTracker {
+export class JobTracker {
   private readonly runs = new Map<string, RunState>();
   private readonly flushMs: number;
   private readonly maxBuffer: number;
@@ -57,15 +57,15 @@ export class ProcessTracker {
   private dropped = 0;
 
   constructor(
-    private readonly store: ProcessStore,
-    options: ProcessTrackerOptions = {},
+    private readonly store: JobStore,
+    options: JobTrackerOptions = {},
   ) {
     this.flushMs = options.flushMs ?? 500;
     this.maxBuffer = options.maxBuffer ?? 50;
     this.onError = options.onError;
   }
 
-  async begin(input: ProcessBeginInput): Promise<void> {
+  async begin(input: JobBeginInput): Promise<void> {
     const startedAt = input.startedAt ?? new Date();
     const stages = input.stages.length > 0 ? input.stages : ['start'];
     const state: RunState = {
@@ -84,7 +84,7 @@ export class ProcessTracker {
 
     this.append(state, {
       kind: 'lifecycle',
-      message: 'Process started',
+      message: 'Job started',
       data: { stages },
     });
 
@@ -117,7 +117,7 @@ export class ProcessTracker {
   completeStage(
     jobRunId: string,
     key: string,
-    status: ProcessStageStatus = 'succeeded',
+    status: JobStageStatus = 'succeeded',
     message?: string,
   ): void {
     const state = this.runs.get(jobRunId);
@@ -186,7 +186,7 @@ export class ProcessTracker {
     });
   }
 
-  async finish(jobRunId: string, input: ProcessFinishInput): Promise<void> {
+  async finish(jobRunId: string, input: JobFinishInput): Promise<void> {
     const state = this.runs.get(jobRunId);
     const failed = input.status === 'failed';
     const lastStage = state?.stages.at(-1) ?? null;
@@ -196,7 +196,7 @@ export class ProcessTracker {
       this.append(state, {
         kind: 'lifecycle',
         level: failed ? 'error' : 'info',
-        message: failed ? 'Process failed' : 'Process finished',
+        message: failed ? 'Job failed' : 'Job finished',
         data: { status: input.status },
       });
       this.clearTimer(state);
@@ -231,7 +231,7 @@ export class ProcessTracker {
     return this.dropped;
   }
 
-  private append(state: RunState, event: Omit<ProcessEventInput, 'jobRunId' | 'occurredAt'>): void {
+  private append(state: RunState, event: Omit<JobEventInput, 'jobRunId' | 'occurredAt'>): void {
     state.buffer.push({
       ...event,
       jobRunId: state.jobRunId,

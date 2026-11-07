@@ -1,4 +1,4 @@
-# Process ledger
+# Job ledger
 
 Operational timeline for every worker job. It answers three questions:
 
@@ -34,24 +34,24 @@ before insert; raw provider bodies are never stored here.
 
 `apps/worker/src/observability` wraps every BullMQ processor:
 
-- `ProcessTrackingService.run` starts the run, drives the generic
+- `JobTrackingService.run` starts the run, drives the generic
   `start → work → finish` rail, and closes it on success or failure.
 - `historical-backfill` opts into `prepare → chunks → close` and reports one
   step per chunk plus row counts.
 - `packages/observability` owns buffering, redaction and best-effort writes. A
   tracking failure logs once and never fails the job.
 
-Adding a new domain stage means adding an entry to `process-stages.ts`, calling
+Adding a new domain stage means adding an entry to `job-stages.ts`, calling
 `enterStage`/`completeStage` (or `stage`) from the service, and optionally
 recording metrics with `metric`.
 
 ## API and dashboard
 
-- `GET /api/v1/processes` returns the summary and recent runs.
-- `GET /api/v1/processes/:id` returns the run, derived stages, latest metrics
+- `GET /api/v1/jobs` returns the summary and recent runs.
+- `GET /api/v1/jobs/:id` returns the run, derived stages, latest metrics
   and the last 500 events.
-- `/processes` lists runs and polls only while a visible run is active.
-- `/processes/[id]` renders the stage rail, the metric strip, the timestamped
+- `/jobs` lists runs and polls only while a visible run is active.
+- `/jobs/[id]` renders the stage rail, the metric strip, the timestamped
   timeline and the payload/result.
 
 ## Retention

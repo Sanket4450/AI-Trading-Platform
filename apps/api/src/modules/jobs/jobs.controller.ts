@@ -8,32 +8,29 @@ import {
 } from '@nestjs/swagger';
 import { ErrorResponseDto } from '../../common/dto/error-response.dto.js';
 import { ApiSessionAuth } from '../../common/swagger/api-session-auth.decorator.js';
-import {
-  ProcessDetailDto,
-  ProcessListResponseDto,
-} from './dto/process-response.dto.js';
-import { ProcessQueryDto } from './dto/process-query.dto.js';
-import { ProcessesService } from './processes.service.js';
+import { JobDetailResponseDto, JobListResponseDto } from './dto/job-response.dto.js';
+import { JobQueryDto } from './dto/job-query.dto.js';
+import { JobsService } from './jobs.service.js';
 
-@ApiTags('processes')
+@ApiTags('jobs')
 @ApiSessionAuth()
-@Controller('processes')
-export class ProcessesController {
-  constructor(private readonly processes: ProcessesService) {}
+@Controller('jobs')
+export class JobsController {
+  constructor(private readonly jobs: JobsService) {}
 
   @Get()
   @ApiOperation({ summary: 'List background job runs with a 24-hour summary' })
-  @ApiOkResponse({ type: ProcessListResponseDto })
-  list(@Query() query: ProcessQueryDto) {
-    return this.processes.list(query);
+  @ApiOkResponse({ type: JobListResponseDto })
+  list(@Query() query: JobQueryDto) {
+    return this.jobs.list(query);
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Return a job run with stages, metrics and events' })
   @ApiParam({ name: 'id', format: 'uuid' })
-  @ApiOkResponse({ type: ProcessDetailDto })
-  @ApiNotFoundResponse({ type: ErrorResponseDto, description: 'Process not found' })
+  @ApiOkResponse({ type: JobDetailResponseDto })
+  @ApiNotFoundResponse({ type: ErrorResponseDto, description: 'Job not found' })
   detail(@Param('id', ParseUUIDPipe) id: string) {
-    return this.processes.detail(id);
+    return this.jobs.detail(id);
   }
 }

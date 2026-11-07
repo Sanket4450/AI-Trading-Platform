@@ -44,7 +44,7 @@ import {
   upsertQualityIssue,
   writeCandles,
 } from '@ai-trading/database';
-import { ProcessTrackingService } from '../../observability/process-tracking.service.js';
+import { JobTrackingService } from '../../observability/job-tracking.service.js';
 import { QualityService } from './quality.service.js';
 import { RedisRateLimiter } from './rate-limit.service.js';
 
@@ -69,7 +69,7 @@ export class IngestionService {
     private readonly config: ConfigService,
     private readonly limiter: RedisRateLimiter,
     private readonly quality: QualityService,
-    private readonly tracking: ProcessTrackingService,
+    private readonly tracking: JobTrackingService,
   ) {}
 
   private client(): UpstoxClient {

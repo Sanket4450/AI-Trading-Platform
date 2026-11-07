@@ -1,16 +1,16 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import {
-  getProcessEvents,
-  getProcessMetrics,
-  getProcessRun,
-  getProcessSummary,
-  listProcessRuns,
+  getJobRun,
+  getJobRunEvents,
+  getJobRunMetrics,
+  getJobRunSummary,
+  listTrackedJobRuns,
 } from '@ai-trading/database';
-import type { ProcessQueryDto } from './dto/process-query.dto.js';
+import type { JobQueryDto } from './dto/job-query.dto.js';
 
-type RunRow = NonNullable<Awaited<ReturnType<typeof getProcessRun>>>;
-type EventRow = Awaited<ReturnType<typeof getProcessEvents>>[number];
-type MetricRow = Awaited<ReturnType<typeof getProcessMetrics>>[number];
+type RunRow = NonNullable<Awaited<ReturnType<typeof getJobRun>>>;
+type EventRow = Awaited<ReturnType<typeof getJobRunEvents>>[number];
+type MetricRow = Awaited<ReturnType<typeof getJobRunMetrics>>[number];
 
 const TERMINAL_STATUSES = new Set([
   'succeeded',
@@ -37,7 +37,7 @@ function numericValue(value: string | null): number | null {
   return Number.isFinite(number) ? number : null;
 }
 
-function mapListRun(run: Awaited<ReturnType<typeof listProcessRuns>>[number]) {
+function mapListRun(run: Awaited<ReturnType<typeof listTrackedJobRuns>>[number]) {
   return {
     ...run,
     stageKeys: stageKeysOf(run.stageKeys),
@@ -128,11 +128,11 @@ function deriveMetrics(rows: MetricRow[]) {
 }
 
 @Injectable()
-export class ProcessesService {
-  async list(query: ProcessQueryDto) {
+export class JobsService {
+  async list(query: JobQueryDto) {
     const [summary, runs] = await Promise.all([
-      getProcessSummary(),
-      listProcessRuns({
+      getJobRunSummary(),
+      listTrackedJobRuns({
         limit: query.limit ?? 50,
         status: query.status,
         jobType: query.jobType,
@@ -151,12 +151,12 @@ export class ProcessesService {
   }
 
   async detail(id: string) {
-    const run = await getProcessRun(id);
-    if (!run) throw new NotFoundException('Process not found');
+    const run = await getJobRun(id);
+    if (!run) throw new NotFoundException('Job not found');
 
     const [events, metrics] = await Promise.all([
-      getProcessEvents(id, 500),
-      getProcessMetrics(id),
+      getJobRunEvents(id, 500),
+      getJobRunMetrics(id),
     ]);
 
     return {

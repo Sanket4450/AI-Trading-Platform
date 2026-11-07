@@ -1,14 +1,14 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import type { Job } from 'bullmq';
 import { QUEUES } from '@ai-trading/domain';
-import { ProcessTrackingService } from '../../observability/process-tracking.service.js';
+import { JobTrackingService } from '../../observability/job-tracking.service.js';
 import { HistoricalDataService } from './historical-data.service.js';
 
 @Processor(QUEUES.historicalData, { concurrency: 4 })
 export class HistoricalDataProcessor extends WorkerHost {
   constructor(
     private readonly historicalData: HistoricalDataService,
-    private readonly tracking: ProcessTrackingService,
+    private readonly tracking: JobTrackingService,
   ) {
     super();
   }

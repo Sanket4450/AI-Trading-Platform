@@ -6,11 +6,11 @@ import {
   refreshDailyStats,
   updateJobRun,
 } from '@ai-trading/database';
-import { ProcessTrackingService } from '../../observability/process-tracking.service.js';
+import { JobTrackingService } from '../../observability/job-tracking.service.js';
 
 @Processor(QUEUES.maintenance)
 export class MaintenanceProcessor extends WorkerHost {
-  constructor(private readonly tracking: ProcessTrackingService) {
+  constructor(private readonly tracking: JobTrackingService) {
     super();
   }
 

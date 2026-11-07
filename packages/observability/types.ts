@@ -1,13 +1,13 @@
-export type ProcessEventKind = 'lifecycle' | 'stage' | 'step' | 'metric' | 'warning' | 'error';
+export type JobEventKind = 'lifecycle' | 'stage' | 'step' | 'metric' | 'warning' | 'error';
 
-export type ProcessEventLevel = 'debug' | 'info' | 'warn' | 'error';
+export type JobEventLevel = 'debug' | 'info' | 'warn' | 'error';
 
-export type ProcessStageStatus = 'succeeded' | 'failed' | 'skipped';
+export type JobStageStatus = 'succeeded' | 'failed' | 'skipped';
 
-export interface ProcessEventInput {
+export interface JobEventInput {
   jobRunId: string;
-  kind: ProcessEventKind;
-  level?: ProcessEventLevel;
+  kind: JobEventKind;
+  level?: JobEventLevel;
   stageKey?: string | null;
   message?: string | null;
   data?: Record<string, unknown>;
@@ -17,19 +17,19 @@ export interface ProcessEventInput {
   occurredAt?: Date;
 }
 
-export interface ProcessBeginInput {
+export interface JobBeginInput {
   jobRunId: string;
   stages: string[];
   startedAt?: Date;
 }
 
-export interface ProcessFinishInput {
+export interface JobFinishInput {
   status: 'succeeded' | 'failed';
   summary?: string | null;
   error?: unknown;
 }
 
-export interface ProcessStore {
+export interface JobStore {
   beginRun(input: { jobRunId: string; stages: string[]; startedAt: Date }): Promise<void>;
   setStage(input: { jobRunId: string; stageKey: string }): Promise<void>;
   finishRun(input: {
@@ -40,10 +40,10 @@ export interface ProcessStore {
     summary?: string | null;
     errorMessage?: string | null;
   }): Promise<void>;
-  appendEvents(events: ProcessEventInput[]): Promise<void>;
+  appendEvents(events: JobEventInput[]): Promise<void>;
 }
 
-export interface ProcessTrackerOptions {
+export interface JobTrackerOptions {
   flushMs?: number;
   maxBuffer?: number;
   onError?: (error: unknown) => void;

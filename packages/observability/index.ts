@@ -1,15 +1,15 @@
 /**
  * @ai-trading/observability
- * Structured process journal primitives. Framework-specific wiring lives in the apps.
+ * Structured job journal primitives. Framework-specific wiring lives in the apps.
  */
-export { ProcessTracker } from './process-tracker.js';
+export { JobTracker } from './job-tracker.js';
 export type {
-  ProcessBeginInput,
-  ProcessEventInput,
-  ProcessEventKind,
-  ProcessEventLevel,
-  ProcessFinishInput,
-  ProcessStageStatus,
-  ProcessStore,
-  ProcessTrackerOptions,
+  JobBeginInput,
+  JobEventInput,
+  JobEventKind,
+  JobEventLevel,
+  JobFinishInput,
+  JobStageStatus,
+  JobStore,
+  JobTrackerOptions,
 } from './types.js';

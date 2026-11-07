@@ -34,7 +34,7 @@ const navigation = [
   { href: '/strategies', label: 'Strategies', icon: FlaskConical },
   { href: '/configuration', label: 'Configuration', icon: SlidersHorizontal },
   { href: '/data', label: 'Data health', icon: Database },
-  { href: '/processes', label: 'Processes', icon: Activity },
+  { href: '/jobs', label: 'Jobs', icon: Activity },
   { href: '/audit', label: 'Audit', icon: ScrollText },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];

@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { ArrowUpRight, ShieldCheck } from 'lucide-react';
+import { ArrowUpRight } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import type { HealthResponse, Overview } from '@/lib/types';
 import { formatDateTime, formatNumber } from '@/lib/format';
@@ -107,6 +107,12 @@ export default async function OverviewPage() {
         <SectionCard
           title="Recent jobs"
           description="Worker runs, retries and skipped provider calls are all recorded."
+          toolbar={
+            <Link href="/jobs" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+              View all jobs
+              <ArrowUpRight className="size-4" />
+            </Link>
+          }
         >
           {overview.recentJobs.length === 0 ? (
             <EmptyState
@@ -176,24 +182,6 @@ export default async function OverviewPage() {
             </div>
           )}
         </SectionCard>
-      </div>
-
-      <div className="border-primary/20 bg-primary/5 mt-4 rounded-xl border px-4 py-3">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-start gap-3">
-            <ShieldCheck className="text-primary-strong mt-0.5 size-5" />
-            <div>
-              <p className="text-sm font-medium">Research is a capability boundary, not a label.</p>
-              <p className="text-muted-foreground mt-1 text-xs leading-5">
-                The API and worker accept only offline or research mode. No route writes to orders,
-                fills or positions, and the Upstox adapter has no order method.
-              </p>
-            </div>
-          </div>
-          <Link href="/audit" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
-            Review audit trail
-          </Link>
-        </div>
       </div>
     </div>
   );

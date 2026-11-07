@@ -2,7 +2,7 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 
-export const PROCESS_STATUSES = [
+export const JOB_STATUSES = [
   'queued',
   'running',
   'retrying',
@@ -11,10 +11,10 @@ export const PROCESS_STATUSES = [
   'cancelled',
 ] as const;
 
-export class ProcessQueryDto {
-  @ApiPropertyOptional({ enum: [...PROCESS_STATUSES] })
+export class JobQueryDto {
+  @ApiPropertyOptional({ enum: [...JOB_STATUSES] })
   @IsOptional()
-  @IsIn(PROCESS_STATUSES)
+  @IsIn(JOB_STATUSES)
   status?: string;
 
   @ApiPropertyOptional({ maxLength: 30, example: 'ingestion' })

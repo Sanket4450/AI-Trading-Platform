@@ -52,7 +52,7 @@ export function formatDuration(value: number | null | undefined): string {
   return `${hours}h ${String(minutes % 60).padStart(2, '0')}m`;
 }
 
-/** 24-hour clock in IST, used by the timestamped process timeline. */
+/** 24-hour clock in IST, used by the timestamped job timeline. */
 export function formatClock(value: string | Date | null | undefined): string {
   if (!value) return '—';
   const date = value instanceof Date ? value : new Date(value);

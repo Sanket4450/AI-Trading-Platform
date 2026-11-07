@@ -208,7 +208,7 @@ modular monolith or the R1 lifecycle tables.
   display order, one status row per member, a 2022–2027 NSE calendar, corrected tick sizes and a
   research-mode account/system setting.
 - `0009_process_tracking.sql` adds stage columns to `job_runs` and the append-only
-  `job_run_events` stream behind `/processes`. Every worker job now records start, stage, step,
+  `job_run_events` stream behind `/jobs`. Every worker job now records start, stage, step,
   metric and terminal events with timestamps. The database ends at 61 logical tables.
 - `pnpm db:verify` asserts 61 tables, the R2 tables and indexes, 51 ranked members, 51 status rows,
   51 primary mappings, valid tick sizes, calendar coverage and zero orders.

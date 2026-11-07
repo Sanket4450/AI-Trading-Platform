@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { apiFetch } from '@/lib/api';
-import type { ProcessDetail } from '@/lib/types';
+import type { JobDetail } from '@/lib/types';
 import { formatDateTime, formatDuration, formatNumber } from '@/lib/format';
 import { label } from '@/lib/labels';
 import { PageMeta } from '@/components/shell/page-meta';
@@ -13,20 +13,20 @@ import { JsonBlock } from '@/components/dashboard/json-block';
 import { EmptyState } from '@/components/dashboard/empty-state';
 import { AutoRefresh } from '@/components/dashboard/auto-refresh';
 import { buttonVariants } from '@/components/ui/button';
-import { StageRail } from '@/features/processes/components/stage-rail';
-import { EventTimeline } from '@/features/processes/components/event-timeline';
+import { StageRail } from '@/features/jobs/components/stage-rail';
+import { EventTimeline } from '@/features/jobs/components/event-timeline';
 
 const ACTIVE_STATUSES = new Set(['queued', 'running', 'retrying']);
 
-function durationOf(run: ProcessDetail['run']): number | null {
+function durationOf(run: JobDetail['run']): number | null {
   if (run.durationMs !== null) return run.durationMs;
   if (!run.startedAt) return null;
   return Date.now() - new Date(run.startedAt).getTime();
 }
 
-export default async function ProcessDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const detail = await apiFetch<ProcessDetail>(`/processes/${id}`);
+  const detail = await apiFetch<JobDetail>(`/jobs/${id}`);
   const run = detail.run;
   const active = ACTIVE_STATUSES.has(run.status);
   const parentJobRunId =
@@ -37,15 +37,15 @@ export default async function ProcessDetailPage({ params }: { params: Promise<{ 
   return (
     <div>
       <AutoRefresh active={active} />
-      <PageMeta title={`Process ${run.id.slice(0, 8)}`} />
+      <PageMeta title={`Job ${run.id.slice(0, 8)}`} />
 
       <DetailHeader
         badges={<StatusBadge status={run.status} />}
         meta={`${label(run.jobName)} · ${label(run.queueName)} · attempt ${run.attempt}/${run.maxAttempts}`}
         actions={
           <>
-            <Link href="/processes" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
-              All processes
+            <Link href="/jobs" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+              All jobs
             </Link>
             {parentJobRunId ? (
               <Link
@@ -106,7 +106,7 @@ export default async function ProcessDetailPage({ params }: { params: Promise<{ 
         {detail.metrics.length === 0 ? (
           <EmptyState
             title="No metrics recorded"
-            description="Metrics appear when the process reports counts or durations."
+            description="Metrics appear when the job reports counts or durations."
           />
         ) : (
           <StatGrid columns={4}>

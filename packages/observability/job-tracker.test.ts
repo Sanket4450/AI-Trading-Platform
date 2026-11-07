@@ -1,30 +1,30 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ProcessTracker } from './process-tracker.js';
-import type { ProcessEventInput, ProcessStore } from './types.js';
+import { JobTracker } from './job-tracker.js';
+import type { JobEventInput, JobStore } from './types.js';
 
 function createStore(): {
-  store: ProcessStore;
-  events: ProcessEventInput[];
+  store: JobStore;
+  events: JobEventInput[];
   stageUpdates: string[];
-  finished: Parameters<ProcessStore['finishRun']>[0][];
+  finished: Parameters<JobStore['finishRun']>[0][];
 } {
-  const events: ProcessEventInput[] = [];
+  const events: JobEventInput[] = [];
   const stageUpdates: string[] = [];
-  const finished: Parameters<ProcessStore['finishRun']>[0][] = [];
+  const finished: Parameters<JobStore['finishRun']>[0][] = [];
 
   return {
     events,
     stageUpdates,
     finished,
     store: {
-      beginRun: vi.fn<ProcessStore['beginRun']>(async () => undefined),
-      setStage: vi.fn<ProcessStore['setStage']>(async (input) => {
+      beginRun: vi.fn<JobStore['beginRun']>(async () => undefined),
+      setStage: vi.fn<JobStore['setStage']>(async (input) => {
         stageUpdates.push(input.stageKey);
       }),
-      finishRun: vi.fn<ProcessStore['finishRun']>(async (input) => {
+      finishRun: vi.fn<JobStore['finishRun']>(async (input) => {
         finished.push(input);
       }),
-      appendEvents: vi.fn<ProcessStore['appendEvents']>(async (batch) => {
+      appendEvents: vi.fn<JobStore['appendEvents']>(async (batch) => {
         events.push(...batch);
       }),
     },
@@ -35,11 +35,11 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe('ProcessTracker', () => {
+describe('JobTracker', () => {
   it('flushes buffered events when the run finishes', async () => {
     vi.useFakeTimers();
     const { store, events } = createStore();
-    const tracker = new ProcessTracker(store);
+    const tracker = new JobTracker(store);
 
     await tracker.begin({ jobRunId: 'run-1', stages: ['start', 'work'] });
     tracker.step('run-1', 'first step');
@@ -48,14 +48,14 @@ describe('ProcessTracker', () => {
     await tracker.finish('run-1', { status: 'succeeded' });
 
     expect(events.map((event) => event.message)).toEqual(
-      expect.arrayContaining(['Process started', 'first step', 'Process finished']),
+      expect.arrayContaining(['Job started', 'first step', 'Job finished']),
     );
   });
 
   it('flushes on the timer without waiting for finish', async () => {
     vi.useFakeTimers();
     const { store, events } = createStore();
-    const tracker = new ProcessTracker(store, { flushMs: 500 });
+    const tracker = new JobTracker(store, { flushMs: 500 });
 
     await tracker.begin({ jobRunId: 'run-2', stages: ['start'] });
     tracker.step('run-2', 'buffered');
@@ -68,7 +68,7 @@ describe('ProcessTracker', () => {
 
   it('emits entered and completed events around a stage', async () => {
     const { store, events } = createStore();
-    const tracker = new ProcessTracker(store);
+    const tracker = new JobTracker(store);
 
     await tracker.begin({ jobRunId: 'run-3', stages: ['prepare', 'close'] });
     const result = await tracker.stage('run-3', 'prepare', async () => 7);
@@ -82,7 +82,7 @@ describe('ProcessTracker', () => {
 
   it('marks a failed stage and rethrows', async () => {
     const { store, events } = createStore();
-    const tracker = new ProcessTracker(store);
+    const tracker = new JobTracker(store);
 
     await tracker.begin({ jobRunId: 'run-4', stages: ['fetch'] });
     await expect(
@@ -100,7 +100,7 @@ describe('ProcessTracker', () => {
 
   it('redacts secret-looking keys before writing', async () => {
     const { store, events } = createStore();
-    const tracker = new ProcessTracker(store);
+    const tracker = new JobTracker(store);
 
     await tracker.begin({ jobRunId: 'run-5', stages: ['start'] });
     tracker.step('run-5', 'calling provider', {
@@ -116,17 +116,17 @@ describe('ProcessTracker', () => {
     });
   });
 
-  it('never interrupts the process when the store fails', async () => {
+  it('never interrupts the job when the store fails', async () => {
     const onError = vi.fn<(error: unknown) => void>();
-    const store: ProcessStore = {
-      beginRun: vi.fn<ProcessStore['beginRun']>(async () => undefined),
-      setStage: vi.fn<ProcessStore['setStage']>(async () => undefined),
-      finishRun: vi.fn<ProcessStore['finishRun']>(async () => undefined),
-      appendEvents: vi.fn<ProcessStore['appendEvents']>(async () => {
+    const store: JobStore = {
+      beginRun: vi.fn<JobStore['beginRun']>(async () => undefined),
+      setStage: vi.fn<JobStore['setStage']>(async () => undefined),
+      finishRun: vi.fn<JobStore['finishRun']>(async () => undefined),
+      appendEvents: vi.fn<JobStore['appendEvents']>(async () => {
         throw new Error('database unavailable');
       }),
     };
-    const tracker = new ProcessTracker(store, { onError });
+    const tracker = new JobTracker(store, { onError });
 
     await tracker.begin({ jobRunId: 'run-6', stages: ['start'] });
     tracker.step('run-6', 'still going');
@@ -138,7 +138,7 @@ describe('ProcessTracker', () => {
 
   it('reports the active stage on success and failure', async () => {
     const { store, finished } = createStore();
-    const tracker = new ProcessTracker(store);
+    const tracker = new JobTracker(store);
 
     await tracker.begin({ jobRunId: 'run-7', stages: ['prepare', 'close'] });
     tracker.enterStage('run-7', 'prepare');

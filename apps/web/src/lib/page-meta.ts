@@ -39,10 +39,10 @@ const routes: Record<string, RouteMeta> = {
     description:
       'Data coverage, download runs, validation results and the quality issues that need attention.',
   },
-  '/processes': {
-    title: 'Processes',
+  '/jobs': {
+    title: 'Jobs',
     description:
-      'Every scheduled and operator-triggered process with its stage, timestamped timeline and important figures.',
+      'Every scheduled and operator-triggered job with its stage, timestamped timeline and important figures.',
   },
   '/audit': {
     title: 'Audit',
@@ -66,11 +66,11 @@ const detailRoutes: Array<{ prefix: string; meta: RouteMeta }> = [
     },
   },
   {
-    prefix: '/processes/',
+    prefix: '/jobs/',
     meta: {
-      title: 'Process detail',
+      title: 'Job detail',
       description:
-        'Stage rail, timestamped steps, important figures and the payload or result of a single process run.',
+        'Stage rail, timestamped steps, important figures and the payload or result of a single job run.',
     },
   },
   {

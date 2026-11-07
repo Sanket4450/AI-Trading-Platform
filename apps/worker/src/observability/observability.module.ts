@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
-import { ProcessTrackingService } from './process-tracking.service.js';
+import { JobTrackingService } from './job-tracking.service.js';
 
 @Module({
-  providers: [ProcessTrackingService],
-  exports: [ProcessTrackingService],
+  providers: [JobTrackingService],
+  exports: [JobTrackingService],
 })
-export class ProcessObservabilityModule {}
+export class JobObservabilityModule {}

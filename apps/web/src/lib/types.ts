@@ -360,31 +360,24 @@ export interface SystemSetting {
   updatedAt: string;
 }
 
-export interface JobRun {
+export interface JobRunSummary {
   id: string;
   jobName: string;
-  queueName: string;
   jobType: string;
   status: string;
-  scheduledFor: string | null;
   startedAt: string | null;
   finishedAt: string | null;
-  attempt: number;
-  maxAttempts: number;
-  payload: Record<string, unknown>;
-  result: Record<string, unknown> | null;
-  errorMessage: string | null;
   createdAt: string;
 }
 
-export interface ProcessSummary {
+export interface JobStats {
   running: number;
   failed24h: number;
   succeeded24h: number;
   p95DurationMs: number;
 }
 
-export interface ProcessRun {
+export interface JobRun {
   id: string;
   jobName: string;
   queueName: string;
@@ -407,12 +400,12 @@ export interface ProcessRun {
   createdAt: string;
 }
 
-export interface ProcessListResponse {
-  summary: ProcessSummary;
-  items: ProcessRun[];
+export interface JobListResponse {
+  summary: JobStats;
+  items: JobRun[];
 }
 
-export interface ProcessStage {
+export interface JobStage {
   key: string;
   status: string;
   enteredAt: string | null;
@@ -420,14 +413,14 @@ export interface ProcessStage {
   durationMs: number | null;
 }
 
-export interface ProcessMetric {
+export interface JobMetric {
   key: string;
   value: number | null;
   unit: string | null;
   at: string;
 }
 
-export interface ProcessEvent {
+export interface JobEvent {
   id: number;
   occurredAt: string;
   kind: string;
@@ -440,11 +433,11 @@ export interface ProcessEvent {
   metricUnit: string | null;
 }
 
-export interface ProcessDetail {
-  run: ProcessRun;
-  stages: ProcessStage[];
-  metrics: ProcessMetric[];
-  events: ProcessEvent[];
+export interface JobDetail {
+  run: JobRun;
+  stages: JobStage[];
+  metrics: JobMetric[];
+  events: JobEvent[];
 }
 
 export interface HealthCheck {
@@ -479,7 +472,7 @@ export interface SystemStatus {
 
 export interface Overview {
   counts: Record<string, number | string | null>;
-  recentJobs: JobRun[];
+  recentJobs: JobRunSummary[];
   openIssues: QualityIssue[];
   latestCoverageDate: string | null;
   coverageByStatus: { status: string; count: number }[];
