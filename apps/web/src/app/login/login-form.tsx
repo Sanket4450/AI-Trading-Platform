@@ -131,9 +131,9 @@ export function LoginForm({ next, initialError }: { next?: string; initialError?
             aria-label={showPassword ? 'Hide password' : 'Show password'}
             aria-pressed={showPassword}
             aria-controls="password"
-            className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 focus-visible:ring-3 absolute inset-y-0 right-0 flex w-10 items-center justify-center rounded-r-lg outline-none transition-colors"
+            className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 focus-visible:ring-3 absolute inset-y-0 right-0 flex w-10 cursor-pointer items-center justify-center rounded-r-lg outline-none transition-colors disabled:cursor-not-allowed"
           >
-            {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+            {showPassword ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
           </button>
         </div>
         {fieldErrors.password ? (
