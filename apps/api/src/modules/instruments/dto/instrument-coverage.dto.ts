@@ -93,16 +93,7 @@ export class InstrumentCoverageRowDto {
   missingDays!: number | null;
 
   @ApiProperty({ type: Number, nullable: true })
-  notApplicableDays!: number | null;
-
-  @ApiProperty({ type: Number, nullable: true })
   openCriticalIssues!: number | null;
-
-  @ApiProperty({ type: String, format: 'uuid', nullable: true })
-  lastRunId!: string | null;
-
-  @ApiProperty({ type: String, format: 'uuid', nullable: true })
-  activeRunId!: string | null;
 
   @ApiProperty({ type: String, format: 'date-time', nullable: true })
   lastSuccessAt!: string | null;
@@ -126,146 +117,6 @@ export class InstrumentCoverageMonthDto {
 
   @ApiProperty()
   missing!: number;
-
-  @ApiProperty()
-  notApplicable!: number;
-}
-
-export class IngestionRunDto {
-  @ApiProperty({ format: 'uuid' })
-  id!: string;
-
-  @ApiProperty({ format: 'uuid', required: false })
-  providerId?: string;
-
-  @ApiProperty({ example: 'upstox' })
-  providerCode!: string;
-
-  @ApiProperty({ example: 'historical_backfill' })
-  runType!: string;
-
-  @ApiProperty({ type: String, format: 'uuid', nullable: true })
-  instrumentId!: string | null;
-
-  @ApiProperty({ type: String, nullable: true })
-  symbol!: string | null;
-
-  @ApiProperty({ type: String, nullable: true })
-  timeframeUnit!: string | null;
-
-  @ApiProperty({ type: Number, nullable: true })
-  timeframeInterval!: number | null;
-
-  @ApiProperty({ type: String, format: 'date', nullable: true })
-  requestedFrom!: string | null;
-
-  @ApiProperty({ type: String, format: 'date', nullable: true })
-  requestedTo!: string | null;
-
-  @ApiProperty({
-    enum: [
-      'queued',
-      'running',
-      'succeeded',
-      'partially_failed',
-      'failed',
-      'cancelled',
-    ],
-  })
-  status!: string;
-
-  @ApiProperty()
-  rowsFetched!: number;
-
-  @ApiProperty()
-  rowsWritten!: number;
-
-  @ApiProperty()
-  rowsRejected!: number;
-
-  @ApiProperty()
-  rowsSkipped!: number;
-
-  @ApiProperty()
-  rowsUpdated!: number;
-
-  @ApiProperty({ type: String, format: 'uuid', nullable: true })
-  parentJobRunId!: string | null;
-
-  @ApiProperty({ type: Number, nullable: true })
-  chunkIndex!: number | null;
-
-  @ApiProperty({ type: Number, nullable: true })
-  chunkCount!: number | null;
-
-  @ApiProperty()
-  attempt!: number;
-
-  @ApiProperty({ type: String, nullable: true })
-  requestFingerprint!: string | null;
-
-  @ApiProperty({ type: Number, nullable: true })
-  httpStatus!: number | null;
-
-  @ApiProperty({ type: String, nullable: true })
-  providerErrorCode!: string | null;
-
-  @ApiProperty({ type: Number, nullable: true })
-  durationMs!: number | null;
-
-  @ApiProperty({ type: String, format: 'date-time', nullable: true })
-  rateLimitedUntil!: string | null;
-
-  @ApiProperty({ type: String, nullable: true })
-  errorMessage!: string | null;
-
-  @ApiProperty({ type: String, format: 'date-time', nullable: true })
-  startedAt!: string | null;
-
-  @ApiProperty({ type: String, format: 'date-time', nullable: true })
-  finishedAt!: string | null;
-
-  @ApiProperty({ type: String, format: 'date-time' })
-  createdAt!: string;
-}
-
-export class RawProviderPayloadDto {
-  @ApiProperty({ format: 'uuid' })
-  id!: string;
-
-  @ApiProperty()
-  endpoint!: string;
-
-  @ApiProperty({ example: 200 })
-  httpStatus!: number;
-
-  @ApiProperty({ example: 84213 })
-  payloadBytes!: number;
-
-  @ApiProperty()
-  payloadSha256!: string;
-
-  @ApiProperty({ type: String, format: 'date-time' })
-  fetchedAt!: string;
-
-  @ApiProperty({ enum: ['standard', 'extended', 'errors'] })
-  retentionClass!: string;
-
-  @ApiProperty({ type: String, format: 'date-time', nullable: true })
-  expiresAt!: string | null;
-}
-
-export class IngestionRunDetailDto extends IngestionRunDto {
-  @ApiProperty({
-    type: String,
-    format: 'uuid',
-    nullable: true,
-    required: false,
-  })
-  rawPayloadId?: string | null;
-
-  @ApiProperty({ type: RawProviderPayloadDto, nullable: true })
-  rawPayload!: RawProviderPayloadDto | null;
 }
 
 export class InstrumentCoverageDetailDto {
@@ -324,16 +175,7 @@ export class InstrumentCoverageDetailDto {
   missingDays!: number | null;
 
   @ApiProperty({ type: Number, nullable: true })
-  notApplicableDays!: number | null;
-
-  @ApiProperty({ type: Number, nullable: true })
   openCriticalIssues!: number | null;
-
-  @ApiProperty({ type: String, format: 'uuid', nullable: true })
-  lastRunId!: string | null;
-
-  @ApiProperty({ type: String, format: 'uuid', nullable: true })
-  activeRunId!: string | null;
 
   @ApiProperty({ type: String, format: 'date-time', nullable: true })
   lastSuccessAt!: string | null;
@@ -346,9 +188,6 @@ export class InstrumentCoverageDetailDto {
 
   @ApiProperty({ type: [InstrumentCoverageMonthDto] })
   months!: InstrumentCoverageMonthDto[];
-
-  @ApiProperty({ type: [IngestionRunDto] })
-  runs!: IngestionRunDto[];
 
   @ApiProperty({ type: [QualityIssueDto] })
   issues!: QualityIssueDto[];
@@ -368,17 +207,37 @@ export class CoverageInstrumentDto {
   tickSize!: string;
 }
 
+export class InstrumentCoverageDayRowDto {
+  @ApiProperty({ format: 'uuid' })
+  instrumentId!: string;
+
+  @ApiProperty({ format: 'date' })
+  tradingDate!: string;
+
+  @ApiProperty({ example: 375 })
+  expectedBars!: number;
+
+  @ApiProperty({ example: 372 })
+  storedBars!: number;
+
+  @ApiProperty({ enum: ['complete', 'partial', 'missing'] })
+  status!: string;
+
+  @ApiProperty({ format: 'date-time' })
+  checkedAt!: string;
+}
+
 export class CoverageDayDetailDto {
   @ApiProperty({ type: CoverageInstrumentDto, nullable: true })
   instrument!: CoverageInstrumentDto | null;
 
   @ApiProperty({
-    type: Object,
-    additionalProperties: true,
+    type: InstrumentCoverageDayRowDto,
     nullable: true,
-    description: 'Raw coverage row for the instrument/date pair.',
+    description:
+      'Coverage row for the instrument/date pair. Null when the instrument was not expected to trade.',
   })
-  coverage!: Record<string, unknown> | null;
+  coverage!: InstrumentCoverageDayRowDto | null;
 
   @ApiProperty({ type: [QualityIssueDto] })
   issues!: QualityIssueDto[];
@@ -461,12 +320,12 @@ export class QueuedInstrumentDto {
   to!: string;
 }
 
-export class ExistingRunDto {
+export class ExistingJobDto {
   @ApiProperty({ format: 'uuid' })
   instrumentId!: string;
 
   @ApiProperty({ format: 'uuid' })
-  runId!: string;
+  jobRunId!: string;
 }
 
 export class InstrumentFetchResponseDto {
@@ -484,8 +343,8 @@ export class InstrumentFetchResponseDto {
   @ApiProperty({ type: [QueuedInstrumentDto], required: false })
   queued?: QueuedInstrumentDto[];
 
-  @ApiProperty({ type: [ExistingRunDto], required: false })
-  existingRunIds?: ExistingRunDto[];
+  @ApiProperty({ type: [ExistingJobDto], required: false })
+  existingJobIds?: ExistingJobDto[];
 }
 
 export class CancelInstrumentFetchDto {

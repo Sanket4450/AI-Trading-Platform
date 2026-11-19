@@ -67,7 +67,7 @@ seed, repositories, configuration management, API, dashboard, worker jobs and au
 
 ### Database
 
-- **56 logical tables + 1 materialized view.** The explicit M:N tables are
+- **55 logical tables + 1 materialized view.** The explicit M:N tables are
   `user_account_access`, `account_instrument_permissions`, `strategy_config_bindings` and
   `strategy_activations`.
 - **Drizzle schema mirrors the database.** `packages/database/schema/*.ts` defines the tables, checks and simple
@@ -110,7 +110,7 @@ seed, repositories, configuration management, API, dashboard, worker jobs and au
   releases.
 - **Credentials.** `CONFIG_ENCRYPTION_KEY` drives AES-256-GCM envelope encryption. The API returns credential
   metadata only; ciphertext is never exposed.
-- **API surface.** Health, auth, accounts, instruments (including coverage and ingestion runs),
+- **API surface.** Health, auth, accounts, instruments (including coverage and fetch status),
   strategies, configuration, jobs, audit, settings (including provider state and provider-wide issues) and
   system status. See Swagger at `/api/docs`.
 - **Ingestion writes.** A per-instrument fetch and a materialized-view refresh create `job_runs` and enqueue
@@ -177,7 +177,7 @@ pnpm --filter @ai-trading/worker build
 pnpm --filter @ai-trading/web build
 ```
 
-The database verification reports 58 logical tables, 1 materialized view, 63 candle partitions, 15 quote
+The database verification reports 55 logical tables, 1 materialized view, 63 candle partitions, 15 quote
 partitions, zero live orders and a parameters binding for every strategy version. The API smoke test covers
 login, every read route, configuration create/idempotency/diff/bind, settings update and a bounded backfill. The
 worker processes the backfill and records a skipped result when Upstox credentials are empty. The Playwright
@@ -200,9 +200,9 @@ R1 lifecycle tables.
 
 ### Database
 
-- **60 logical tables at the end of 0008.** `0008_r2_ingestion_quality.sql` adds orchestration counters to
-  `market_data_ingestion_runs`, gap fields to `market_data_coverage`, dedupe and lifecycle fields to
-  `data_quality_issues`, a unique raw-payload key and `instrument_data_status`.
+- **60 logical tables at the end of 0008.** `0008_r2_ingestion_quality.sql` adds gap fields to
+  `market_data_coverage`, dedupe and lifecycle fields to `data_quality_issues`, a unique raw-payload key and
+  `instrument_data_status`.
 - The migration is additive. It preflights duplicate raw payloads before creating the unique index and
   preserves legacy resolved/ignored issues with an explicit migration note.
 - The seed flags the 51 reference instruments as `is_sync_target`, creates one status row per target,
@@ -214,8 +214,11 @@ R1 lifecycle tables.
   `instruments.is_sync_target`.
 - `0011_drop_daily_validation.sql` removes the daily-oracle validation feature: the
   `market_data_daily_validation` table, the coverage comparison columns and the `partial_reconciled`
-  data status. The database ends at 56 logical tables.
-- `pnpm db:verify` asserts 56 tables, the R2 tables and indexes, 51 sync targets, 51 status rows,
+  data status.
+- `0012_drop_ingestion_runs.sql` removes the per-chunk `market_data_ingestion_runs` ledger. Child
+  `job_runs` plus `job_run_events` carry orchestration, progress and failure diagnostics, while candles
+  keep their `raw_payload_id` lineage. The database ends at 55 logical tables.
+- `pnpm db:verify` asserts 55 tables, the R2 tables and indexes, 51 sync targets, 51 status rows,
   51 primary mappings, valid tick sizes, calendar coverage and zero orders.
 
 ### Provider and pipeline
@@ -223,22 +226,22 @@ R1 lifecycle tables.
 - `packages/adapters` owns the read-only V3 historical, intraday, holidays and timings calls,
   error classification and the rate-limiter interface. It still has no order method.
 - `packages/market-data` owns tuple normalization, IST/UTC conversion, session windows, strict
-  coverage, gap runs, the 21-rule catalog, dedupe keys and catalog status precedence.
-- The worker runs one child job per instrument, one ingestion run per month chunk, a Redis-backed
-  three-window provider budget, retry/backoff, cooperative cancellation, stale-run recovery and
-  parent-plan completion.
+  coverage, gap runs, the 22-rule catalog, dedupe keys and catalog status precedence.
+- The worker runs one child job per instrument, iterates month chunks inside that job, and records
+  chunk steps and metrics on the job timeline. It also runs a Redis-backed three-window provider budget,
+  retry/backoff, cooperative cancellation, stale-job recovery and parent-plan completion.
 
 ### API and dashboard
 
 - The catalog-first surface adds instrument coverage status, per-instrument fetch/cancel/recompute,
-  coverage day detail, ingestion run detail and issue lifecycle. Jobs expose plan chunks; settings expose
+  coverage day detail and issue lifecycle. Jobs expose instrument children and progress; settings expose
   provider state and provider-wide issues. Every write records an audit row.
 - A broker-contract test asserts that the API does not import order, position or trading modules, that
   the Upstox adapter has no order method and that the placeholder order controller has no route.
 - Reference sync and corporate-action import require the global `admin` user role.
-- The dashboard adds `/instruments/[id]`, its coverage day detail, `/instruments/runs/[id]`,
-  `/instruments/issues/[id]`, `/settings/issues/[id]` and plan chunks inside `/jobs/[id]`. It polls only
-  while a visible row is active.
+- The dashboard adds `/instruments/[id]`, its coverage day detail, `/instruments/issues/[id]`,
+  `/settings/issues/[id]` and the instrument table inside `/jobs/[id]`. It polls only while a visible row
+  is active.
 
 ### Open checks
 
@@ -258,10 +261,10 @@ pnpm nx run-many -t test -p domain configuration market-data adapters api worker
 ```
 
 The external PostgreSQL migration 0008 applied successfully, the R2 seed completed and `db:verify`
-reported 61 logical tables, 1 materialized view, 63 candle partitions, 15 quote partitions, 51
-sync targets with status rows and primary mappings, 2191 calendar days and zero orders. The
-subsequent `0010_drop_universes.sql` and `0011_drop_daily_validation.sql` migrations leave 56 logical
-tables.
+reported the R2 tables, 1 materialized view, 63 candle partitions, 15 quote partitions, 51 sync targets
+with status rows and primary mappings, 2191 calendar days and zero orders. The subsequent
+`0010_drop_universes.sql`, `0011_drop_daily_validation.sql` and `0012_drop_ingestion_runs.sql`
+migrations leave 55 logical tables.
 
 ### Live read-only checks (2026-10-27)
 
@@ -289,3 +292,9 @@ Consequences:
   removal: `0011_drop_daily_validation.sql` drops the oracle and leaves strict coverage only.
 - A full backfill was **not** started. The plan's stop condition applied at the time; the daily-oracle
   feature was later removed, so completeness now rests on strict coverage alone.
+- `0013_instrument_day_coverage.sql` replaces `market_data_coverage` with `instrument_day_coverage`:
+  `instrument_id`, `trading_date`, `expected_bars`, `stored_bars`, `checked_at`. The verdict, gap
+  metrics and evidence blob were dropped because they are derived; `not_applicable` rows were dropped
+  because the calendar and listing window already express that. The table is a rebuildable cache,
+  refilled by the `coverage-rebuild` job (`POST /system/coverage/rebuild`) or the nightly
+  `coverage-recompute`.

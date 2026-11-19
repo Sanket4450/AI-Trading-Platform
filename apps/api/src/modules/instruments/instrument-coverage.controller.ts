@@ -65,7 +65,7 @@ export class InstrumentCoverageController {
   }
 
   @Get(':instrumentId/coverage')
-  @ApiOperation({ summary: 'Return coverage counters, month grid, runs and issues for one instrument' })
+  @ApiOperation({ summary: 'Return coverage counters, month grid and issues for one instrument' })
   @ApiParam({ name: 'instrumentId', format: 'uuid' })
   @ApiOkResponse({ type: InstrumentCoverageDetailDto })
   @ApiNotFoundResponse({ type: ErrorResponseDto, description: 'Instrument not found' })

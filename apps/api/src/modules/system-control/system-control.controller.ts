@@ -1,9 +1,16 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Post, Query, Req } from '@nestjs/common';
 import {
+  ApiCreatedResponse,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
+import type { Request } from 'express';
+import {
+  CurrentUser,
+  type AuthenticatedUser,
+} from '../../common/auth/current-user.decorator.js';
+import { requestMeta } from '../../common/http/request-meta.js';
 import { ApiSessionAuth } from '../../common/swagger/api-session-auth.decorator.js';
 import { JobRunDto } from '../../common/dto/job-run.dto.js';
 import { TradingSessionDto } from '../accounts/dto/account-response.dto.js';
@@ -56,6 +63,20 @@ export class SystemControlController {
   @ApiOkResponse({ type: JobRunDto, isArray: true })
   jobs(@Query() query: JobsQueryDto) {
     return this.system.jobs(limit(query.limit), query.status);
+  }
+
+  @Post('coverage/rebuild')
+  @ApiOperation({
+    summary: 'Queue a full rebuild of instrument day coverage',
+    description:
+      'Clears instrument_day_coverage and recomputes it for every sync target from 2022-01-01 to the latest completed session.',
+  })
+  @ApiCreatedResponse({ type: JobRunDto })
+  rebuildCoverage(
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() request: Request,
+  ) {
+    return this.system.rebuildCoverage(user.id, requestMeta(request));
   }
 
   @Get('health-snapshots')

@@ -42,6 +42,11 @@ export class HistoricalDataService {
           String(payload.jobRunId),
           payload,
         );
+      case 'coverage-rebuild':
+        return this.ingestion.coverageRebuild(
+          String(payload.jobRunId),
+          payload,
+        );
       case 'quality-scan':
         return this.ingestion.qualityScanJob(String(payload.jobRunId), payload);
       case 'ingestion-reconcile':

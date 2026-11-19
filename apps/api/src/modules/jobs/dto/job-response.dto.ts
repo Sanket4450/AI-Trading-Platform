@@ -92,7 +92,7 @@ export class JobEventDto {
 
 export class JobPlanProgressDto {
   @ApiProperty()
-  chunks!: number;
+  jobs!: number;
 
   @ApiProperty()
   instruments!: number;
@@ -131,7 +131,7 @@ export class JobPlanProgressDto {
   rowsUpdated!: number;
 }
 
-export class JobPlanChunkDto {
+export class JobChildRunDto {
   @ApiProperty({ format: 'uuid' })
   id!: string;
 
@@ -141,26 +141,17 @@ export class JobPlanChunkDto {
   @ApiProperty({ type: String, nullable: true })
   symbol!: string | null;
 
-  @ApiProperty({ type: Number, nullable: true })
-  rank!: number | null;
+  @ApiProperty()
+  status!: string;
 
-  @ApiProperty({ type: Number, nullable: true })
-  chunkIndex!: number | null;
-
-  @ApiProperty({ type: Number, nullable: true })
-  chunkCount!: number | null;
+  @ApiProperty()
+  attempt!: number;
 
   @ApiProperty({ type: String, format: 'date', nullable: true })
   requestedFrom!: string | null;
 
   @ApiProperty({ type: String, format: 'date', nullable: true })
   requestedTo!: string | null;
-
-  @ApiProperty()
-  status!: string;
-
-  @ApiProperty()
-  attempt!: number;
 
   @ApiProperty()
   rowsFetched!: number;
@@ -175,16 +166,7 @@ export class JobPlanChunkDto {
   rowsSkipped!: number;
 
   @ApiProperty()
-  rowsUpdated!: number;
-
-  @ApiProperty({ type: Number, nullable: true })
-  httpStatus!: number | null;
-
-  @ApiProperty({ type: String, nullable: true })
-  providerErrorCode!: string | null;
-
-  @ApiProperty({ type: Number, nullable: true })
-  durationMs!: number | null;
+  chunks!: number;
 
   @ApiProperty({ type: String, nullable: true })
   errorMessage!: string | null;
@@ -194,6 +176,9 @@ export class JobPlanChunkDto {
 
   @ApiProperty({ type: String, format: 'date-time', nullable: true })
   finishedAt!: string | null;
+
+  @ApiProperty({ type: String, format: 'date-time' })
+  createdAt!: string;
 }
 
 export class JobDetailResponseDto {
@@ -217,9 +202,9 @@ export class JobDetailResponseDto {
   planProgress!: JobPlanProgressDto | null;
 
   @ApiProperty({
-    type: [JobPlanChunkDto],
-    description: 'Only populated for a multi-instrument backfill plan.',
+    type: [JobChildRunDto],
+    description: 'One row per instrument job for a multi-instrument backfill plan.',
   })
-  chunks!: JobPlanChunkDto[];
+  children!: JobChildRunDto[];
 }
 

@@ -35,7 +35,7 @@ describe('safeReturnPath', () => {
     'https://evil.example.com',
     '//evil.example.com',
     '/login',
-    '/instruments/runs/1',
+    '/instruments/issues/1',
     '/instruments?search=infy#frag',
     '/instruments\\..\\secret',
     '',
@@ -65,7 +65,7 @@ describe('backLinkFor', () => {
   });
 
   it('falls back when the marker is not a list page', () => {
-    expect(backLinkFor('/instruments/runs/1', '/jobs')).toEqual({
+    expect(backLinkFor('/instruments/issues/1', '/jobs')).toEqual({
       href: '/jobs',
       label: 'Back to jobs',
     });

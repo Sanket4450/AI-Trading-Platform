@@ -4,14 +4,16 @@ Task: Do the following task for webapp
 
 ### Description
 
-- In case of Refresh missing months button, it should show a confirmation dialog for that action
+- Want to make the job and job events standardized:
 
-- Go through for each such action button or trigger within webapp that does an important operation directly, the dialog should be come for every one of them
+First about job:
 
-- Make sure to levarage existing common dialog if present otherwise build a such dialog and levarage that consistently
 
-- Make sure it shouldn't show "Refresh missing months" tooltip or button for every instrument strait, in case some instrument aren't fetched anytime, so that action would fetch the instrument data from scratch so the action button and dialog should show something else, like this in case of different cases then show messages, tooltip, labels conditionally
-  - Not too conditionally, you can group related things together
+Now about job events:
+
+I want to make the job_run_events entity simpler and standardized, the purpose is now not just the run tracking but showing the progress with exact figures into UI, this includes predefined fix stages for every job (the stages must be decided for every job), some stages may include numeric figures where as some may not
+
+ex. fetching candles month by month chunks, so per tracking record represents a month chunk having numerical information where as some stages like preparing or auditing doesn't contain any numerical information
 
 ### Context
 

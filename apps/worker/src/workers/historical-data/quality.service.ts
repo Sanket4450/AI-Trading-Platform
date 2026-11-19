@@ -15,7 +15,6 @@ import {
 } from '@ai-trading/market-data';
 import {
   autoResolveStaleIssues,
-  findActiveBackfillRun,
   findProviderByCode,
   getCandleUpdatedAt,
   getCoverageInputs,
@@ -26,9 +25,9 @@ import {
   hasConfirmedCorporateAction,
   getInstrumentStatusRow,
   getInstrumentTickSize,
-  getLastSuccessfulRunForInstrument,
+  getLastSuccessfulJobForInstrument,
   getLatestCompletedSession,
-  getLatestRunForInstrument,
+  getLatestJobForInstrument,
   getPrimaryMappingCount,
   getSyncTargetInstruments,
   getTradingSessionsForRange,
@@ -107,50 +106,15 @@ export class QualityService {
     let complete = 0;
     let partial = 0;
     let missing = 0;
-    let notApplicable = 0;
     const rows: Parameters<typeof upsertCoverageBatch>[0] = [];
 
     for (const date of eachDate(from, to)) {
-      const session = sessions.get(date) ?? null;
-      if (!session) {
-        rows.push({
-          instrumentId,
-          tradingDate: date,
-          expectedBars: 0,
-          storedBars: 0,
-          gapCount: 0,
-          gapRunCount: 0,
-          maxGapMinutes: 0,
-          firstBarAt: null,
-          lastBarAt: null,
-          status: 'not_applicable',
-          details: { reason: 'not a scheduled trading session' },
-        });
-        notApplicable += 1;
-        continue;
-      }
+      const session = sessions.get(date);
+      if (!session) continue;
       if (
         (listing?.listedOn && date < listing.listedOn) ||
         (listing?.delistedOn && date > listing.delistedOn)
       ) {
-        rows.push({
-          instrumentId,
-          tradingDate: date,
-          expectedBars: 0,
-          storedBars: 0,
-          gapCount: 0,
-          gapRunCount: 0,
-          maxGapMinutes: 0,
-          firstBarAt: null,
-          lastBarAt: null,
-          status: 'not_applicable',
-          details: {
-            reason: 'outside the reviewed listing window',
-            listedOn: listing.listedOn,
-            delistedOn: listing.delistedOn,
-          },
-        });
-        notApplicable += 1;
         continue;
       }
 
@@ -163,24 +127,14 @@ export class QualityService {
         volume: '0',
         isFinal: !(input?.has_partial && index === observed.length - 1),
       }));
-      const verdict = computeCoverageVerdict({
-        session,
-        observed,
-        hasCriticalIssue: false,
-      });
+      const verdict = computeCoverageVerdict({ session, observed });
 
       rows.push({
         instrumentId,
         tradingDate: date,
         expectedBars: verdict.expectedBars,
         storedBars: verdict.storedBars,
-        gapCount: verdict.missingBarCount,
-        gapRunCount: verdict.gapRunCount,
-        maxGapMinutes: verdict.maxGapMinutes,
-        firstBarAt: verdict.firstBarAt,
-        lastBarAt: verdict.lastBarAt,
-        status: verdict.status,
-        details: verdict.details,
+        checkedAt: new Date(),
       });
 
       if (verdict.status === 'complete') complete += 1;
@@ -203,7 +157,6 @@ export class QualityService {
       complete,
       partial,
       missing,
-      notApplicable,
       datesChecked: rows.length,
     };
   }
@@ -316,9 +269,8 @@ export class QualityService {
       targetFrom,
       targetTo,
     );
-    const latestRun = await getLatestRunForInstrument(instrumentId);
-    const activeRun = await findActiveBackfillRun(instrumentId);
-    const lastSuccess = await getLastSuccessfulRunForInstrument(instrumentId);
+    const latestJob = await getLatestJobForInstrument(instrumentId);
+    const lastSuccess = await getLastSuccessfulJobForInstrument(instrumentId);
     const staleSessions = this.config.get<number>(
       'DATA_STATUS_STALE_SESSIONS',
       1,
@@ -333,19 +285,18 @@ export class QualityService {
             86_400_000,
         ) >= staleSessions);
 
-    const dataStatus = deriveDataStatus({
-      expectedDays: counters.expectedDays,
-      completeDays: counters.completeDays,
-      partialDays: counters.partialDays,
-      missingDays: counters.missingDays,
-      notApplicableDays: counters.notApplicableDays,
-      openCriticalIssues: counters.openCriticalIssues,
-    });
+    const listing = await getInstrumentListing(instrumentId);
+    const expectsData =
+      Boolean(listing) &&
+      Boolean(listing?.isActive) &&
+      (!listing?.delistedOn || listing.delistedOn >= targetFrom) &&
+      (!listing?.listedOn || listing.listedOn <= targetTo);
+    const dataStatus = deriveDataStatus(counters, expectsData);
     const fetchStatus = deriveFetchStatus({
-      hasRun: Boolean(latestRun),
-      queued: latestRun?.status === 'queued' ? 1 : 0,
-      running: latestRun?.status === 'running' ? 1 : 0,
-      lastStatus: latestRun?.status ?? null,
+      hasRun: Boolean(latestJob),
+      queued: latestJob?.status === 'queued' ? 1 : 0,
+      running: latestJob?.status === 'running' ? 1 : 0,
+      lastStatus: latestJob?.status ?? null,
       stale: dataStatus === 'complete' && stale,
     });
 
@@ -359,10 +310,7 @@ export class QualityService {
       completeDays: counters.completeDays,
       partialDays: counters.partialDays,
       missingDays: counters.missingDays,
-      notApplicableDays: counters.notApplicableDays,
       openCriticalIssues: counters.openCriticalIssues,
-      lastRunId: latestRun?.id ?? null,
-      activeRunId: activeRun?.id ?? null,
       lastSuccessAt: lastSuccess?.finishedAt ?? null,
       computedAt: new Date(),
     });
@@ -504,7 +452,7 @@ export class QualityService {
     const staleHours = this.config.get<number>('DATA_QUALITY_STALE_HOURS', 24);
     let findings = 0;
     for (const target of targets) {
-      const lastSuccess = await getLastSuccessfulRunForInstrument(
+      const lastSuccess = await getLastSuccessfulJobForInstrument(
         target.instrumentId,
       );
       if (!lastSuccess?.finishedAt) {

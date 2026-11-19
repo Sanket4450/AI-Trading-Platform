@@ -9,7 +9,6 @@ import { StatCard, StatGrid } from '@/components/dashboard/stat-card';
 import { SectionCard } from '@/components/dashboard/section-card';
 import { DetailHeader } from '@/components/dashboard/detail-header';
 import { StatusBadge } from '@/components/dashboard/status-badge';
-import { JsonBlock } from '@/components/dashboard/json-block';
 
 interface DayDetail {
   instrument: { id: string; symbol: string; name: string; segment?: string; tickSize: string } | null;
@@ -29,6 +28,7 @@ export default async function InstrumentCoverageDayPage({
   const back = backLinkFor(fromParam, `/instruments/${id}`);
   const detail = await apiFetch<DayDetail>(`/instruments/${id}/coverage/${date}`);
   const coverage = detail.coverage;
+  const missing = coverage ? Math.max(coverage.expectedBars - coverage.storedBars, 0) : 0;
 
   return (
     <div>
@@ -50,7 +50,7 @@ export default async function InstrumentCoverageDayPage({
         ]}
       />
 
-      <StatGrid columns={4}>
+      <StatGrid columns={3}>
         <StatCard
           label="Expected"
           value={formatNumber(coverage?.expectedBars ?? 0)}
@@ -60,54 +60,43 @@ export default async function InstrumentCoverageDayPage({
         <StatCard
           label="Stored"
           value={formatNumber(coverage?.storedBars ?? 0)}
-          hint="Distinct 1-minute rows"
+          hint="Distinct in-session minutes"
           tone="success"
         />
         <StatCard
-          label="Gaps"
-          value={formatNumber(coverage?.gapCount ?? 0)}
-          hint="Missing minutes"
-          tone="warning"
-        />
-        <StatCard
-          label="Gap runs"
-          value={formatNumber(coverage?.gapRunCount ?? 0)}
-          hint={`Longest ${coverage?.maxGapMinutes ?? 0}m`}
-          tone="highlight"
+          label="Missing"
+          value={formatNumber(missing)}
+          hint="Expected minus stored"
+          tone={missing > 0 ? 'warning' : 'success'}
         />
       </StatGrid>
 
       <SectionCard
         className="mt-4"
-        title="Evidence"
-        description="Gap starts and raw payload lineage."
-        contentClassName="space-y-4"
+        title="Issues for this day"
+        description="Findings raised by the quality rules."
       >
-        {coverage ? <JsonBlock value={coverage.details} /> : null}
-        <div>
-          <h3 className="mb-2 text-sm font-medium">Issues for this day</h3>
-          {detail.issues.length === 0 ? (
-            <p className="text-muted-foreground text-sm">No issues recorded.</p>
-          ) : (
-            <div className="space-y-2">
-              {detail.issues.map((issue) => (
-                <Link
-                  key={issue.id}
-                  href={detailHref(`/instruments/issues/${issue.id}`, back.href)}
-                  className="border-border/70 bg-background/40 block rounded-lg border p-3 text-sm"
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="font-medium">{label(issue.issueType)}</span>
-                    <StatusBadge status={issue.severity} />
-                  </div>
-                  <p className="text-muted-foreground mt-1 text-xs">
-                    {issue.ruleId ?? 'No rule'} · {label(issue.status)} · seen {issue.occurrenceCount}×
-                  </p>
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
+        {detail.issues.length === 0 ? (
+          <p className="text-muted-foreground text-sm">No issues recorded.</p>
+        ) : (
+          <div className="space-y-2">
+            {detail.issues.map((issue) => (
+              <Link
+                key={issue.id}
+                href={detailHref(`/instruments/issues/${issue.id}`, back.href)}
+                className="border-border/70 bg-background/40 block rounded-lg border p-3 text-sm"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-medium">{label(issue.issueType)}</span>
+                  <StatusBadge status={issue.severity} />
+                </div>
+                <p className="text-muted-foreground mt-1 text-xs">
+                  {issue.ruleId ?? 'No rule'} · {label(issue.status)} · seen {issue.occurrenceCount}×
+                </p>
+              </Link>
+            ))}
+          </div>
+        )}
       </SectionCard>
     </div>
   );

@@ -25,6 +25,7 @@ const LABEL_OVERRIDES: Record<string, string> = {
   'instrument-sync': 'Instrument sync',
   'calendar-sync': 'Calendar sync',
   'coverage-recompute': 'Coverage recompute',
+  'coverage-rebuild': 'Coverage rebuild',
   'quality-scan': 'Quality scan',
   'ingestion-reconcile': 'Ingestion reconcile',
   'refresh-materialized-view': 'Refresh daily stats',

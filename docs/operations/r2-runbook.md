@@ -36,7 +36,7 @@ provisional where marked; reconcile it with NSE circulars before relying on it f
 | 08:00    | Mon–Fri      | `instrument-sync`           | Refresh the BOD master, mappings and tick sizes.               |
 | 08:05    | Mon–Fri      | `calendar-sync`             | Reconcile the current year with Upstox holidays and timings.   |
 | 08:15    | Mon–Fri      | `historical-finalize`       | Replace the previous session's partial bar with final history. |
-| 08:30    | Mon–Fri      | `ingestion-reconcile`       | Mark stale running chunks failed and surface them.             |
+| 08:30    | Mon–Fri      | `ingestion-reconcile`       | Mark stale running jobs failed and surface them.               |
 | 16:00    | Mon–Fri      | `intraday-sync`             | Capture the current session; the last bar stays non-final.     |
 | 16:15    | Mon–Fri      | `coverage-recompute`        | Recompute strict coverage and project instrument status.       |
 | 16:30    | Mon–Fri      | `quality-scan`              | Scan the last 10 trading days.                                 |
@@ -46,6 +46,16 @@ provisional where marked; reconcile it with NSE circulars before relying on it f
 
 Every market-data schedule checks the reviewed calendar first. `WORKER_SCHEDULES_ENABLED=false`
 disables all schedules for maintenance.
+
+`instrument_day_coverage` is a rebuildable cache. To clear it and recompute every sync target from
+2022-01-01 to the latest completed session, queue `coverage-rebuild`:
+
+```bash
+curl -X POST http://localhost:8000/api/v1/system/coverage/rebuild -b cookies.txt
+```
+
+The endpoint returns the queued job run; watch it on `/jobs`. It deletes no candles and edits no
+quality issues.
 
 ## Token procedure
 
@@ -69,8 +79,8 @@ The catalog is the entry point.
 5. Watch rows move through Queued, Fetching, Verifying and then their data status.
 6. Open `/instruments` for per-instrument coverage and its month grid; open a row for runs, issues
    and the coverage day detail.
-7. Open `/jobs` and select the plan row for chunk progress, then export or record the acceptance
-   evidence from its chunk table.
+7. Open `/jobs` and select the plan row for instrument progress, then export or record the
+   acceptance evidence from its instrument table.
 
 The first full run is roughly 2,958 monthly requests for 51 instruments. The provider budget, not
 network latency, dominates: at 1,600 requests per 30 minutes the floor is about 45 minutes.
@@ -79,12 +89,12 @@ network latency, dominates: at 1,600 requests per 30 minutes the floor is about 
 
 - **Worker killed mid-backfill**: run `ingestion-reconcile` from the scheduler or trigger a
   `coverage-recompute` from the instrument page.
-  Runs older than 15 minutes are marked failed; launch a new missing-month fetch from the catalog.
-  Completed chunks are skipped.
+  Jobs older than 15 minutes are marked failed; launch a new missing-month fetch from the catalog.
+  Months that strict coverage already marks complete are skipped.
 - **Redis unavailable**: queue and limiter fail. Start Redis, restart the worker and retry queued or
   failed jobs. No database state is lost.
 - **Database unavailable**: restore PostgreSQL and restart the worker. In-flight batches roll back;
-  resume from the chunk ledger.
+  resume from coverage and job status.
 - **Provider schema change**: stop the plan, keep the raw payload, update the contract fixture and
   parser, then replay from raw.
 - **Bad calendar fixture**: correct the reviewed fixture in a new migration or seed change, rerun
@@ -103,11 +113,13 @@ pnpm build
 pnpm db:verify
 ```
 
-`pnpm db:verify` expects 56 logical tables, the R2 tables and indexes, 51 sync targets with status
+`pnpm db:verify` expects 55 logical tables, the R2 tables and indexes, 51 sync targets with status
 rows and primary mappings, a 2022–2027 calendar, valid tick sizes and zero orders.
 
-Strict coverage is the only completeness verdict. Coverage that is missing minutes stays `partial`
-until the gap is repaired.
+Strict coverage is the only completeness verdict. `instrument_day_coverage` stores one row per
+instrument per expected trading day with `expected_bars` and `stored_bars`; missing minutes are
+`expected_bars - stored_bars`. Days the instrument was not expected to trade have no row, and a day
+that is missing minutes stays `partial` until the gap is repaired.
 
 The integration suite uses testcontainers PostgreSQL and a fixture provider. It never needs a live
 Upstox token.

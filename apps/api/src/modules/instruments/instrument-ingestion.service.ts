@@ -16,7 +16,7 @@ import {
 } from '@ai-trading/market-data';
 import {
   createJobRun,
-  findActiveBackfillRun,
+  findActiveBackfillJob,
   getCoverageMonths,
   getInstrumentsByIds,
   getLatestCompletedSession,
@@ -48,7 +48,7 @@ interface FetchScope {
 
 /**
  * Per-instrument historical fetch: one parent plan job with a single child job.
- * Month-level ingestion runs are created by the worker from the child payload.
+ * Month chunks are derived from the child payload and tracked on the job timeline.
  */
 @Injectable()
 export class InstrumentIngestionService {
@@ -174,14 +174,14 @@ export class InstrumentIngestionService {
       return { dryRun: true, preview };
     }
 
-    const active = await findActiveBackfillRun(instrumentId);
+    const active = await findActiveBackfillJob(instrumentId);
     if (active) {
       return {
         dryRun: false,
         preview,
         plan: null,
         queued: [],
-        existingRunIds: [{ instrumentId, runId: active.id }],
+        existingJobIds: [{ instrumentId, jobRunId: active.id }],
       };
     }
     if (!scope.instrument.externalKey) {
@@ -296,21 +296,21 @@ export class InstrumentIngestionService {
           to: window.to,
         },
       ],
-      existingRunIds: [],
+      existingJobIds: [],
     };
   }
 
   async cancel(instrumentId: string, actorUserId: string, meta: RequestMeta) {
-    const active = await findActiveBackfillRun(instrumentId);
+    const active = await findActiveBackfillJob(instrumentId);
     if (!active) {
       throw new NotFoundException(
-        'No active backfill run for this instrument',
+        'No active backfill job for this instrument',
       );
     }
-    if (!active.parentJobRunId) {
-      throw new BadRequestException('The active run has no parent plan');
+    if (!active.correlationId) {
+      throw new BadRequestException('The active job has no parent plan');
     }
-    const plan = await getPlanJob(active.parentJobRunId);
+    const plan = await getPlanJob(active.correlationId);
     if (!plan) throw new NotFoundException('Parent plan not found');
     const children = await listChildJobRuns(plan.id);
     const child = children.find(

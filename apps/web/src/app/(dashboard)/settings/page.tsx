@@ -101,7 +101,7 @@ export default async function SettingsPage({
                 : 'Unavailable',
             },
             {
-              label: 'Chunks',
+              label: 'Jobs',
               value: `${formatNumber(provider.runningChunks)} running · ${formatNumber(provider.queuedChunks)} queued`,
             },
             {

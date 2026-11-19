@@ -6,126 +6,63 @@ import {
   dataQualityIssues,
   exchanges,
   instrumentDataStatus,
+  instrumentDayCoverage,
   instrumentProviderMappings,
   instruments,
   jobRuns,
   marketCandles1m,
-  marketDataCoverage,
-  marketDataIngestionRuns,
   providers,
   rawProviderPayloads,
 } from '../schema/index.js';
 
 type CandleInsert = InferInsertModel<typeof marketCandles1m>;
 
-export async function findIngestionRun(id: string) {
-  const rows = await db
-    .select()
-    .from(marketDataIngestionRuns)
-    .where(eq(marketDataIngestionRuns.id, id))
-    .limit(1);
-  return rows[0] ?? null;
-}
+const activeBackfillStatuses = ['queued', 'running'];
 
-export async function findActiveBackfillRun(instrumentId: string) {
+export async function findActiveBackfillJob(instrumentId: string) {
   const rows = await db
     .select()
-    .from(marketDataIngestionRuns)
+    .from(jobRuns)
     .where(
       and(
-        eq(marketDataIngestionRuns.instrumentId, instrumentId),
-        eq(marketDataIngestionRuns.runType, 'historical_backfill'),
-        inArray(marketDataIngestionRuns.status, ['queued', 'running']),
+        eq(jobRuns.jobName, 'historical-backfill'),
+        inArray(jobRuns.status, activeBackfillStatuses),
+        sql`${jobRuns.payload} ->> 'instrumentId' = ${instrumentId}`,
       ),
     )
-    .orderBy(desc(marketDataIngestionRuns.createdAt))
+    .orderBy(desc(jobRuns.createdAt))
     .limit(1);
   return rows[0] ?? null;
 }
 
-export async function findActiveBackfillRuns(instrumentIds: string[]) {
-  if (instrumentIds.length === 0) return [];
+export async function listRunningJobsOlderThan(minutes: number) {
   return db
     .select()
-    .from(marketDataIngestionRuns)
+    .from(jobRuns)
     .where(
       and(
-        inArray(marketDataIngestionRuns.instrumentId, instrumentIds),
-        eq(marketDataIngestionRuns.runType, 'historical_backfill'),
-        inArray(marketDataIngestionRuns.status, ['queued', 'running']),
+        eq(jobRuns.status, 'running'),
+        isNotNull(jobRuns.startedAt),
+        sql`${jobRuns.startedAt} < now() - (${minutes} || ' minutes')::interval`,
       ),
     );
 }
 
-export async function findChunk(input: {
-  parentJobRunId: string;
-  instrumentId: string;
-  chunkIndex: number;
-}) {
-  const rows = await db
-    .select()
-    .from(marketDataIngestionRuns)
-    .where(
-      and(
-        eq(marketDataIngestionRuns.parentJobRunId, input.parentJobRunId),
-        eq(marketDataIngestionRuns.instrumentId, input.instrumentId),
-        eq(marketDataIngestionRuns.chunkIndex, input.chunkIndex),
-      ),
-    )
-    .limit(1);
-  return rows[0] ?? null;
-}
-
-export async function findSucceededChunk(input: {
-  parentJobRunId: string;
-  instrumentId: string;
-  from: string;
-  to: string;
-}) {
-  const rows = await db
-    .select()
-    .from(marketDataIngestionRuns)
-    .where(
-      and(
-        eq(marketDataIngestionRuns.parentJobRunId, input.parentJobRunId),
-        eq(marketDataIngestionRuns.instrumentId, input.instrumentId),
-        eq(marketDataIngestionRuns.requestedFrom, input.from),
-        eq(marketDataIngestionRuns.requestedTo, input.to),
-        eq(marketDataIngestionRuns.status, 'succeeded'),
-      ),
-    )
-    .limit(1);
-  return rows[0] ?? null;
-}
-
-export async function listRunningChunksOlderThan(minutes: number) {
-  return db
-    .select()
-    .from(marketDataIngestionRuns)
-    .where(
-      and(
-        eq(marketDataIngestionRuns.status, 'running'),
-        isNotNull(marketDataIngestionRuns.startedAt),
-        sql`${marketDataIngestionRuns.startedAt} < now() - (${minutes} || ' minutes')::interval`,
-      ),
-    );
-}
-
-export async function markStaleRunsFailed(minutes: number) {
-  const stale = await listRunningChunksOlderThan(minutes);
+export async function markStaleJobsFailed(minutes: number) {
+  const stale = await listRunningJobsOlderThan(minutes);
   if (stale.length === 0) return [];
   await db
-    .update(marketDataIngestionRuns)
+    .update(jobRuns)
     .set({
       status: 'failed',
       finishedAt: new Date(),
-      errorMessage: `Stale run recovered after ${minutes} minutes without a heartbeat`,
+      errorMessage: `Stale job recovered after ${minutes} minutes without a heartbeat`,
     })
     .where(
       and(
-        eq(marketDataIngestionRuns.status, 'running'),
+        eq(jobRuns.status, 'running'),
         inArray(
-          marketDataIngestionRuns.id,
+          jobRuns.id,
           stale.map((row) => row.id),
         ),
       ),
@@ -136,25 +73,25 @@ export async function markStaleRunsFailed(minutes: number) {
 export async function getParentPlanProgress(parentJobRunId: string) {
   const [counts] = await db
     .select({
-      chunks: sql<number>`count(*)::int`,
-      instruments: sql<number>`count(distinct ${marketDataIngestionRuns.instrumentId})::int`,
-      queued: sql<number>`count(*) filter (where ${marketDataIngestionRuns.status} = 'queued')::int`,
-      running: sql<number>`count(*) filter (where ${marketDataIngestionRuns.status} = 'running')::int`,
-      succeeded: sql<number>`count(*) filter (where ${marketDataIngestionRuns.status} = 'succeeded')::int`,
-      partiallyFailed: sql<number>`count(*) filter (where ${marketDataIngestionRuns.status} = 'partially_failed')::int`,
-      failed: sql<number>`count(*) filter (where ${marketDataIngestionRuns.status} = 'failed')::int`,
-      cancelled: sql<number>`count(*) filter (where ${marketDataIngestionRuns.status} = 'cancelled')::int`,
-      rowsFetched: sql<number>`coalesce(sum(${marketDataIngestionRuns.rowsFetched}), 0)::int`,
-      rowsWritten: sql<number>`coalesce(sum(${marketDataIngestionRuns.rowsWritten}), 0)::int`,
-      rowsRejected: sql<number>`coalesce(sum(${marketDataIngestionRuns.rowsRejected}), 0)::int`,
-      rowsSkipped: sql<number>`coalesce(sum(${marketDataIngestionRuns.rowsSkipped}), 0)::int`,
-      rowsUpdated: sql<number>`coalesce(sum(${marketDataIngestionRuns.rowsUpdated}), 0)::int`,
+      jobs: sql<number>`count(*)::int`,
+      instruments: sql<number>`count(distinct ${jobRuns.payload} ->> 'instrumentId')::int`,
+      queued: sql<number>`count(*) filter (where ${jobRuns.status} = 'queued')::int`,
+      running: sql<number>`count(*) filter (where ${jobRuns.status} = 'running')::int`,
+      succeeded: sql<number>`count(*) filter (where ${jobRuns.status} = 'succeeded')::int`,
+      partiallyFailed: sql<number>`count(*) filter (where ${jobRuns.status} = 'partially_failed')::int`,
+      failed: sql<number>`count(*) filter (where ${jobRuns.status} = 'failed')::int`,
+      cancelled: sql<number>`count(*) filter (where ${jobRuns.status} = 'cancelled')::int`,
+      rowsFetched: sql<number>`coalesce(sum((${jobRuns.result} ->> 'fetched')::int), 0)::int`,
+      rowsWritten: sql<number>`coalesce(sum((${jobRuns.result} ->> 'written')::int), 0)::int`,
+      rowsRejected: sql<number>`coalesce(sum((${jobRuns.result} ->> 'rejected')::int), 0)::int`,
+      rowsSkipped: sql<number>`coalesce(sum((${jobRuns.result} ->> 'skippedChunks')::int), 0)::int`,
+      rowsUpdated: sql<number>`0::int`,
     })
-    .from(marketDataIngestionRuns)
-    .where(eq(marketDataIngestionRuns.parentJobRunId, parentJobRunId));
+    .from(jobRuns)
+    .where(eq(jobRuns.correlationId, parentJobRunId));
   return (
     counts ?? {
-      chunks: 0,
+      jobs: 0,
       instruments: 0,
       queued: 0,
       running: 0,
@@ -169,6 +106,57 @@ export async function getParentPlanProgress(parentJobRunId: string) {
       rowsUpdated: 0,
     }
   );
+}
+
+export async function listPlanChildJobs(parentJobRunId: string) {
+  return db
+    .select({
+      id: jobRuns.id,
+      instrumentId: sql<string | null>`${jobRuns.payload} ->> 'instrumentId'`,
+      symbol: instruments.tradingSymbol,
+      status: jobRuns.status,
+      attempt: jobRuns.attempt,
+      requestedFrom: sql<string | null>`${jobRuns.payload} ->> 'from'`,
+      requestedTo: sql<string | null>`${jobRuns.payload} ->> 'to'`,
+      result: jobRuns.result,
+      errorMessage: jobRuns.errorMessage,
+      startedAt: jobRuns.startedAt,
+      finishedAt: jobRuns.finishedAt,
+      createdAt: jobRuns.createdAt,
+    })
+    .from(jobRuns)
+    .leftJoin(
+      instruments,
+      sql`${instruments.id} = (${jobRuns.payload} ->> 'instrumentId')::uuid`,
+    )
+    .where(eq(jobRuns.correlationId, parentJobRunId))
+    .orderBy(asc(jobRuns.createdAt));
+}
+
+export async function getLatestJobForInstrument(instrumentId: string) {
+  const rows = await db
+    .select()
+    .from(jobRuns)
+    .where(sql`${jobRuns.payload} ->> 'instrumentId' = ${instrumentId}`)
+    .orderBy(desc(jobRuns.createdAt))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function getLastSuccessfulJobForInstrument(instrumentId: string) {
+  const rows = await db
+    .select()
+    .from(jobRuns)
+    .where(
+      and(
+        eq(jobRuns.jobName, 'historical-backfill'),
+        eq(jobRuns.status, 'succeeded'),
+        sql`${jobRuns.payload} ->> 'instrumentId' = ${instrumentId}`,
+      ),
+    )
+    .orderBy(desc(jobRuns.finishedAt))
+    .limit(1);
+  return rows[0] ?? null;
 }
 
 export async function getExistingCandles(instrumentId: string, from: Date, to: Date) {
@@ -295,7 +283,6 @@ export async function writeCandles(
             close: sql`excluded.close`,
             volume: sql`excluded.volume`,
             sourceProviderId: sql`excluded.source_provider_id`,
-            ingestionRunId: sql`excluded.ingestion_run_id`,
             rawPayloadId: sql`excluded.raw_payload_id`,
             isFinal: sql`excluded.is_final`,
             updatedAt: new Date(),
@@ -310,12 +297,24 @@ export async function writeCandles(
 
 export async function getCoverageDayDetail(instrumentId: string, date: string) {
   const coverage = await db
-    .select()
-    .from(marketDataCoverage)
+    .select({
+      instrumentId: instrumentDayCoverage.instrumentId,
+      tradingDate: instrumentDayCoverage.tradingDate,
+      expectedBars: instrumentDayCoverage.expectedBars,
+      storedBars: instrumentDayCoverage.storedBars,
+      checkedAt: instrumentDayCoverage.checkedAt,
+      status: sql<string>`
+        case
+          when ${instrumentDayCoverage.storedBars} = 0 then 'missing'
+          when ${instrumentDayCoverage.storedBars} = ${instrumentDayCoverage.expectedBars} then 'complete'
+          else 'partial'
+        end`,
+    })
+    .from(instrumentDayCoverage)
     .where(
       and(
-        eq(marketDataCoverage.instrumentId, instrumentId),
-        eq(marketDataCoverage.tradingDate, date),
+        eq(instrumentDayCoverage.instrumentId, instrumentId),
+        eq(instrumentDayCoverage.tradingDate, date),
       ),
     )
     .limit(1);
@@ -345,68 +344,6 @@ export async function getCoverageDayDetail(instrumentId: string, date: string) {
     coverage: coverage[0] ?? null,
     issues,
   };
-}
-
-export async function getIngestionRunDetail(id: string) {
-  const rows = await db
-    .select({
-      id: marketDataIngestionRuns.id,
-      providerId: marketDataIngestionRuns.providerId,
-      providerCode: providers.code,
-      runType: marketDataIngestionRuns.runType,
-      instrumentId: marketDataIngestionRuns.instrumentId,
-      symbol: instruments.tradingSymbol,
-      timeframeUnit: marketDataIngestionRuns.timeframeUnit,
-      timeframeInterval: marketDataIngestionRuns.timeframeInterval,
-      requestedFrom: marketDataIngestionRuns.requestedFrom,
-      requestedTo: marketDataIngestionRuns.requestedTo,
-      status: marketDataIngestionRuns.status,
-      rowsFetched: marketDataIngestionRuns.rowsFetched,
-      rowsWritten: marketDataIngestionRuns.rowsWritten,
-      rowsRejected: marketDataIngestionRuns.rowsRejected,
-      rowsSkipped: marketDataIngestionRuns.rowsSkipped,
-      rowsUpdated: marketDataIngestionRuns.rowsUpdated,
-      parentJobRunId: marketDataIngestionRuns.parentJobRunId,
-      chunkIndex: marketDataIngestionRuns.chunkIndex,
-      chunkCount: marketDataIngestionRuns.chunkCount,
-      attempt: marketDataIngestionRuns.attempt,
-      requestFingerprint: marketDataIngestionRuns.requestFingerprint,
-      httpStatus: marketDataIngestionRuns.httpStatus,
-      providerErrorCode: marketDataIngestionRuns.providerErrorCode,
-      durationMs: marketDataIngestionRuns.durationMs,
-      rateLimitedUntil: marketDataIngestionRuns.rateLimitedUntil,
-      errorMessage: marketDataIngestionRuns.errorMessage,
-      rawPayloadId: marketDataIngestionRuns.rawPayloadId,
-      startedAt: marketDataIngestionRuns.startedAt,
-      finishedAt: marketDataIngestionRuns.finishedAt,
-      createdAt: marketDataIngestionRuns.createdAt,
-    })
-    .from(marketDataIngestionRuns)
-    .innerJoin(providers, eq(providers.id, marketDataIngestionRuns.providerId))
-    .leftJoin(instruments, eq(instruments.id, marketDataIngestionRuns.instrumentId))
-    .where(eq(marketDataIngestionRuns.id, id))
-    .limit(1);
-  const run = rows[0];
-  if (!run) return null;
-  const payload = run.rawPayloadId
-    ? ((
-        await db
-          .select({
-            id: rawProviderPayloads.id,
-            endpoint: rawProviderPayloads.endpoint,
-            httpStatus: rawProviderPayloads.httpStatus,
-            payloadBytes: rawProviderPayloads.payloadBytes,
-            payloadSha256: rawProviderPayloads.payloadSha256,
-            fetchedAt: rawProviderPayloads.fetchedAt,
-            retentionClass: rawProviderPayloads.retentionClass,
-            expiresAt: rawProviderPayloads.expiresAt,
-          })
-          .from(rawProviderPayloads)
-          .where(eq(rawProviderPayloads.id, run.rawPayloadId))
-          .limit(1)
-      )[0] ?? null)
-    : null;
-  return { ...run, rawPayload: payload };
 }
 
 export async function getQualityIssue(id: string) {
@@ -546,18 +483,19 @@ export async function getProviderStatus() {
     .select({
       lastSuccessfulSyncAt: sql<
         string | null
-      >`max(${marketDataIngestionRuns.finishedAt}) filter (where ${marketDataIngestionRuns.runType} = 'instrument_master' and ${marketDataIngestionRuns.status} = 'succeeded')::text`,
+      >`max(${jobRuns.finishedAt}) filter (where ${jobRuns.jobName} = 'instrument-sync' and ${jobRuns.status} = 'succeeded')::text`,
       lastSuccessfulBackfillAt: sql<
         string | null
-      >`max(${marketDataIngestionRuns.finishedAt}) filter (where ${marketDataIngestionRuns.runType} = 'historical_backfill' and ${marketDataIngestionRuns.status} = 'succeeded')::text`,
+      >`max(${jobRuns.finishedAt}) filter (where ${jobRuns.jobName} = 'historical-backfill' and ${jobRuns.status} = 'succeeded')::text`,
       lastSuccessfulIntradayAt: sql<
         string | null
-      >`max(${marketDataIngestionRuns.finishedAt}) filter (where ${marketDataIngestionRuns.runType} = 'intraday_sync' and ${marketDataIngestionRuns.status} = 'succeeded')::text`,
-      failedRuns24h: sql<number>`count(*) filter (where ${marketDataIngestionRuns.status} = 'failed' and ${marketDataIngestionRuns.createdAt} >= now() - interval '24 hours')::int`,
-      runningChunks: sql<number>`count(*) filter (where ${marketDataIngestionRuns.status} = 'running')::int`,
-      queuedChunks: sql<number>`count(*) filter (where ${marketDataIngestionRuns.status} = 'queued')::int`,
+      >`max(${jobRuns.finishedAt}) filter (where ${jobRuns.jobName} = 'intraday-sync' and ${jobRuns.status} = 'succeeded')::text`,
+      failedRuns24h: sql<number>`count(*) filter (where ${jobRuns.status} = 'failed' and ${jobRuns.createdAt} >= now() - interval '24 hours')::int`,
+      runningChunks: sql<number>`count(*) filter (where ${jobRuns.status} = 'running')::int`,
+      queuedChunks: sql<number>`count(*) filter (where ${jobRuns.status} = 'queued')::int`,
     })
-    .from(marketDataIngestionRuns);
+    .from(jobRuns)
+    .where(eq(jobRuns.jobType, 'ingestion'));
   const [payloads] = await db
     .select({
       payloadCount: sql<number>`count(*)::int`,
@@ -638,8 +576,8 @@ export async function getInstrumentSymbol(instrumentId: string) {
 
 export async function getLatestCoverageDate() {
   const [row] = await db
-    .select({ date: sql<string | null>`max(${marketDataCoverage.tradingDate})::text` })
-    .from(marketDataCoverage);
+    .select({ date: sql<string | null>`max(${instrumentDayCoverage.tradingDate})::text` })
+    .from(instrumentDayCoverage);
   return row?.date ?? null;
 }
 
@@ -720,21 +658,6 @@ export async function getLatestCompletedSession(now: Date = new Date()) {
   return rows[0]?.trading_date ?? null;
 }
 
-export async function getLastSuccessfulRunForInstrument(instrumentId: string) {
-  const rows = await db
-    .select()
-    .from(marketDataIngestionRuns)
-    .where(
-      and(
-        eq(marketDataIngestionRuns.instrumentId, instrumentId),
-        eq(marketDataIngestionRuns.status, 'succeeded'),
-      ),
-    )
-    .orderBy(desc(marketDataIngestionRuns.finishedAt))
-    .limit(1);
-  return rows[0] ?? null;
-}
-
 export async function getRawPayloadByFingerprint(values: {
   providerId: string;
   requestFingerprint: string;
@@ -752,36 +675,6 @@ export async function getRawPayloadByFingerprint(values: {
     )
     .limit(1);
   return rows[0] ?? null;
-}
-
-export async function listPlanChunks(parentJobRunId: string) {
-  return db
-    .select({
-      id: marketDataIngestionRuns.id,
-      instrumentId: marketDataIngestionRuns.instrumentId,
-      symbol: instruments.tradingSymbol,
-      chunkIndex: marketDataIngestionRuns.chunkIndex,
-      chunkCount: marketDataIngestionRuns.chunkCount,
-      requestedFrom: marketDataIngestionRuns.requestedFrom,
-      requestedTo: marketDataIngestionRuns.requestedTo,
-      status: marketDataIngestionRuns.status,
-      attempt: marketDataIngestionRuns.attempt,
-      rowsFetched: marketDataIngestionRuns.rowsFetched,
-      rowsWritten: marketDataIngestionRuns.rowsWritten,
-      rowsRejected: marketDataIngestionRuns.rowsRejected,
-      rowsSkipped: marketDataIngestionRuns.rowsSkipped,
-      rowsUpdated: marketDataIngestionRuns.rowsUpdated,
-      httpStatus: marketDataIngestionRuns.httpStatus,
-      providerErrorCode: marketDataIngestionRuns.providerErrorCode,
-      durationMs: marketDataIngestionRuns.durationMs,
-      errorMessage: marketDataIngestionRuns.errorMessage,
-      startedAt: marketDataIngestionRuns.startedAt,
-      finishedAt: marketDataIngestionRuns.finishedAt,
-    })
-    .from(marketDataIngestionRuns)
-    .leftJoin(instruments, eq(instruments.id, marketDataIngestionRuns.instrumentId))
-    .where(eq(marketDataIngestionRuns.parentJobRunId, parentJobRunId))
-    .orderBy(asc(marketDataIngestionRuns.instrumentId), asc(marketDataIngestionRuns.chunkIndex));
 }
 
 export async function getPlanJob(id: string) {
@@ -812,16 +705,6 @@ export async function getPrimaryMappingCount(instrumentId: string, providerId: s
       ),
     );
   return row?.count ?? 0;
-}
-
-export async function getLatestRunForInstrument(instrumentId: string) {
-  const rows = await db
-    .select()
-    .from(marketDataIngestionRuns)
-    .where(eq(marketDataIngestionRuns.instrumentId, instrumentId))
-    .orderBy(desc(marketDataIngestionRuns.createdAt))
-    .limit(1);
-  return rows[0] ?? null;
 }
 
 export async function getDailyAggregatesFromMinutes(
@@ -867,39 +750,26 @@ export async function listChildJobRuns(parentJobRunId: string) {
     .orderBy(asc(jobRuns.createdAt));
 }
 
-export async function getChunkRowsForInstrument(parentJobRunId: string, instrumentId: string) {
-  return db
-    .select()
-    .from(marketDataIngestionRuns)
-    .where(
-      and(
-        eq(marketDataIngestionRuns.parentJobRunId, parentJobRunId),
-        eq(marketDataIngestionRuns.instrumentId, instrumentId),
-      ),
-    )
-    .orderBy(asc(marketDataIngestionRuns.chunkIndex));
-}
-
 export async function getCoverageMonths(instrumentIds: string[], from: string, to: string) {
   if (instrumentIds.length === 0) return [];
   return db
     .select({
-      instrumentId: marketDataCoverage.instrumentId,
-      month: sql<string>`to_char(date_trunc('month', ${marketDataCoverage.tradingDate}), 'YYYY-MM')`,
-      complete: sql<number>`count(*) filter (where ${marketDataCoverage.status} = 'complete')::int`,
+      instrumentId: instrumentDayCoverage.instrumentId,
+      month: sql<string>`to_char(date_trunc('month', ${instrumentDayCoverage.tradingDate}), 'YYYY-MM')`,
+      complete: sql<number>`count(*) filter (where ${instrumentDayCoverage.storedBars} = ${instrumentDayCoverage.expectedBars})::int`,
       total: sql<number>`count(*)::int`,
     })
-    .from(marketDataCoverage)
+    .from(instrumentDayCoverage)
     .where(
       and(
-        inArray(marketDataCoverage.instrumentId, instrumentIds),
-        gte(marketDataCoverage.tradingDate, from),
-        lte(marketDataCoverage.tradingDate, to),
+        inArray(instrumentDayCoverage.instrumentId, instrumentIds),
+        gte(instrumentDayCoverage.tradingDate, from),
+        lte(instrumentDayCoverage.tradingDate, to),
       ),
     )
     .groupBy(
-      marketDataCoverage.instrumentId,
-      sql`date_trunc('month', ${marketDataCoverage.tradingDate})`,
+      instrumentDayCoverage.instrumentId,
+      sql`date_trunc('month', ${instrumentDayCoverage.tradingDate})`,
     );
 }
 
@@ -907,14 +777,14 @@ export async function isMonthComplete(instrumentId: string, from: string, to: st
   const [row] = await db
     .select({
       total: sql<number>`count(*)::int`,
-      complete: sql<number>`count(*) filter (where ${marketDataCoverage.status} = 'complete')::int`,
+      complete: sql<number>`count(*) filter (where ${instrumentDayCoverage.storedBars} = ${instrumentDayCoverage.expectedBars})::int`,
     })
-    .from(marketDataCoverage)
+    .from(instrumentDayCoverage)
     .where(
       and(
-        eq(marketDataCoverage.instrumentId, instrumentId),
-        gte(marketDataCoverage.tradingDate, from),
-        lte(marketDataCoverage.tradingDate, to),
+        eq(instrumentDayCoverage.instrumentId, instrumentId),
+        gte(instrumentDayCoverage.tradingDate, from),
+        lte(instrumentDayCoverage.tradingDate, to),
       ),
     );
   return Boolean(row && row.total > 0 && row.complete === row.total);
@@ -951,30 +821,26 @@ export async function getCoverageInputs(instrumentId: string, from: string, to: 
   `);
 }
 
-export async function upsertCoverageBatch(rows: (typeof marketDataCoverage.$inferInsert)[]) {
+export async function upsertCoverageBatch(rows: (typeof instrumentDayCoverage.$inferInsert)[]) {
   if (rows.length === 0) return 0;
   const batchSize = 500;
   for (let index = 0; index < rows.length; index += batchSize) {
     const batch = rows.slice(index, index + batchSize);
     await db
-      .insert(marketDataCoverage)
+      .insert(instrumentDayCoverage)
       .values(batch)
       .onConflictDoUpdate({
-        target: [marketDataCoverage.instrumentId, marketDataCoverage.tradingDate],
+        target: [instrumentDayCoverage.instrumentId, instrumentDayCoverage.tradingDate],
         set: {
           expectedBars: sql`excluded.expected_bars`,
           storedBars: sql`excluded.stored_bars`,
-          gapCount: sql`excluded.gap_count`,
-          gapRunCount: sql`excluded.gap_run_count`,
-          maxGapMinutes: sql`excluded.max_gap_minutes`,
-          firstBarAt: sql`excluded.first_bar_at`,
-          lastBarAt: sql`excluded.last_bar_at`,
-          status: sql`excluded.status`,
-          details: sql`excluded.details`,
           checkedAt: new Date(),
-          updatedAt: new Date(),
         },
       });
   }
   return rows.length;
+}
+
+export async function deleteAllCoverage() {
+  await db.delete(instrumentDayCoverage);
 }

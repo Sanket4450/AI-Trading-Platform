@@ -25,7 +25,6 @@ const session: SessionWindow = {
 const context = {
   instrumentId: 'instrument',
   sourceProviderId: 'provider',
-  ingestionRunId: 'run',
   rawPayloadId: 'raw',
   session,
   isFinal: true,
@@ -128,7 +127,6 @@ describe('coverage', () => {
     const verdict = computeCoverageVerdict({
       session,
       observed: [new Date('2026-09-01T03:45:00.000Z')],
-      hasCriticalIssue: false,
     });
     expect(verdict.status).toBe('partial');
     expect(verdict.expectedBars).toBe(375);
@@ -141,7 +139,7 @@ describe('coverage', () => {
       value.setUTCMinutes(value.getUTCMinutes() + index);
       return value;
     });
-    const verdict = computeCoverageVerdict({ session, observed, hasCriticalIssue: false });
+    const verdict = computeCoverageVerdict({ session, observed });
     expect(verdict.status).toBe('complete');
     expect(verdict.missingBarCount).toBe(0);
   });
@@ -196,7 +194,6 @@ describe('normalized candle type', () => {
       close: '1.0000',
       volume: '0',
       sourceProviderId: 'p',
-      ingestionRunId: 'r',
       rawPayloadId: 'raw',
       isFinal: false,
     };

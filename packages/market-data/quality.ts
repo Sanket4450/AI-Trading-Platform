@@ -171,6 +171,14 @@ export const QUALITY_RULES: readonly QualityRule[] = [
     description: 'More than one primary mapping resolves to an instrument.',
     blocksPreflightWhenCritical: false,
   },
+  {
+    ruleId: 'DQ-026',
+    issueType: 'provider_fetch_failed',
+    dimension: 'completeness',
+    defaultSeverity: 'warning',
+    description: 'A provider fetch failed; the window remains uncovered until it is retried.',
+    blocksPreflightWhenCritical: false,
+  },
 ] as const;
 
 export const QUALITY_RULE_BY_ID = new Map(QUALITY_RULES.map((rule) => [rule.ruleId, rule]));

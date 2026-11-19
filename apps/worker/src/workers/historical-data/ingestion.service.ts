@@ -10,6 +10,7 @@ import { sha256Hex } from '@ai-trading/domain';
 import {
   buildSessionWindow,
   dedupeCandles,
+  HISTORY_START,
   istToday,
   istTradingDate,
   monthChunks,
@@ -23,12 +24,10 @@ import {
   type SessionWindow,
 } from '@ai-trading/market-data';
 import {
-  createIngestionRun,
   createRawProviderPayload,
-  findChunk,
+  deleteAllCoverage,
   findProviderByCode,
   findProviderMapping,
-  findSucceededChunk,
   getInstrumentTickSize,
   getLatestCompletedSession,
   getParentPlanProgress,
@@ -39,7 +38,6 @@ import {
   isMonthComplete,
   listChildJobRuns,
   refreshDailyStats,
-  updateIngestionRun,
   updateJobRun,
   upsertQualityIssue,
   writeCandles,
@@ -57,7 +55,6 @@ interface ChunkInput {
   to: string;
   chunkIndex: number;
   chunkCount: number;
-  runId: string;
   mode: 'missing_only' | 'force';
 }
 
@@ -211,31 +208,13 @@ export class IngestionService {
 
     for (const chunk of chunks) {
       this.tracking.step(childJobRunId, `Chunk ${chunk.index + 1}/${chunks.length}`, {
+        chunkIndex: chunk.index,
         from: chunk.from,
         to: chunk.to,
       });
       if (await this.isCancelled(parentJobRunId, childJobRunId)) {
         cancelled = true;
         break;
-      }
-      const existing = await findChunk({
-        parentJobRunId,
-        instrumentId,
-        chunkIndex: chunk.index,
-      });
-      if (existing?.status === 'succeeded' && mode !== 'force') {
-        skippedChunks += 1;
-        continue;
-      }
-      const alreadySucceeded = await findSucceededChunk({
-        parentJobRunId,
-        instrumentId,
-        from: chunk.from,
-        to: chunk.to,
-      });
-      if (alreadySucceeded && mode !== 'force') {
-        skippedChunks += 1;
-        continue;
       }
       if (
         mode === 'missing_only' &&
@@ -244,32 +223,6 @@ export class IngestionService {
         skippedChunks += 1;
         continue;
       }
-
-      const run =
-        existing ??
-        (await createIngestionRun({
-          providerId: provider.id,
-          runType: 'historical_backfill',
-          instrumentId,
-          timeframeUnit: 'minutes',
-          timeframeInterval: 1,
-          requestedFrom: chunk.from,
-          requestedTo: chunk.to,
-          status: 'queued',
-          parentJobRunId,
-          chunkIndex: chunk.index,
-          chunkCount: chunks.length,
-          attempt: 1,
-          requestFingerprint: sha256Hex(
-            `${provider.id}|${mapping.externalKey}|minutes|1|${chunk.from}|${chunk.to}`,
-          ),
-        }));
-
-      await updateIngestionRun(run.id, {
-        status: 'running',
-        startedAt: new Date(),
-        attempt: (run.attempt ?? 0) + 1,
-      });
 
       try {
         const result = await this.runChunk({
@@ -281,35 +234,32 @@ export class IngestionService {
           to: chunk.to,
           chunkIndex: chunk.index,
           chunkCount: chunks.length,
-          runId: run.id,
           mode,
         });
         fetched += result.fetched;
         written += result.written;
         rejected += result.rejected;
-        await updateIngestionRun(run.id, {
-          status: result.rejected > 0 ? 'partially_failed' : 'succeeded',
-          rowsFetched: result.fetched,
-          rowsWritten: result.written,
-          rowsRejected: result.rejected,
-          rowsSkipped: result.skipped,
-          rowsUpdated: result.updated,
-          httpStatus: result.httpStatus,
-          durationMs: result.durationMs,
-          finishedAt: new Date(),
-        });
       } catch (error) {
         failedChunks += 1;
         const classification = classifyUpstoxError(error);
-        await updateIngestionRun(run.id, {
-          status: 'failed',
-          errorMessage: classification.message,
-          providerErrorCode: classification.errorCode,
-          httpStatus:
-            error instanceof Error && 'status' in error
-              ? Number((error as { status: number }).status)
-              : null,
-          finishedAt: new Date(),
+        await this.issue({
+          ruleId: 'DQ-026',
+          severity: 'warning',
+          providerId: provider.id,
+          instrumentId,
+          tradingDate: null,
+          windowStart: null,
+          windowEnd: null,
+          details: {
+            chunkIndex: chunk.index,
+            chunkCount: chunks.length,
+            from: chunk.from,
+            to: chunk.to,
+            kind: classification.kind,
+            message: classification.message,
+            errorCode: classification.errorCode,
+          },
+          detectedBy: 'ingestion',
         });
         if (classification.kind === 'throttle') {
           await this.issue({
@@ -350,6 +300,10 @@ export class IngestionService {
           chunkIndex: chunk.index,
           from: chunk.from,
           to: chunk.to,
+          httpStatus:
+            error instanceof Error && 'status' in error
+              ? Number((error as { status: number }).status)
+              : null,
         });
       }
     }
@@ -494,7 +448,6 @@ export class IngestionService {
       const result = normalizeCandle(candle, {
         instrumentId: input.instrumentId,
         sourceProviderId: input.providerId,
-        ingestionRunId: input.runId,
         rawPayloadId: raw.id,
         session,
         isFinal: true,
@@ -696,26 +649,11 @@ export class IngestionService {
           ),
         });
         const parsed = parseCandleEnvelope(response);
-        const run = await createIngestionRun({
-          providerId: provider.id,
-          runType: 'intraday_sync',
-          instrumentId: target.instrumentId,
-          timeframeUnit: 'minutes',
-          timeframeInterval: 1,
-          requestedFrom: today,
-          requestedTo: today,
-          status: 'running',
-        });
-        await updateIngestionRun(run.id, {
-          status: 'running',
-          startedAt: new Date(),
-        });
         const rows = [];
         for (const [index, candle] of parsed.data.candles.entries()) {
           const result = normalizeCandle(candle, {
             instrumentId: target.instrumentId,
             sourceProviderId: provider.id,
-            ingestionRunId: run.id,
             rawPayloadId: raw.id,
             session,
             isFinal: index !== parsed.data.candles.length - 1,
@@ -725,13 +663,6 @@ export class IngestionService {
         const write = await writeCandles(rows);
         rowsWritten += write.inserted + write.updated;
         instruments += 1;
-        await updateIngestionRun(run.id, {
-          status: 'succeeded',
-          rowsFetched: parsed.data.candles.length,
-          rowsWritten: write.inserted + write.updated,
-          rowsSkipped: write.skipped,
-          finishedAt: new Date(),
-        });
         await this.issue({
           ruleId: 'DQ-004',
           severity: 'info',
@@ -800,22 +731,10 @@ export class IngestionService {
       );
       if (!mapping) continue;
       for (const date of dates) {
-        const run = await createIngestionRun({
-          providerId: provider.id,
-          runType: 'historical_repair',
+        this.tracking.step(jobRunId, `Repair ${target.symbol} ${date}`, {
           instrumentId: target.instrumentId,
-          timeframeUnit: 'minutes',
-          timeframeInterval: 1,
-          requestedFrom: date,
-          requestedTo: date,
-          status: 'queued',
-          parentJobRunId: jobRunId,
-          chunkIndex: dates.indexOf(date),
-          chunkCount: dates.length,
-        });
-        await updateIngestionRun(run.id, {
-          status: 'running',
-          startedAt: new Date(),
+          from: date,
+          to: date,
         });
         try {
           const result = await this.runChunk({
@@ -827,29 +746,30 @@ export class IngestionService {
             to: date,
             chunkIndex: dates.indexOf(date),
             chunkCount: dates.length,
-            runId: run.id,
             mode: 'force',
           });
           rowsWritten += result.written;
-          await updateIngestionRun(run.id, {
-            status: 'succeeded',
-            rowsFetched: result.fetched,
-            rowsWritten: result.written,
-            rowsSkipped: result.skipped,
-            rowsRejected: result.rejected,
-            httpStatus: result.httpStatus,
-            durationMs: result.durationMs,
-            finishedAt: new Date(),
-          });
           await this.quality.recomputeCoverage(target.instrumentId, date, date);
           await this.quality.recomputeInstrumentStatus(target.instrumentId);
           instruments += 1;
         } catch (error) {
-          await updateIngestionRun(run.id, {
-            status: 'failed',
-            errorMessage:
-              error instanceof Error ? error.message : 'Finalize failed',
-            finishedAt: new Date(),
+          const classification = classifyUpstoxError(error);
+          await this.issue({
+            ruleId: 'DQ-026',
+            severity: 'warning',
+            providerId: provider.id,
+            instrumentId: target.instrumentId,
+            tradingDate: date,
+            windowStart: null,
+            windowEnd: null,
+            details: {
+              from: date,
+              to: date,
+              kind: classification.kind,
+              message: classification.message,
+              errorCode: classification.errorCode,
+            },
+            detectedBy: 'ingestion',
           });
         }
       }
@@ -921,6 +841,36 @@ export class IngestionService {
     return result;
   }
 
+  async coverageRebuild(jobRunId: string, payload: Record<string, unknown>) {
+    await updateJobRun(jobRunId, {
+      status: 'running',
+      startedAt: new Date(),
+      attempt: 1,
+    });
+    const latest =
+      (await getLatestCompletedSession()) ??
+      (typeof payload.to === 'string' ? payload.to : istToday());
+    const from =
+      typeof payload.from === 'string' ? payload.from : HISTORY_START;
+
+    await deleteAllCoverage();
+    const targets = await getSyncTargetInstruments();
+    let rebuilt = 0;
+    for (const target of targets) {
+      await this.quality.recomputeCoverage(target.instrumentId, from, latest);
+      await this.quality.recomputeInstrumentStatus(target.instrumentId);
+      rebuilt += 1;
+    }
+
+    const result = { rebuilt, from, to: latest };
+    await updateJobRun(jobRunId, {
+      status: 'succeeded',
+      finishedAt: new Date(),
+      result,
+    });
+    return result;
+  }
+
   async qualityScanJob(jobRunId: string, payload: Record<string, unknown>) {
     await updateJobRun(jobRunId, {
       status: 'running',
@@ -946,20 +896,25 @@ export class IngestionService {
       startedAt: new Date(),
       attempt: 1,
     });
-    const { markStaleRunsFailed } = await import('@ai-trading/database');
-    const stale = await markStaleRunsFailed(15);
-    for (const run of stale) {
+    const { markStaleJobsFailed } = await import('@ai-trading/database');
+    const stale = await markStaleJobsFailed(15);
+    for (const job of stale) {
       await this.issue({
         ruleId: 'DQ-023',
         severity: 'warning',
-        providerId: run.providerId,
-        instrumentId: run.instrumentId,
+        providerId: null,
+        instrumentId:
+          typeof (job.payload as Record<string, unknown> | null)?.instrumentId ===
+          'string'
+            ? String((job.payload as Record<string, unknown>).instrumentId)
+            : null,
         tradingDate: null,
         windowStart: null,
         windowEnd: null,
         details: {
-          runId: run.id,
-          startedAt: run.startedAt?.toISOString() ?? null,
+          jobRunId: job.id,
+          jobName: job.jobName,
+          startedAt: job.startedAt?.toISOString() ?? null,
         },
         detectedBy: 'reconciliation',
       });

@@ -192,52 +192,12 @@ export interface ConfigurationDiff {
 }
 
 export interface CoverageRow {
-  id: string;
   instrumentId: string;
-  symbol: string;
-  name: string;
   tradingDate: string;
   expectedBars: number;
   storedBars: number;
-  gapCount: number;
-  gapRunCount: number;
-  maxGapMinutes: number;
-  firstBarAt: string | null;
-  lastBarAt: string | null;
-  details: Record<string, unknown>;
   status: string;
   checkedAt: string;
-}
-
-export interface IngestionRun {
-  id: string;
-  providerCode: string;
-  runType: string;
-  instrumentId: string | null;
-  symbol: string | null;
-  timeframeUnit: string | null;
-  timeframeInterval: number | null;
-  requestedFrom: string | null;
-  requestedTo: string | null;
-  status: string;
-  rowsFetched: number;
-  rowsWritten: number;
-  rowsRejected: number;
-  rowsSkipped: number;
-  rowsUpdated: number;
-  parentJobRunId: string | null;
-  chunkIndex: number | null;
-  chunkCount: number | null;
-  attempt: number;
-  requestFingerprint: string | null;
-  httpStatus: number | null;
-  providerErrorCode: string | null;
-  durationMs: number | null;
-  rateLimitedUntil: string | null;
-  errorMessage: string | null;
-  startedAt: string | null;
-  finishedAt: string | null;
-  createdAt: string;
 }
 
 export interface QualityIssue {
@@ -362,7 +322,7 @@ export interface JobEvent {
 }
 
 export interface JobPlanProgress {
-  chunks: number;
+  jobs: number;
   instruments: number;
   queued: number;
   running: number;
@@ -377,27 +337,23 @@ export interface JobPlanProgress {
   rowsUpdated: number;
 }
 
-export interface JobPlanChunk {
+export interface JobChildRun {
   id: string;
   instrumentId: string | null;
   symbol: string | null;
-  chunkIndex: number | null;
-  chunkCount: number | null;
-  requestedFrom: string | null;
-  requestedTo: string | null;
   status: string;
   attempt: number;
+  requestedFrom: string | null;
+  requestedTo: string | null;
   rowsFetched: number;
   rowsWritten: number;
   rowsRejected: number;
   rowsSkipped: number;
-  rowsUpdated: number;
-  httpStatus: number | null;
-  providerErrorCode: string | null;
-  durationMs: number | null;
+  chunks: number;
   errorMessage: string | null;
   startedAt: string | null;
   finishedAt: string | null;
+  createdAt: string;
 }
 
 export interface JobDetail {
@@ -406,7 +362,7 @@ export interface JobDetail {
   metrics: JobMetric[];
   events: JobEvent[];
   planProgress: JobPlanProgress | null;
-  chunks: JobPlanChunk[];
+  children: JobChildRun[];
 }
 
 export interface HealthCheck {
@@ -466,10 +422,7 @@ export interface InstrumentCoverageRow {
   completeDays: number | null;
   partialDays: number | null;
   missingDays: number | null;
-  notApplicableDays: number | null;
   openCriticalIssues: number | null;
-  lastRunId: string | null;
-  activeRunId: string | null;
   lastSuccessAt: string | null;
   computedAt: string | null;
   mappingCount: number;
@@ -480,12 +433,10 @@ export interface InstrumentCoverageMonth {
   complete: number;
   partial: number;
   missing: number;
-  notApplicable: number;
 }
 
 export interface InstrumentCoverageDetail extends InstrumentCoverageRow {
   months: InstrumentCoverageMonth[];
-  runs: IngestionRun[];
   issues: QualityIssue[];
 }
 

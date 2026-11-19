@@ -6,7 +6,7 @@ import {
   dataQualityIssues,
   instruments,
   jobRuns,
-  marketDataCoverage,
+  instrumentDayCoverage,
   notificationEvents,
   reportRuns,
   systemHealthSnapshots,
@@ -156,14 +156,14 @@ export async function getDashboardOverview() {
       strategies: sql<number>`(select count(*)::int from strategies where status in ('research','active'))`,
       openIssues: sql<number>`(select count(*)::int from data_quality_issues where status = 'open')`,
       criticalIssues: sql<number>`(select count(*)::int from data_quality_issues where status = 'open' and severity = 'critical')`,
-      coverageRows: sql<number>`(select count(*)::int from market_data_coverage)`,
-      completeCoverage: sql<number>`(select count(*)::int from market_data_coverage where status = 'complete')`,
-      partialCoverage: sql<number>`(select count(*)::int from market_data_coverage where status = 'partial')`,
-      missingCoverage: sql<number>`(select count(*)::int from market_data_coverage where status = 'missing')`,
+      coverageRows: sql<number>`(select count(*)::int from instrument_day_coverage)`,
+      completeCoverage: sql<number>`(select count(*)::int from instrument_day_coverage where stored_bars = expected_bars)`,
+      partialCoverage: sql<number>`(select count(*)::int from instrument_day_coverage where stored_bars > 0 and stored_bars < expected_bars)`,
+      missingCoverage: sql<number>`(select count(*)::int from instrument_day_coverage where stored_bars = 0)`,
       candles: sql<number>`(select count(*)::int from market_candles_1m)`,
       lastIngestionAt: sql<
         string | null
-      >`(select max(created_at)::text from market_data_ingestion_runs)`,
+      >`(select max(finished_at)::text from job_runs where job_type = 'ingestion' and status in ('succeeded', 'partially_failed'))`,
     })
     .from(sql`(select 1) as singleton`);
 
@@ -199,18 +199,27 @@ export async function getDashboardOverview() {
   const latestCoverageDate =
     (
       await db
-        .select({ date: sql<string | null>`max(${marketDataCoverage.tradingDate})::text` })
-        .from(marketDataCoverage)
+        .select({ date: sql<string | null>`max(${instrumentDayCoverage.tradingDate})::text` })
+        .from(instrumentDayCoverage)
     )[0]?.date ?? null;
 
   const coverageByStatus = await db
     .select({
-      status: marketDataCoverage.status,
+      status: sql<string>`
+        case
+          when ${instrumentDayCoverage.storedBars} = 0 then 'missing'
+          when ${instrumentDayCoverage.storedBars} = ${instrumentDayCoverage.expectedBars} then 'complete'
+          else 'partial'
+        end`,
       count: sql<number>`count(*)::int`,
     })
-    .from(marketDataCoverage)
-    .where(latestCoverageDate ? eq(marketDataCoverage.tradingDate, latestCoverageDate) : undefined)
-    .groupBy(marketDataCoverage.status);
+    .from(instrumentDayCoverage)
+    .where(
+      latestCoverageDate
+        ? eq(instrumentDayCoverage.tradingDate, latestCoverageDate)
+        : undefined,
+    )
+    .groupBy(sql`1`);
 
   return {
     counts,

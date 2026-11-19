@@ -26,7 +26,6 @@ export interface NormalizedCandle {
   close: string;
   volume: string;
   sourceProviderId: string;
-  ingestionRunId: string;
   rawPayloadId: string;
   isFinal: boolean;
 }
@@ -34,7 +33,6 @@ export interface NormalizedCandle {
 export interface NormalizationContext {
   instrumentId: string;
   sourceProviderId: string;
-  ingestionRunId: string;
   rawPayloadId: string;
   session: SessionWindow | null;
   isFinal: boolean;
@@ -80,7 +78,7 @@ export interface GapRun {
   minutes: number;
 }
 
-export type CoverageStatus = 'complete' | 'partial' | 'missing' | 'not_applicable';
+export type CoverageStatus = 'complete' | 'partial' | 'missing';
 
 export interface CoverageVerdict {
   expectedBars: number;
@@ -88,8 +86,6 @@ export interface CoverageVerdict {
   missingBarCount: number;
   gapRunCount: number;
   maxGapMinutes: number;
-  firstBarAt: Date | null;
-  lastBarAt: Date | null;
   status: CoverageStatus;
   details: Record<string, unknown>;
 }

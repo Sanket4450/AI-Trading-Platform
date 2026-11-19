@@ -16,7 +16,6 @@ import { KeyValueGrid } from '@/components/dashboard/key-value-grid';
 import { DetailDialog } from '@/components/dashboard/detail-dialog';
 import {
   TableActionButton,
-  TableActionLink,
   TableActions,
   TableRefreshButton,
 } from '@/components/dashboard/table-actions';
@@ -208,81 +207,34 @@ export default async function InstrumentDetailPage({
         </SectionCard>
       </div>
 
-      <div className="mt-4 grid gap-4 xl:grid-cols-2">
-        <SectionCard
-          title="Recent runs"
-          description="Every chunk records its request, HTTP status, counts and duration."
-          actions={<TableRefreshButton />}
-        >
-          {detail.runs.length === 0 ? (
-            <EmptyState title="No runs" description="Queue a fetch from the catalog." />
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Window</TableHead>
-                    <TableHead>Rows</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {detail.runs.map((run) => (
-                    <TableRow key={run.id}>
-                      <TableCell>{label(run.runType)}</TableCell>
-                      <TableCell className="text-muted-foreground text-xs">
-                        {run.requestedFrom ?? '—'} → {run.requestedTo ?? '—'}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-xs">
-                        {run.rowsFetched}/{run.rowsWritten}/{run.rowsRejected}
-                      </TableCell>
-                      <TableCell>
-                        <StatusBadge status={run.status} />
-                      </TableCell>
-                      <TableActions>
-                        <TableActionLink
-                          href={detailHref(`/instruments/runs/${run.id}`, back.href)}
-                          label="View run"
-                        />
-                      </TableActions>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </SectionCard>
-
-        <SectionCard
-          title="Open issues"
-          description="Every partial or missing day has a rule, severity and decision."
-        >
-          {detail.issues.length === 0 ? (
-            <EmptyState title="No issues" description="The validation layer is clean." />
-          ) : (
-            <div className="space-y-2">
-              {detail.issues.slice(0, 10).map((issue) => (
-                <Link
-                  key={issue.id}
-                  href={detailHref(`/instruments/issues/${issue.id}`, back.href)}
-                  className="border-border/70 bg-background/40 block rounded-lg border p-3 text-sm"
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="font-medium">{label(issue.issueType)}</span>
-                    <StatusBadge status={issue.severity} />
-                  </div>
-                  <p className="text-muted-foreground mt-1 text-xs">
-                    {issue.ruleId ?? 'No rule'} · {issue.tradingDate ?? 'No date'} · seen{' '}
-                    {issue.occurrenceCount}×
-                  </p>
-                </Link>
-              ))}
-            </div>
-          )}
-        </SectionCard>
-      </div>
+      <SectionCard
+        className="mt-4"
+        title="Open issues"
+        description="Every partial or missing day has a rule, severity and decision."
+      >
+        {detail.issues.length === 0 ? (
+          <EmptyState title="No issues" description="The validation layer is clean." />
+        ) : (
+          <div className="grid gap-2 sm:grid-cols-2">
+            {detail.issues.slice(0, 10).map((issue) => (
+              <Link
+                key={issue.id}
+                href={detailHref(`/instruments/issues/${issue.id}`, back.href)}
+                className="border-border/70 bg-background/40 block rounded-lg border p-3 text-sm"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-medium">{label(issue.issueType)}</span>
+                  <StatusBadge status={issue.severity} />
+                </div>
+                <p className="text-muted-foreground mt-1 text-xs">
+                  {issue.ruleId ?? 'No rule'} · {issue.tradingDate ?? 'No date'} · seen{' '}
+                  {issue.occurrenceCount}×
+                </p>
+              </Link>
+            ))}
+          </div>
+        )}
+      </SectionCard>
 
       <SectionCard
         className="mt-4"

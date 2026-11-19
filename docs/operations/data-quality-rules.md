@@ -35,9 +35,10 @@ dedupe key. The rule catalog is the `QUALITY_RULES` constant in `@ai-trading/mar
 | DQ-020 | `corporate_action_mismatch` | critical           | A discontinuity implies an unconfirmed corporate action.                              |
 | DQ-021 | `stale_ingestion`           | warning            | The latest completed session has no successful ingestion within the freshness window. |
 | DQ-022 | `rate_limit_exhausted`      | warning            | A run exhausted its retry budget on throttling.                                       |
-| DQ-023 | `stale_ingestion`           | warning            | A running chunk exceeded the heartbeat window and was recovered.                      |
+| DQ-023 | `stale_ingestion`           | warning            | A running job exceeded the heartbeat window and was recovered.                        |
 | DQ-024 | `coverage_shortfall`        | info               | A coverage verdict is older than the latest candle for the same instrument-day.       |
 | DQ-025 | `duplicate_mapping`         | warning            | More than one primary mapping resolves to an instrument.                              |
+| DQ-026 | `provider_fetch_failed`     | warning            | A provider fetch failed; the window stays uncovered until it is retried.              |
 
 ## Lifecycle
 
@@ -51,7 +52,17 @@ dedupe key. The rule catalog is the `QUALITY_RULES` constant in `@ai-trading/mar
 
 ## Coverage
 
-Strict coverage is the only completeness verdict: `complete`, `partial`, `missing`, `not_applicable`.
+Strict coverage is the only completeness verdict: `complete`, `partial`, `missing`.
+
+`instrument_day_coverage` holds one row per instrument per expected trading day:
+`expected_bars`, `stored_bars` and `checked_at`. Missing minutes are `expected_bars - stored_bars`;
+they are never stored. `stored_bars` counts distinct `candle_start` values inside the session
+window, so it cannot exceed `expected_bars`.
+
+Days with no expected minutes have no row: the trading calendar and the instrument listing window
+already say nothing was expected, so `not_applicable` is not a stored state. An instrument whose
+whole target window has no rows reads `not_applicable` in the catalog when it is inactive or
+outside its listing window, and `pending` otherwise.
 
 A missing minute is never filled with a flat bar. A day with missing minutes stays `partial` until
 the gap is repaired from the provider.

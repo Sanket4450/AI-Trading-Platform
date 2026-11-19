@@ -89,8 +89,8 @@ try {
       (SELECT count(*)::int
          FROM pg_indexes
         WHERE schemaname = 'public'
-          AND indexname IN ('uq_raw_payload_request_hash', 'uq_ingestion_active_instrument',
-                            'uq_quality_open_dedupe', 'uq_ingestion_parent_chunk')) AS indexes
+          AND indexname IN ('uq_raw_payload_request_hash', 'uq_job_runs_active_backfill',
+                            'uq_quality_open_dedupe', 'idx_job_runs_status_started')) AS indexes
   `;
 
   const [seed] = await sql<
@@ -123,7 +123,7 @@ try {
   `;
 
   const checks = [
-    { name: '56 logical tables', ok: schema.logical_tables === 56, value: schema.logical_tables },
+    { name: '55 logical tables', ok: schema.logical_tables === 55, value: schema.logical_tables },
     { name: 'materialized view present', ok: schema.matviews >= 1, value: schema.matviews },
     {
       name: 'candle partitions >= 63',

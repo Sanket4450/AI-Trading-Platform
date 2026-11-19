@@ -44,7 +44,7 @@ afterAll(async () => {
 });
 
 describe('R2 database lifecycle', () => {
-  it('creates 56 logical tables, the materialized view and the partitions', async () => {
+  it('creates 55 logical tables, the materialized view and the partitions', async () => {
     const [schema] = await sql<{ tables: number; matviews: number }[]>`
       select
         count(*) filter (
@@ -56,7 +56,7 @@ describe('R2 database lifecycle', () => {
       from pg_class c
       where relnamespace = 'public'::regnamespace
     `;
-    expect(schema.tables).toBe(56);
+    expect(schema.tables).toBe(55);
     expect(schema.matviews).toBe(1);
 
     const [partitions] = await sql<{ count: number }[]>`
@@ -286,26 +286,26 @@ describe('R2 database lifecycle', () => {
   });
 
   it('enforces one active manual backfill per instrument', async () => {
-    const [provider] = await sql<{ id: string }[]>`select id from providers where code = 'upstox'`;
     const [instrument] = await sql<{ id: string }[]>`
       select id from instruments where trading_symbol = 'RELIANCE' limit 1
     `;
     await sql`
-      insert into market_data_ingestion_runs
-        (provider_id, run_type, instrument_id, timeframe_unit, timeframe_interval,
-         requested_from, requested_to, status)
-      values (${provider.id}, 'historical_backfill', ${instrument.id}, 'minutes', 1,
-              '2022-01-01', '2022-01-31', 'queued')
+      insert into job_runs (job_name, queue_name, job_type, status, payload)
+      values ('historical-backfill', 'historical-data', 'ingestion', 'queued',
+              ${sql.json({ instrumentId: instrument.id, from: '2022-01-01', to: '2022-01-31' })})
     `;
     await expect(
       sql`
-        insert into market_data_ingestion_runs
-          (provider_id, run_type, instrument_id, timeframe_unit, timeframe_interval,
-           requested_from, requested_to, status)
-        values (${provider.id}, 'historical_backfill', ${instrument.id}, 'minutes', 1,
-                '2022-02-01', '2022-02-28', 'queued')
+        insert into job_runs (job_name, queue_name, job_type, status, payload)
+        values ('historical-backfill', 'historical-data', 'ingestion', 'queued',
+                ${sql.json({ instrumentId: instrument.id, from: '2022-02-01', to: '2022-02-28' })})
       `,
-    ).rejects.toThrow(/uq_ingestion_active_instrument|duplicate key/i);
+    ).rejects.toThrow(/uq_job_runs_active_backfill|duplicate key/i);
+    await sql`
+      delete from job_runs
+       where job_name = 'historical-backfill'
+         and payload ->> 'instrumentId' = ${instrument.id}
+    `;
   });
 
   it('deduplicates quality issues', async () => {
@@ -341,32 +341,20 @@ describe('R2 database lifecycle', () => {
       tradingDate: '2026-09-01',
       expectedBars: 375,
       storedBars: 375,
-      gapCount: 0,
-      gapRunCount: 0,
-      maxGapMinutes: 0,
-      firstBarAt: null,
-      lastBarAt: null,
-      status: 'complete',
-      details: {},
     };
     await upsertCoverageBatch([base]);
-    await upsertCoverageBatch([
-      {
-        ...base,
-        storedBars: 372,
-        gapCount: 3,
-        gapRunCount: 2,
-        maxGapMinutes: 2,
-        status: 'partial',
-      },
-    ]);
-    const rows = await sql<{ count: number; status: string; stored_bars: number }[]>`
-      select count(*)::int as count, max(status) as status, max(stored_bars)::int as stored_bars
-      from market_data_coverage
+    await upsertCoverageBatch([{ ...base, storedBars: 372 }]);
+    const rows = await sql<
+      { count: number; expected_bars: number; stored_bars: number }[]
+    >`
+      select count(*)::int as count,
+             max(expected_bars)::int as expected_bars,
+             max(stored_bars)::int as stored_bars
+      from instrument_day_coverage
       where instrument_id = ${instrument.id} and trading_date = '2026-09-01'
     `;
     expect(rows[0]?.count).toBe(1);
-    expect(rows[0]?.status).toBe('partial');
+    expect(rows[0]?.expected_bars).toBe(375);
     expect(rows[0]?.stored_bars).toBe(372);
   });
 });

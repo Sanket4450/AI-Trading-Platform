@@ -7,10 +7,9 @@ import {
   dataQualityIssues,
   exchanges,
   instrumentDataStatus,
+  instrumentDayCoverage,
   instrumentProviderMappings,
   instruments,
-  marketDataCoverage,
-  marketDataIngestionRuns,
   providers,
   rawProviderPayloads,
   tradingCalendar,
@@ -619,10 +618,7 @@ export async function listInstrumentCatalog(filters: {
       completeDays: instrumentDataStatus.completeDays,
       partialDays: instrumentDataStatus.partialDays,
       missingDays: instrumentDataStatus.missingDays,
-      notApplicableDays: instrumentDataStatus.notApplicableDays,
       openCriticalIssues: instrumentDataStatus.openCriticalIssues,
-      lastRunId: instrumentDataStatus.lastRunId,
-      activeRunId: instrumentDataStatus.activeRunId,
       lastSuccessAt: instrumentDataStatus.lastSuccessAt,
       computedAt: instrumentDataStatus.computedAt,
       mappingCount: sql<number>`(
@@ -659,10 +655,7 @@ export async function getInstrumentStatusDetail(instrumentId: string) {
       completeDays: instrumentDataStatus.completeDays,
       partialDays: instrumentDataStatus.partialDays,
       missingDays: instrumentDataStatus.missingDays,
-      notApplicableDays: instrumentDataStatus.notApplicableDays,
       openCriticalIssues: instrumentDataStatus.openCriticalIssues,
-      lastRunId: instrumentDataStatus.lastRunId,
-      activeRunId: instrumentDataStatus.activeRunId,
       lastSuccessAt: instrumentDataStatus.lastSuccessAt,
       computedAt: instrumentDataStatus.computedAt,
       mappingCount: sql<number>`(
@@ -679,43 +672,23 @@ export async function getInstrumentStatusDetail(instrumentId: string) {
 
   const months = await db
     .select({
-      month: sql<string>`to_char(date_trunc('month', ${marketDataCoverage.tradingDate}), 'YYYY-MM')`,
-      complete: sql<number>`count(*) filter (where ${marketDataCoverage.status} = 'complete')::int`,
-      partial: sql<number>`count(*) filter (where ${marketDataCoverage.status} = 'partial')::int`,
-      missing: sql<number>`count(*) filter (where ${marketDataCoverage.status} = 'missing')::int`,
-      notApplicable: sql<number>`count(*) filter (where ${marketDataCoverage.status} = 'not_applicable')::int`,
+      month: sql<string>`to_char(date_trunc('month', ${instrumentDayCoverage.tradingDate}), 'YYYY-MM')`,
+      complete: sql<number>`count(*) filter (where ${instrumentDayCoverage.storedBars} = ${instrumentDayCoverage.expectedBars})::int`,
+      partial: sql<number>`count(*) filter (where ${instrumentDayCoverage.storedBars} > 0 and ${instrumentDayCoverage.storedBars} < ${instrumentDayCoverage.expectedBars})::int`,
+      missing: sql<number>`count(*) filter (where ${instrumentDayCoverage.storedBars} = 0)::int`,
     })
-    .from(marketDataCoverage)
+    .from(instrumentDayCoverage)
     .where(
       status.targetFrom && status.targetTo
         ? and(
-            eq(marketDataCoverage.instrumentId, instrumentId),
-            gte(marketDataCoverage.tradingDate, status.targetFrom),
-            lte(marketDataCoverage.tradingDate, status.targetTo),
+            eq(instrumentDayCoverage.instrumentId, instrumentId),
+            gte(instrumentDayCoverage.tradingDate, status.targetFrom),
+            lte(instrumentDayCoverage.tradingDate, status.targetTo),
           )
-        : eq(marketDataCoverage.instrumentId, instrumentId),
+        : eq(instrumentDayCoverage.instrumentId, instrumentId),
     )
-    .groupBy(sql`date_trunc('month', ${marketDataCoverage.tradingDate})`)
-    .orderBy(sql`date_trunc('month', ${marketDataCoverage.tradingDate})`);
-
-  const runs = await db
-    .select({
-      id: marketDataIngestionRuns.id,
-      runType: marketDataIngestionRuns.runType,
-      status: marketDataIngestionRuns.status,
-      requestedFrom: marketDataIngestionRuns.requestedFrom,
-      requestedTo: marketDataIngestionRuns.requestedTo,
-      rowsFetched: marketDataIngestionRuns.rowsFetched,
-      rowsWritten: marketDataIngestionRuns.rowsWritten,
-      rowsRejected: marketDataIngestionRuns.rowsRejected,
-      startedAt: marketDataIngestionRuns.startedAt,
-      finishedAt: marketDataIngestionRuns.finishedAt,
-      errorMessage: marketDataIngestionRuns.errorMessage,
-    })
-    .from(marketDataIngestionRuns)
-    .where(eq(marketDataIngestionRuns.instrumentId, instrumentId))
-    .orderBy(desc(marketDataIngestionRuns.createdAt))
-    .limit(25);
+    .groupBy(sql`date_trunc('month', ${instrumentDayCoverage.tradingDate})`)
+    .orderBy(sql`date_trunc('month', ${instrumentDayCoverage.tradingDate})`);
 
   const issues = await db
     .select({
@@ -733,7 +706,7 @@ export async function getInstrumentStatusDetail(instrumentId: string) {
     .orderBy(desc(dataQualityIssues.lastSeenAt))
     .limit(50);
 
-  return { ...status, months, runs, issues };
+  return { ...status, months, issues };
 }
 
 export async function createInstrumentStatusRows(
@@ -765,10 +738,7 @@ export async function upsertInstrumentStatus(values: {
   completeDays: number;
   partialDays: number;
   missingDays: number;
-  notApplicableDays: number;
   openCriticalIssues: number;
-  lastRunId: string | null;
-  activeRunId: string | null;
   lastSuccessAt: Date | null;
   computedAt: Date;
 }) {
@@ -786,10 +756,7 @@ export async function upsertInstrumentStatus(values: {
         completeDays: values.completeDays,
         partialDays: values.partialDays,
         missingDays: values.missingDays,
-        notApplicableDays: values.notApplicableDays,
         openCriticalIssues: values.openCriticalIssues,
-        lastRunId: values.lastRunId,
-        activeRunId: values.activeRunId,
         lastSuccessAt: values.lastSuccessAt,
         computedAt: values.computedAt,
         updatedAt: new Date(),
@@ -806,18 +773,17 @@ export async function getInstrumentStatusCounters(
 ) {
   const coverage = await db
     .select({
-      expectedDays: sql<number>`count(*) filter (where ${marketDataCoverage.status} <> 'not_applicable')::int`,
-      completeDays: sql<number>`count(*) filter (where ${marketDataCoverage.status} = 'complete')::int`,
-      partialDays: sql<number>`count(*) filter (where ${marketDataCoverage.status} = 'partial')::int`,
-      missingDays: sql<number>`count(*) filter (where ${marketDataCoverage.status} = 'missing')::int`,
-      notApplicableDays: sql<number>`count(*) filter (where ${marketDataCoverage.status} = 'not_applicable')::int`,
+      expectedDays: sql<number>`count(*)::int`,
+      completeDays: sql<number>`count(*) filter (where ${instrumentDayCoverage.storedBars} = ${instrumentDayCoverage.expectedBars})::int`,
+      partialDays: sql<number>`count(*) filter (where ${instrumentDayCoverage.storedBars} > 0 and ${instrumentDayCoverage.storedBars} < ${instrumentDayCoverage.expectedBars})::int`,
+      missingDays: sql<number>`count(*) filter (where ${instrumentDayCoverage.storedBars} = 0)::int`,
     })
-    .from(marketDataCoverage)
+    .from(instrumentDayCoverage)
     .where(
       and(
-        eq(marketDataCoverage.instrumentId, instrumentId),
-        gte(marketDataCoverage.tradingDate, targetFrom),
-        lte(marketDataCoverage.tradingDate, targetTo),
+        eq(instrumentDayCoverage.instrumentId, instrumentId),
+        gte(instrumentDayCoverage.tradingDate, targetFrom),
+        lte(instrumentDayCoverage.tradingDate, targetTo),
       ),
     );
   const counters = coverage[0] ?? {
@@ -825,7 +791,6 @@ export async function getInstrumentStatusCounters(
     completeDays: 0,
     partialDays: 0,
     missingDays: 0,
-    notApplicableDays: 0,
   };
   const [issues] = await db
     .select({ count: sql<number>`count(*)::int` })

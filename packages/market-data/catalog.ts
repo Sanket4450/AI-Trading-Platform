@@ -1,22 +1,25 @@
-import type { CoverageStatus, DataStatus, FetchStatus } from './types.js';
+import type { DataStatus, FetchStatus } from './types.js';
 
 export interface InstrumentStatusCounters {
   expectedDays: number;
   completeDays: number;
   partialDays: number;
   missingDays: number;
-  notApplicableDays: number;
   openCriticalIssues: number;
 }
 
 /**
  * Data status is derived from coverage and open issues, never from the HTTP
  * success of a fetch. Complete means every expected day is complete and no
- * critical issue is open.
+ * critical issue is open. `expectsData` is false when the instrument was not
+ * listed inside the target window.
  */
-export function deriveDataStatus(counters: InstrumentStatusCounters): DataStatus {
+export function deriveDataStatus(
+  counters: InstrumentStatusCounters,
+  expectsData: boolean,
+): DataStatus {
   if (counters.expectedDays === 0) {
-    return counters.notApplicableDays > 0 ? 'not_applicable' : 'pending';
+    return expectsData ? 'pending' : 'not_applicable';
   }
   if (counters.openCriticalIssues > 0) return 'needs_review';
   if (counters.missingDays > 0) return 'missing';
@@ -94,22 +97,4 @@ export function displayStatus(input: {
   if (dataStatus === 'not_applicable') return 'Not applicable';
   if (dataStatus === 'complete') return 'Complete';
   return 'Not fetched';
-}
-
-export function coverageCounts(rows: readonly { status: CoverageStatus }[]): {
-  complete: number;
-  partial: number;
-  missing: number;
-  notApplicable: number;
-} {
-  return rows.reduce(
-    (counts, row) => {
-      if (row.status === 'complete') counts.complete += 1;
-      else if (row.status === 'partial') counts.partial += 1;
-      else if (row.status === 'missing') counts.missing += 1;
-      else counts.notApplicable += 1;
-      return counts;
-    },
-    { complete: 0, partial: 0, missing: 0, notApplicable: 0 },
-  );
 }

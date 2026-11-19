@@ -74,7 +74,6 @@ export {
 } from './quality.js';
 
 export {
-  coverageCounts,
   deriveDataStatus,
   deriveFetchStatus,
   displayStatus,

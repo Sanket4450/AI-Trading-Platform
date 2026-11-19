@@ -83,7 +83,6 @@ export function normalizeCandle(
       close: decimal(close),
       volume: decimal(volume),
       sourceProviderId: context.sourceProviderId,
-      ingestionRunId: context.ingestionRunId,
       rawPayloadId: context.rawPayloadId,
       isFinal: context.isFinal,
     },

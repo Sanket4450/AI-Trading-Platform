@@ -1,6 +1,7 @@
 import {
   Injectable,
   Logger,
+  ServiceUnavailableException,
   type OnModuleDestroy,
   type OnModuleInit,
 } from '@nestjs/common';
@@ -10,6 +11,7 @@ import type { Queue } from 'bullmq';
 import { Redis } from 'ioredis';
 import { sql } from 'drizzle-orm';
 import {
+  createJobRun,
   db,
   getDashboardOverview,
   getSystemStatus,
@@ -21,8 +23,11 @@ import {
   listRiskEvents,
   listTradingCalendar,
   listTradingSessions,
+  recordAudit,
+  updateJobRun,
 } from '@ai-trading/database';
 import { QUEUES } from '@ai-trading/domain';
+import type { RequestMeta } from '../../common/http/request-meta.js';
 
 export interface CheckResult {
   status: 'healthy' | 'unhealthy';
@@ -110,6 +115,53 @@ export class SystemControlService implements OnModuleInit, OnModuleDestroy {
 
   jobs(limit = 100, status?: string) {
     return listJobRuns({ limit, status });
+  }
+
+  async rebuildCoverage(actorUserId: string, meta: RequestMeta) {
+    const jobRun = await createJobRun({
+      jobName: 'coverage-rebuild',
+      queueName: QUEUES.historicalData,
+      jobType: 'maintenance',
+      status: 'queued',
+      payload: {},
+      correlationId: meta.requestId,
+    });
+    try {
+      await this.historicalQueue.add(
+        'coverage-rebuild',
+        { jobRunId: jobRun.id },
+        {
+          jobId: jobRun.id,
+          priority: 10,
+          attempts: 1,
+          removeOnComplete: 200,
+          removeOnFail: 500,
+        },
+      );
+    } catch (error) {
+      await updateJobRun(jobRun.id, {
+        status: 'failed',
+        finishedAt: new Date(),
+        errorMessage:
+          error instanceof Error ? error.message : 'Queue unavailable',
+      });
+      throw new ServiceUnavailableException(
+        'The background queue is unavailable',
+      );
+    }
+    await recordAudit({
+      actorUserId,
+      accountId: null,
+      action: 'data.coverage_rebuild_queued',
+      entityType: 'job_run',
+      entityId: jobRun.id,
+      beforeState: null,
+      afterState: { jobName: 'coverage-rebuild' },
+      requestId: meta.requestId,
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+    });
+    return jobRun;
   }
 
   healthSnapshots(limit = 100, component?: string) {

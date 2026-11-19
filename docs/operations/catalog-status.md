@@ -8,13 +8,13 @@ The instrument catalog is a read model over persisted evidence. It is not a seco
 
 | Value           | Meaning                                                              |
 | --------------- | -------------------------------------------------------------------- |
-| `not_requested` | No run has ever been created.                                        |
+| `not_requested` | No ingestion job has ever been created.                              |
 | `queued`        | The child job exists and has not started.                            |
-| `fetching`      | At least one chunk is in progress.                                   |
-| `fetched`       | The last run closed successfully; verification may still be pending. |
-| `partial`       | Some chunks failed, were rejected or have no run.                    |
+| `fetching`      | The instrument job is running.                                       |
+| `fetched`       | The last job closed successfully; verification may still be pending. |
+| `partial`       | The job failed partially, or some tuples were rejected.              |
 | `failed`        | Terminal failure: auth, contract or exhausted retries.               |
-| `cancelled`     | Stopped by an operator between chunks.                               |
+| `cancelled`     | Stopped by an operator.                                              |
 | `stale`         | Was complete, but the latest completed session is not covered.       |
 
 ### Data status
@@ -45,8 +45,8 @@ The catalog shows one badge, in this order:
 11. Complete
 12. Not fetched
 
-`succeeded` is not `Complete`. A chunk can return HTTP 200 with an empty or short body. Only strict
-coverage can produce `complete`.
+`succeeded` is not `Complete`. A successful fetch can return HTTP 200 with an empty or short body.
+Only strict coverage can produce `complete`.
 
 ## Target window
 
@@ -55,7 +55,7 @@ names its window. A stock listed in 2024 cannot claim complete history from 2022
 
 ## Recompute triggers
 
-- Chunk close.
+- Instrument job close.
 - T+1 finalization.
 - The scheduled quality scan.
 - The 08:30 ingestion reconciliation.
@@ -68,5 +68,5 @@ The catalog never computes status on read.
 - Default mode is `missing_only`: complete months are skipped.
 - `force` requires a reason, refetches every month in range and records provider revisions.
 - Repair is month-granular because the provider returns a whole month per request.
-- A second request for an active instrument returns the existing run; the partial unique index
-  enforces one active manual backfill per instrument.
+- A second request for an active instrument returns the existing job; the partial unique index
+  on `job_runs` enforces one active manual backfill per instrument.

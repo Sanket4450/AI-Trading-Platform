@@ -501,7 +501,7 @@
         <li>Historical V3 1-minute backfill for the current NIFTY 50 candidate pool and the NIFTY 50 index from January 2022.</li>
         <li>Daily incremental ingestion through the intraday/historical endpoints, with T+1 finalization.</li>
         <li>Raw payload archive, idempotent candle writes and resumable chunked backfills.</li>
-        <li>Strict coverage, a daily OHLCV validation oracle and a deduplicated quality-issue workflow.</li>
+        <li>Strict coverage and a deduplicated quality-issue workflow.</li>
         <li>Operator API and dashboard for backfill planning, progress, coverage, runs and issues.</li>
       </ul>
     </div>
@@ -550,7 +550,7 @@
     <div class="card v">
       <div class="ico">▦</div>
       <h3>Surface</h3>
-      <p>Backfill planner, progress, coverage heatmap, run detail and issue drill-down.</p>
+      <p>Backfill planner, progress, coverage heatmap, instrument job detail and issue drill-down.</p>
     </div>
   </div>
 
@@ -1424,21 +1424,21 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
 
   <h3 style="margin:24px 0 10px">The fifteen stages</h3>
   <div class="timeline">
-    <div class="step"><p class="meta">1 · Plan</p><h3>Resolve scope and coverage</h3><p>Turn the request into a list of instruments, session dates and month chunks. Reject dates before 2022-01-01 or after the last completed session. Skip chunks already marked <code>succeeded</code> unless the plan is a force refetch.</p></div>
+    <div class="step"><p class="meta">1 · Plan</p><h3>Resolve scope and coverage</h3><p>Turn the request into a list of instruments, session dates and month chunks. Reject dates before 2022-01-01 or after the last completed session. Skip month chunks whose strict coverage is already complete unless the plan is a force refetch.</p></div>
     <div class="step"><p class="meta">2 · Reference</p><h3>Resolve provider and mapping</h3><p>Find the Upstox provider, the primary mapping and the instrument's active window. A missing mapping fails the instrument, not the whole plan. The parent job records the failure.</p></div>
     <div class="step"><p class="meta">3 · Chunk</p><h3>Build inclusive month windows</h3><p>Use the first and last calendar day of each month. A partial first or last month uses the exact request dates. Never request more than one calendar month for a 1-minute interval.</p></div>
     <div class="step"><p class="meta">4 · Budget</p><h3>Wait for a token</h3><p>Acquire from the Redis-backed token bucket. The limiter enforces the second, minute and 30-minute windows before the request is sent, not after a 429.</p></div>
     <div class="step"><p class="meta">5 · Fetch</p><h3>Call Upstox once</h3><p>Send the read-only historical request with a 60-second timeout. Classify the response by HTTP status and body. Do not parse a non-success body as candles.</p></div>
     <div class="step"><p class="meta">6 · Archive</p><h3>Store the raw response first</h3><p>Compute the request fingerprint and payload SHA-256. Reuse an identical archive row; otherwise insert the raw JSON, byte count, HTTP status, retention class and expiry.</p></div>
     <div class="step"><p class="meta">7 · Parse</p><h3>Validate the envelope</h3><p>Check <code>status === 'success'</code> and <code>data.candles</code> is an array. A schema failure is <code>schema_invalid</code>; it is not an empty month.</p></div>
-    <div class="step"><p class="meta">8 · Normalize</p><h3>Tuple to canonical row</h3><p>Parse IST with an explicit offset, convert to UTC, derive the IST trading date, convert prices and volume to decimal strings, and attach the run and raw payload IDs.</p></div>
+    <div class="step"><p class="meta">8 · Normalize</p><h3>Tuple to canonical row</h3><p>Parse IST with an explicit offset, convert to UTC, derive the IST trading date, convert prices and volume to decimal strings, and attach the raw payload ID.</p></div>
     <div class="step"><p class="meta">9 · Row validate</p><h3>Reject what cannot be trusted</h3><p>Check finite numbers, positive prices, OHLC bounds, non-negative volume, minute alignment, session membership, calendar trading day and duplicate timestamps. Every rejection becomes an issue with evidence.</p></div>
     <div class="step"><p class="meta">10 · Reconcile</p><h3>Compare with what is stored</h3><p>Read the existing keys for the chunk. Identical rows are skipped. A final value that differs from a stored final value becomes a <code>provider_revision</code> issue before the new value is written.</p></div>
     <div class="step"><p class="meta">11 · Write</p><h3>Batch upsert</h3><p>Insert in batches of 500–1,000 rows with a single conflict target. Update only when the incoming row is final or the stored row is not. Count inserted, updated, skipped and rejected separately.</p></div>
     <div class="step"><p class="meta">12 · Oracle</p><h3>Fetch daily OHLCV</h3><p>For the instrument and date range, fetch the daily candles (one request per decade) into the raw archive. This is the independent witness for volume and prices; it is not a stored timeframe.</p></div>
     <div class="step"><p class="meta">13 · Reconcile</p><h3>Compare minute aggregate to daily</h3><p>Aggregate the stored 1-minute rows and compare open, high, low, close and volume with the daily row. Store the result per instrument-day in the validation table.</p></div>
     <div class="step"><p class="meta">14 · Coverage</p><h3>Compute the verdict</h3><p>Build the expected minute set from the session window, diff it against the observed set, find gap runs, and write <code>market_data_coverage</code> with strict status plus validation status.</p></div>
-    <div class="step"><p class="meta">15 · Close</p><h3>Close the run and project</h3><p>Update the ingestion run with counts and duration. Close the parent job only when all children finish. Refresh the materialized view once per batch, never once per chunk.</p></div>
+    <div class="step"><p class="meta">15 · Close</p><h3>Close the run and project</h3><p>Record final counts and duration on the child job. Close the parent job only when all children finish. Refresh the materialized view once per batch, never once per chunk.</p></div>
   </div>
 
   <div class="codebox">
@@ -1518,7 +1518,7 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
       <p class="kicker">How a multi-hour backfill survives reality</p>
       <h2>Orchestration and recovery</h2>
       <p>
-        A backfill is not one giant HTTP call. It is a plan, a budget, a set of month chunks and a ledger.
+        A backfill is not one giant HTTP call. It is a plan, a budget and a set of month chunks recorded on the job timeline.
         The design assumes the worker will be killed, the token will expire and the provider will return 429.
       </p>
     </div>
@@ -1539,8 +1539,8 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
     </div>
     <div class="card a">
       <div class="ico">3</div>
-      <h3>Chunk runs</h3>
-      <p>One <code>market_data_ingestion_runs</code> row per month per instrument, linked to the parent job. Counts, status and duration live here.</p>
+      <h3>Job timeline</h3>
+      <p>Each child job appends <code>job_run_events</code> for every month chunk, with its window, counts and outcome. The job row carries the terminal result.</p>
     </div>
   </div>
 
@@ -1548,10 +1548,10 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
     <table class="data-table">
       <thead><tr><th>Layer</th><th>Key</th><th>Retry unit</th><th>Progress query</th></tr></thead>
       <tbody>
-        <tr><td>Plan</td><td><code>job_runs.id</code> (parent)</td><td>Whole plan or failed instruments</td><td>Count child runs by status.</td></tr>
-        <tr><td>Instrument</td><td>BullMQ job ID = parent + instrument</td><td>Instrument job</td><td>Count chunks for that instrument.</td></tr>
-        <tr><td>Chunk</td><td><code>market_data_ingestion_runs.id</code></td><td>Chunk</td><td>Run row status and counts.</td></tr>
-        <tr><td>Batch</td><td>Transaction per 500–1,000 candles</td><td>Batch</td><td>Not persisted separately; the run is the checkpoint.</td></tr>
+        <tr><td>Plan</td><td><code>job_runs.id</code> (parent)</td><td>Whole plan or failed instruments</td><td>Count child jobs by status.</td></tr>
+        <tr><td>Instrument</td><td><code>job_runs.id</code> (child)</td><td>Instrument job</td><td>Child status, result counters and <code>correlation_id</code>.</td></tr>
+        <tr><td>Chunk</td><td><code>job_run_events</code> step</td><td>Chunk</td><td>Step rows and metrics on the job timeline.</td></tr>
+        <tr><td>Batch</td><td>Transaction per 500–1,000 candles</td><td>Batch</td><td>Not persisted separately; coverage is the checkpoint.</td></tr>
       </tbody>
     </table>
   </div>
@@ -1563,7 +1563,6 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
       <tbody>
         <tr><td>1-minute historical</td><td>One calendar month</td><td>Provider limit for 1–15 minute intervals</td><td><code>2026-09-01 → 2026-09-30</code></td></tr>
         <tr><td>First/last partial month</td><td>Exact request dates</td><td>Avoid requesting before 2022 or after the last session</td><td><code>2022-01-01 → 2022-01-31</code></td></tr>
-        <tr><td>Daily oracle</td><td>One decade</td><td>Provider allows a decade per daily request</td><td><code>2022-01-01 → 2026-10-24</code></td></tr>
         <tr><td>Intraday</td><td>One day</td><td>Endpoint is current-day only</td><td><code>minutes/1</code> after close</td></tr>
         <tr><td>Holidays/timings</td><td>One year / one date</td><td>Provider endpoint shape</td><td><code>/v2/market/timings/2026-10-23</code></td></tr>
       </tbody>
@@ -1739,7 +1738,7 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
     <table class="data-table">
       <thead><tr><th>Object</th><th>Change</th><th>Why R2 needs it</th></tr></thead>
       <tbody>
-        <tr><td><code>market_data_ingestion_runs</code></td><td>Add parent/chunk/attempt/HTTP/counter/duration columns; extend run types and status.</td><td>Resumable progress, provider diagnostics and accurate counts.</td></tr>
+        <tr><td><code>job_runs</code> · <code>job_run_events</code></td><td>Add stage columns to the child job and an append-only event stream; allow <code>partially_failed</code>.</td><td>Chunk progress, failure diagnostics and accurate counts without a second ledger.</td></tr>
         <tr><td><code>market_data_coverage</code></td><td>Add gap-run metrics, daily/minute volume, OHLC match, validation status and details; allow <code>not_applicable</code>.</td><td>Strict coverage plus the daily oracle without a second timeframe.</td></tr>
         <tr><td><code>data_quality_issues</code></td><td>Add rule, dedupe, occurrence, last-seen, acknowledgement and resolution fields; extend issue types.</td><td>One issue per real problem, with an auditable lifecycle.</td></tr>
         <tr><td><code>raw_provider_payloads</code></td><td>Add a unique index on <code>(provider_id, request_fingerprint, payload_sha256)</code>.</td><td>Concurrent workers cannot archive the same response twice.</td></tr>
@@ -1752,47 +1751,44 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
   <div class="callout info">
     <span class="ico">i</span>
     <div>
-      <b>Table count moves from 58 to 60.</b> <code>verify.ts</code>, the integration test and the runbook must
-      assert 60 logical tables. <code>market_data_daily_validation</code> and
-      <code>instrument_data_status</code> are the only new logical tables. No lifecycle table is dropped or
-      renamed.
+      <b>Table count moves from 58 to 60 at 0008.</b> <code>verify.ts</code>, the integration test and the
+      runbook assert 60 at that point and 55 after the later 0010–0012 migrations.
+      <code>market_data_daily_validation</code> and <code>instrument_data_status</code> are the new logical
+      tables at 0008; the chunk ledger is not a table of its own. No lifecycle table is dropped or renamed.
     </div>
   </div>
 
-  <details class="tbl" id="tbl-schema-runs" data-name="market_data_ingestion_runs parent_job_run_id chunk_index attempt http_status rows_skipped duration" open>
+  <details class="tbl" id="tbl-schema-job-runs" data-name="job_runs correlation_id payload result stage_keys job_run_events chunk step metric" open>
     <summary>
-      <span class="tbl-name">market_data_ingestion_runs</span>
-      <span class="tbl-badge">Operational · additive</span>
-      <span class="tbl-purpose">The chunk ledger: what was requested, what came back and how long it took.</span>
-      <span class="tbl-count">+11 fields</span>
+      <span class="tbl-name">job_runs · job_run_events</span>
+      <span class="tbl-badge">Orchestration · additive</span>
+      <span class="tbl-purpose">The plan and instrument ledger: what was requested, what came back and how long it took.</span>
+      <span class="tbl-count">+5 fields +1 table</span>
     </summary>
     <div class="tbl-body">
       <div class="scroll-x">
         <table class="fields">
-          <thead><tr><th>New field</th><th>Type</th><th>Default</th><th>Purpose</th></tr></thead>
+          <thead><tr><th>Field</th><th>Type</th><th>Purpose</th></tr></thead>
           <tbody>
-            <tr><td><code>parent_job_run_id</code></td><td><code>uuid</code></td><td>null</td><td>Links a chunk to the operator’s plan. FK to <code>job_runs</code>.</td></tr>
-            <tr><td><code>chunk_index</code></td><td><code>integer</code></td><td>null</td><td>Zero-based position in the instrument’s chunk list.</td></tr>
-            <tr><td><code>chunk_count</code></td><td><code>integer</code></td><td>null</td><td>Total chunks for the instrument; enables progress without a count query.</td></tr>
-            <tr><td><code>attempt</code></td><td><code>integer</code></td><td>1</td><td>Attempt number at the chunk level.</td></tr>
-            <tr><td><code>request_fingerprint</code></td><td><code>char(64)</code></td><td>null</td><td>SHA-256 of provider, endpoint, key, unit, interval, from and to.</td></tr>
-            <tr><td><code>http_status</code></td><td><code>smallint</code></td><td>null</td><td>Last HTTP status, including failures.</td></tr>
-            <tr><td><code>provider_error_code</code></td><td><code>varchar(40)</code></td><td>null</td><td>Upstox <code>error_code</code>, e.g. <code>UDAPI10005</code>.</td></tr>
-            <tr><td><code>rows_skipped</code></td><td><code>integer</code></td><td>0</td><td>Identical rows already stored; proves idempotency.</td></tr>
-            <tr><td><code>rows_updated</code></td><td><code>integer</code></td><td>0</td><td>Existing final rows replaced after a revision check.</td></tr>
-            <tr><td><code>duration_ms</code></td><td><code>integer</code></td><td>null</td><td>Fetch + parse + write wall time.</td></tr>
-            <tr><td><code>rate_limited_until</code></td><td><code>timestamptz</code></td><td>null</td><td>Earliest retry time after a 429.</td></tr>
+            <tr><td><code>correlation_id</code></td><td><code>uuid</code></td><td>Links an instrument job to the operator’s plan.</td></tr>
+            <tr><td><code>payload.instrumentId</code></td><td><code>jsonb</code></td><td>Instrument scope for the child job; indexed for active-backfill dedupe.</td></tr>
+            <tr><td><code>payload.from</code> · <code>payload.to</code></td><td><code>jsonb</code></td><td>Exact inclusive request window.</td></tr>
+            <tr><td><code>result</code></td><td><code>jsonb</code></td><td>Terminal counters: fetched, written, rejected, skipped chunks, failed chunks and chunk total.</td></tr>
+            <tr><td><code>status</code></td><td><code>varchar(20)</code></td><td><code>queued</code>, <code>running</code>, <code>succeeded</code>, <code>partially_failed</code>, <code>failed</code>, <code>retrying</code>, <code>cancelled</code>.</td></tr>
+            <tr><td><code>current_stage</code> · <code>stage_keys</code> · <code>stage_total</code></td><td><code>varchar</code> · <code>jsonb</code> · <code>smallint</code></td><td>Prepare, chunks and close progress rendered by <code>/jobs</code>.</td></tr>
+            <tr><td><code>duration_ms</code> · <code>summary</code></td><td><code>integer</code> · <code>text</code></td><td>Terminal timing and a human-readable close note.</td></tr>
+            <tr><td><code>job_run_events</code></td><td>append-only table</td><td>Every stage, chunk step, metric, warning and failure with a timestamp.</td></tr>
           </tbody>
         </table>
       </div>
       <div class="idx">
         <h4>Indexes and constraints</h4>
         <ul>
-          <li><code>uq_ingestion_parent_chunk</code> <span class="idx-type">unique btree</span> — <code>(parent_job_run_id, instrument_id, chunk_index)</code> where the parent is not null.</li>
-          <li><code>idx_ingestion_parent_status</code> <span class="idx-type">btree</span> — <code>(parent_job_run_id, status)</code> for progress.</li>
-          <li><code>idx_ingestion_stale_running</code> <span class="idx-type">btree</span> — <code>(status, started_at)</code> where <code>status='running'</code> for stale recovery.</li>
-          <li><code>chk_runs_counters</code> — <code>rows_fetched</code>, <code>rows_written</code>, <code>rows_rejected</code>, <code>rows_skipped</code>, <code>rows_updated</code> and <code>duration_ms</code> are non-negative.</li>
-          <li><code>chk_runs_chunk</code> — <code>chunk_index &gt;= 0</code>, <code>chunk_count &gt; 0</code>, <code>attempt &gt; 0</code>, <code>http_status between 100 and 599</code>.</li>
+          <li><code>uq_job_runs_active_backfill</code> <span class="idx-type">unique btree</span> — on <code>((payload ->> 'instrumentId'))</code> where <code>job_name='historical-backfill'</code> and <code>status in ('queued','running')</code>. One active backfill per instrument; scheduled finalize and intraday sync are unaffected.</li>
+          <li><code>idx_job_runs_status_started</code> <span class="idx-type">btree</span> — <code>(status, started_at)</code> for stale-job recovery.</li>
+          <li><code>idx_job_runs_name_status_finished</code> <span class="idx-type">btree</span> — <code>(job_name, status, finished_at)</code> for provider status and last-success queries.</li>
+          <li><code>idx_job_run_events_run</code> <span class="idx-type">btree</span> — <code>(job_run_id, id)</code> for the timeline.</li>
+          <li><code>chk_job_runs_status_2</code> — includes <code>partially_failed</code> so a partially successful instrument closes honestly.</li>
         </ul>
       </div>
     </div>
@@ -1833,12 +1829,12 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
     </div>
   </details>
 
-  <details class="tbl" id="tbl-schema-status" data-name="instrument_data_status fetch_status data_status target_from target_to computed_at last_success_at active_run_id" open>
+  <details class="tbl" id="tbl-schema-status" data-name="instrument_data_status fetch_status data_status target_from target_to computed_at last_success_at" open>
     <summary>
       <span class="tbl-name">instrument_data_status</span>
       <span class="tbl-badge">Catalog · new table</span>
       <span class="tbl-purpose">The persisted projection that makes the catalog readable without aggregating coverage on every request.</span>
-      <span class="tbl-count">17 columns</span>
+      <span class="tbl-count">15 columns</span>
     </summary>
     <div class="tbl-body">
       <div class="scroll-x">
@@ -1848,12 +1844,11 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
             <tr><td><code>instrument_id</code></td><td><code>uuid</code> PK · FK</td><td>One row per instrument. Also carries the sync-target flag.</td></tr>
             <tr><td><code>target_from</code> · <code>target_to</code></td><td><code>date</code></td><td>The window the status describes: <code>max(2022-01-01, listed_on)</code> → the last completed session, capped at <code>delisted_on</code> when set.</td></tr>
             <tr><td><code>fetch_status</code></td><td><code>varchar(20)</code></td><td><code>not_requested</code>, <code>queued</code>, <code>fetching</code>, <code>fetched</code>, <code>partial</code>, <code>failed</code>, <code>cancelled</code>, <code>stale</code>.</td></tr>
-            <tr><td><code>data_status</code></td><td><code>varchar(20)</code></td><td><code>complete</code>, <code>partial_reconciled</code>, <code>partial_mismatch</code>, <code>missing</code>, <code>pending</code>, <code>not_applicable</code>, <code>needs_review</code>.</td></tr>
+            <tr><td><code>data_status</code></td><td><code>varchar(20)</code></td><td><code>complete</code>, <code>partial_mismatch</code>, <code>missing</code>, <code>pending</code>, <code>not_applicable</code>, <code>needs_review</code>.</td></tr>
             <tr><td><code>expected_days</code></td><td><code>integer</code></td><td>Scheduled instrument-days in the window.</td></tr>
             <tr><td><code>complete_days</code> · <code>partial_days</code> · <code>missing_days</code> · <code>not_applicable_days</code></td><td><code>integer</code></td><td>Coverage counters. They sum to at most <code>expected_days</code> while a recompute is in flight.</td></tr>
             <tr><td><code>open_critical_issues</code></td><td><code>integer</code></td><td>Open or acknowledged critical issues for the instrument.</td></tr>
-            <tr><td><code>last_run_id</code> · <code>active_run_id</code></td><td><code>uuid</code> FK</td><td>Latest run and, when non-null, the single queued/running run. Supports the dedupe rule and the row action.</td></tr>
-            <tr><td><code>last_success_at</code></td><td><code>timestamptz</code></td><td>Last successful run close; drives stale detection and the “Verifying” state.</td></tr>
+            <tr><td><code>last_success_at</code></td><td><code>timestamptz</code></td><td>Last successful child job close; drives stale detection and the “Verifying” state.</td></tr>
             <tr><td><code>computed_at</code></td><td><code>timestamptz</code></td><td>When the counters and statuses were last recomputed.</td></tr>
             <tr><td><code>created_at</code> · <code>updated_at</code></td><td><code>timestamptz</code></td><td>Standard timestamps, maintained by the existing trigger.</td></tr>
           </tbody>
@@ -1864,9 +1859,8 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
         <ul>
           <li><code>idx_instrument_status_fetch</code> <span class="idx-type">btree</span> — <code>(fetch_status, data_status)</code> for filtered catalog queries.</li>
           <li><code>idx_instrument_status_last_success</code> <span class="idx-type">btree</span> — <code>(last_success_at)</code> for stale sweeps.</li>
-          <li><code>uq_ingestion_active_instrument</code> <span class="idx-type">unique btree</span> — on <code>market_data_ingestion_runs (instrument_id)</code> where <code>run_type='historical_backfill'</code> and <code>status in ('queued','running')</code>. One active backfill per instrument; scheduled finalize and intraday sync are unaffected.</li>
           <li>A row is written for every sync target during reference sync, and for any instrument requested explicitly. Its absence renders as <code>Not fetched</code>.</li>
-          <li>Recompute runs on chunk close, T+1 finalization, the quality scan, the 08:30 reconcile and an explicit API call. The catalog never computes status on read.</li>
+          <li>Recompute runs on instrument job close, T+1 finalization, the quality scan, the 08:30 reconcile and an explicit API call. The catalog never computes status on read.</li>
           <li><code>chk_instrument_status_counters</code> — every counter is non-negative; <code>target_to &gt;= target_from</code>.</li>
         </ul>
       </div>
@@ -1909,20 +1903,14 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
   </details>
 
   <div class="codebox">
-    <div class="code-head"><span class="code-lang">sql · migration 0008 (shape)</span><button class="copy" type="button">Copy</button></div>
-<pre><code><span class="tok-c">-- Additive orchestration columns.</span>
-<span class="tok-k">ALTER TABLE</span> market_data_ingestion_runs
-  <span class="tok-k">ADD COLUMN</span> parent_job_run_id uuid <span class="tok-k">REFERENCES</span> job_runs(id) <span class="tok-k">ON DELETE SET NULL</span>,
-  <span class="tok-k">ADD COLUMN</span> chunk_index integer,
-  <span class="tok-k">ADD COLUMN</span> chunk_count integer,
-  <span class="tok-k">ADD COLUMN</span> attempt integer <span class="tok-k">NOT NULL DEFAULT</span> 1,
-  <span class="tok-k">ADD COLUMN</span> request_fingerprint char(64),
-  <span class="tok-k">ADD COLUMN</span> http_status smallint,
-  <span class="tok-k">ADD COLUMN</span> provider_error_code varchar(40),
-  <span class="tok-k">ADD COLUMN</span> rows_skipped integer <span class="tok-k">NOT NULL DEFAULT</span> 0,
-  <span class="tok-k">ADD COLUMN</span> rows_updated integer <span class="tok-k">NOT NULL DEFAULT</span> 0,
+    <div class="code-head"><span class="code-lang">sql · migrations 0008–0012 (shape)</span><button class="copy" type="button">Copy</button></div>
+<pre><code><span class="tok-c">-- The child job is the chunk ledger; the event stream carries chunk steps.</span>
+<span class="tok-k">ALTER TABLE</span> job_runs
+  <span class="tok-k">ADD COLUMN</span> current_stage varchar(60),
+  <span class="tok-k">ADD COLUMN</span> stage_keys jsonb <span class="tok-k">NOT NULL DEFAULT</span> <span class="tok-s">'[]'</span>::jsonb,
+  <span class="tok-k">ADD COLUMN</span> stage_total smallint,
   <span class="tok-k">ADD COLUMN</span> duration_ms integer,
-  <span class="tok-k">ADD COLUMN</span> rate_limited_until timestamptz;
+  <span class="tok-k">ADD COLUMN</span> summary text;
 
 <span class="tok-c">-- Coverage now carries the daily-oracle verdict.</span>
 <span class="tok-k">ALTER TABLE</span> market_data_coverage
@@ -1950,12 +1938,12 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
 <span class="tok-k">CREATE UNIQUE INDEX</span> uq_raw_payload_request_hash
   <span class="tok-k">ON</span> raw_provider_payloads (provider_id, request_fingerprint, payload_sha256);
 
-<span class="tok-c">-- One active backfill per instrument, enforced by the database.</span>
-<span class="tok-k">CREATE UNIQUE INDEX</span> uq_ingestion_active_instrument
-  <span class="tok-k">ON</span> market_data_ingestion_runs (instrument_id)
-  <span class="tok-k">WHERE</span> status <span class="tok-k">IN</span> (<span class="tok-s">'queued'</span>, <span class="tok-s">'running'</span>)
-    <span class="tok-k">AND</span> run_type = <span class="tok-s">'historical_backfill'</span>
-    <span class="tok-k">AND</span> instrument_id <span class="tok-k">IS NOT NULL</span>;
+<span class="tok-c">-- One active backfill per instrument, enforced on the child job.</span>
+<span class="tok-k">CREATE UNIQUE INDEX</span> uq_job_runs_active_backfill
+  <span class="tok-k">ON</span> job_runs ((payload ->> <span class="tok-s">'instrumentId'</span>))
+  <span class="tok-k">WHERE</span> job_name = <span class="tok-s">'historical-backfill'</span>
+    <span class="tok-k">AND</span> status <span class="tok-k">IN</span> (<span class="tok-s">'queued'</span>, <span class="tok-s">'running'</span>)
+    <span class="tok-k">AND</span> payload ->> <span class="tok-s">'instrumentId'</span> <span class="tok-k">IS NOT NULL</span>;
 
 <span class="tok-c">-- Persisted catalog projection; recomputed by the worker, never on read.</span>
 <span class="tok-k">CREATE TABLE</span> instrument_data_status (
@@ -1970,8 +1958,6 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
   missing_days integer <span class="tok-k">NOT NULL DEFAULT</span> 0,
   not_applicable_days integer <span class="tok-k">NOT NULL DEFAULT</span> 0,
   open_critical_issues integer <span class="tok-k">NOT NULL DEFAULT</span> 0,
-  last_run_id uuid <span class="tok-k">REFERENCES</span> market_data_ingestion_runs(id),
-  active_run_id uuid <span class="tok-k">REFERENCES</span> market_data_ingestion_runs(id),
   last_success_at timestamptz,
   computed_at timestamptz,
   created_at timestamptz <span class="tok-k">NOT NULL DEFAULT</span> now(),
@@ -1986,9 +1972,6 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
 <span class="tok-c">-- Both new tables use the existing updated_at convention.</span>
 <span class="tok-k">CREATE TRIGGER</span> trg_instrument_data_status_updated_at
   <span class="tok-k">BEFORE UPDATE ON</span> instrument_data_status
-  <span class="tok-k">FOR EACH ROW EXECUTE FUNCTION</span> set_updated_at();
-<span class="tok-k">CREATE TRIGGER</span> trg_market_data_daily_validation_updated_at
-  <span class="tok-k">BEFORE UPDATE ON</span> market_data_daily_validation
   <span class="tok-k">FOR EACH ROW EXECUTE FUNCTION</span> set_updated_at();
 </code></pre>
   </div>
@@ -2029,12 +2012,11 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
     <table class="data-table">
       <thead><tr><th>Check</th><th>Added values</th></tr></thead>
       <tbody>
-        <tr><td><code>market_data_ingestion_runs.run_type</code></td><td><code>historical_repair</code>, <code>daily_validation</code>, <code>quality_scan</code></td></tr>
-        <tr><td><code>market_data_ingestion_runs.status</code></td><td><code>cancelled</code></td></tr>
+        <tr><td><code>job_runs.status</code></td><td><code>partially_failed</code></td></tr>
         <tr><td><code>market_data_coverage.status</code></td><td><code>not_applicable</code></td></tr>
         <tr><td><code>instrument_data_status.fetch_status</code></td><td><code>not_requested</code>, <code>queued</code>, <code>fetching</code>, <code>fetched</code>, <code>partial</code>, <code>failed</code>, <code>cancelled</code>, <code>stale</code></td></tr>
-        <tr><td><code>instrument_data_status.data_status</code></td><td><code>complete</code>, <code>partial_reconciled</code>, <code>partial_mismatch</code>, <code>missing</code>, <code>pending</code>, <code>not_applicable</code>, <code>needs_review</code></td></tr>
-        <tr><td><code>data_quality_issues.issue_type</code></td><td><code>calendar_mismatch</code>, <code>provider_revision</code>, <code>volume_mismatch</code>, <code>stale_ingestion</code>, <code>schema_invalid</code>, <code>instrument_missing</code>, <code>tick_size_mismatch</code>, <code>rate_limit_exhausted</code>, <code>partial_bar</code>, <code>unsupported_instrument</code>, <code>duplicate_mapping</code></td></tr>
+        <tr><td><code>instrument_data_status.data_status</code></td><td><code>complete</code>, <code>partial_mismatch</code>, <code>missing</code>, <code>pending</code>, <code>not_applicable</code>, <code>needs_review</code></td></tr>
+        <tr><td><code>data_quality_issues.issue_type</code></td><td><code>calendar_mismatch</code>, <code>provider_revision</code>, <code>volume_mismatch</code>, <code>stale_ingestion</code>, <code>schema_invalid</code>, <code>instrument_missing</code>, <code>tick_size_mismatch</code>, <code>rate_limit_exhausted</code>, <code>partial_bar</code>, <code>unsupported_instrument</code>, <code>duplicate_mapping</code>, <code>provider_fetch_failed</code></td></tr>
       </tbody>
     </table>
   </div>
@@ -2199,7 +2181,7 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
   <details class="tbl" id="tbl-rule-timeliness" data-name="timeliness stale ingestion rate limit run coverage duplicate mapping" open>
     <summary>
       <span class="tbl-name">Timeliness and operations rules</span>
-      <span class="tbl-badge">DQ-021 → DQ-025</span>
+      <span class="tbl-badge">DQ-021 → DQ-026</span>
       <span class="tbl-purpose">Catch the failures that look healthy because no request failed.</span>
       <span class="tbl-count">5 rules</span>
     </summary>
@@ -2210,9 +2192,10 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
           <tbody>
             <tr><td><code>DQ-021</code></td><td><code>stale_ingestion</code></td><td>warning</td><td>The latest completed trading day has no successful minute ingestion after the configured freshness window. Raise once per instrument-day, not per scan.</td></tr>
             <tr><td><code>DQ-022</code></td><td><code>rate_limit_exhausted</code></td><td>warning</td><td>A run exhausted its retry budget on 429s. Record the provider code, the pause window and the next retry time.</td></tr>
-            <tr><td><code>DQ-023</code></td><td><code>stale_ingestion</code></td><td>warning</td><td>A run has been <code>running</code> beyond the heartbeat window. The reconciliation job marks it failed and requeues the chunk.</td></tr>
+            <tr><td><code>DQ-023</code></td><td><code>stale_ingestion</code></td><td>warning</td><td>A job has been <code>running</code> beyond the heartbeat window. The reconciliation job marks it failed and the instrument can be retried.</td></tr>
             <tr><td><code>DQ-024</code></td><td><code>coverage_shortfall</code></td><td>info</td><td>A coverage row is older than the latest candle for the same instrument-day. Recompute before trusting the verdict.</td></tr>
             <tr><td><code>DQ-025</code></td><td><code>duplicate_mapping</code></td><td>warning</td><td>More than one primary mapping exists for an instrument and provider, or two mappings resolve to the same canonical row. The partial unique index should prevent it; this rule catches a bypass.</td></tr>
+            <tr><td><code>DQ-026</code></td><td><code>provider_fetch_failed</code></td><td>warning</td><td>A provider fetch failed. The window stays uncovered until the instrument job is retried; the issue details carry the window, error class and provider code.</td></tr>
           </tbody>
         </table>
       </div>
@@ -2516,9 +2499,8 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
     <span class="ico">✓</span>
     <div>
       <b>The catalog is a view over evidence, not a second source of truth.</b> A row projects
-      <code>instruments</code>, <code>market_data_ingestion_runs</code>,
-      <code>market_data_coverage</code> and <code>data_quality_issues</code> into a persisted
-      <code>instrument_data_status</code> row. The catalog cannot claim data that the coverage rows do not
+      <code>instruments</code>, <code>job_runs</code>, <code>market_data_coverage</code> and
+      <code>data_quality_issues</code> into a persisted <code>instrument_data_status</code> row. The catalog cannot claim data that the coverage rows do not
       prove.
     </div>
   </div>
@@ -2654,10 +2636,10 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
         <tr><td>Queue</td><td>The existing <code>historical-data</code> BullMQ queue, job name <code>historical-backfill</code>. No second queue for manual work.</td><td>One limiter, one retry policy, one audit path.</td></tr>
         <tr><td>Unit of work</td><td>One child job per instrument, containing that instrument’s month chunks. Chunks run sequentially inside the job.</td><td>Progress, resume and cancellation are per instrument.</td></tr>
         <tr><td>Concurrency</td><td>Four instruments at a time; the chunk inside an instrument is sequential.</td><td>Keeps database writes and the provider budget bounded.</td></tr>
-        <tr><td>Dedupe</td><td>A partial unique index allows one <code>historical_backfill</code> run per instrument where <code>status in ('queued','running')</code>. A second request returns the existing run instead of creating another. Scheduled finalize and intraday runs are exempt.</td><td>Double-clicking Fetch cannot double-fetch.</td></tr>
+        <tr><td>Dedupe</td><td>A partial unique index allows one <code>historical-backfill</code> child job per instrument where <code>status in ('queued','running')</code>. A second request returns the existing job instead of creating another. Scheduled finalize and intraday jobs are exempt.</td><td>Double-clicking Fetch cannot double-fetch.</td></tr>
         <tr><td>Priority</td><td>Scheduled <code>historical-finalize</code> and <code>intraday-sync</code> run above operator requests; a long catalog backfill cannot starve the daily job.</td><td>The T+1 finalization is the freshness guarantee.</td></tr>
         <tr><td>Rate budget</td><td>All jobs share one Redis token bucket at 80% of every provider window.</td><td>A manual “refresh all” cannot exceed the account limit.</td></tr>
-        <tr><td>Cancel and retry</td><td>Per instrument, cooperative between chunks. Retry reuses the same run and skips succeeded chunks.</td><td>No partial batch and no duplicate rows.</td></tr>
+        <tr><td>Cancel and retry</td><td>Per instrument, cooperative between chunks. Retry reuses the same child job and skips months whose strict coverage is complete.</td><td>No partial batch and no duplicate rows.</td></tr>
         <tr><td>Request scope</td><td>1–100 instruments per request, or the full sync-target set. A per-instrument request creates a one-instrument plan.</td><td>One orchestration path; no parallel ingestion code.</td></tr>
       </tbody>
     </table>
@@ -2769,10 +2751,10 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
         <table class="fields">
           <thead><tr><th>Control</th><th>Behaviour</th><th>Evidence</th></tr></thead>
           <tbody>
-            <tr><td><code>Request</code></td><td>One instrument or a selection from the catalog creates the plan scope. A second request while an instrument is active returns the existing run.</td><td>One plan per request and one active run per instrument.</td></tr>
+            <tr><td><code>Request</code></td><td>One instrument or a selection from the catalog creates the plan scope. A second request while an instrument is active returns the existing job.</td><td>One plan per request and one active job per instrument.</td></tr>
             <tr><td><code>Preview</code></td><td>Resolves instruments, counts sessions/months/requests, estimates bars and storage, and reports existing coverage. No queue write.</td><td>Dry-run report in the plan response.</td></tr>
-            <tr><td><code>Launch</code></td><td>Creates one parent job and one child job per instrument; four run concurrently.</td><td>Parent <code>job_runs</code> row and child runs.</td></tr>
-            <tr><td><code>Resume</code></td><td>Skips succeeded chunks and retries failed or partial chunks only.</td><td>Chunk ledger and run counts.</td></tr>
+            <tr><td><code>Launch</code></td><td>Creates one parent job and one child job per instrument; four run concurrently.</td><td>Parent <code>job_runs</code> row and child jobs.</td></tr>
+            <tr><td><code>Resume</code></td><td>Skips months whose strict coverage is complete and retries failed or partial months only.</td><td>Coverage, job timeline and result counts.</td></tr>
             <tr><td><code>Cancel</code></td><td>Stops between chunks; the in-flight chunk closes cleanly.</td><td><code>cancelled</code> parent state and audit row.</td></tr>
             <tr><td><code>Accept</code></td><td>Full quality scan, exception review and an exported backfill report.</td><td>Report with per-instrument coverage and waivers.</td></tr>
           </tbody>
@@ -2887,7 +2869,7 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
         <tr><td>08:00</td><td>Mon–Fri</td><td><code>instrument-sync</code></td><td>Refresh the BOD master, mappings and tick sizes.</td><td>Reference diff and <code>instrument_master</code> run</td></tr>
         <tr><td>08:05</td><td>Mon–Fri</td><td><code>calendar-sync</code></td><td>Reconcile the current year with Upstox holidays/timings.</td><td><code>calendar</code> run and any <code>calendar_mismatch</code></td></tr>
         <tr><td>08:15</td><td>Mon–Fri</td><td><code>historical-finalize</code></td><td>Fetch the previous session historically and replace the intraday partial bar.</td><td>Final 1-minute rows, a coverage update and a status recompute</td></tr>
-        <tr><td>08:30</td><td>Mon–Fri</td><td><code>ingestion-reconcile</code></td><td>Mark stale running chunks failed and requeue them.</td><td>Recovered or failed chunks and refreshed status</td></tr>
+        <tr><td>08:30</td><td>Mon–Fri</td><td><code>ingestion-reconcile</code></td><td>Mark stale running jobs failed and requeue them.</td><td>Recovered or failed jobs and refreshed status</td></tr>
         <tr><td>16:00</td><td>Mon–Fri</td><td><code>intraday-sync</code></td><td>Capture the current session for all 51 instruments.</td><td>Rows with <code>is_final=false</code> for the last bar</td></tr>
         <tr><td>16:15</td><td>Mon–Fri</td><td><code>coverage-recompute</code></td><td>Recompute today with the strict verdict and project instrument status.</td><td>Coverage rows, <code>partial_bar</code> info and a status rollup</td></tr>
         <tr><td>16:30</td><td>Mon–Fri</td><td><code>quality-scan</code></td><td>Scan the last 10 trading days incrementally.</td><td>Issues deduped and refreshed</td></tr>
@@ -2985,7 +2967,7 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
       <h3>Pipeline</h3>
       <ul>
         <li>Requests per window and limiter tokens available.</li>
-        <li>Chunk counts by status and the oldest running chunk.</li>
+        <li>Instrument job counts by status and the oldest running job.</li>
         <li>Rows fetched, written, skipped, updated and rejected.</li>
         <li>Raw payload bytes and archive growth.</li>
         <li>Queue depth, worker concurrency and job duration.</li>
@@ -3048,10 +3030,10 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
         command is validated before it reaches the queue.
       </p>
     </div>
-    <span class="count">21 new routes</span>
+    <span class="count">20 new routes</span>
   </div>
 
-  <details class="tbl" id="tbl-api-existing" data-name="API existing coverage ingestion runs quality issues backfill refresh" open>
+  <details class="tbl" id="tbl-api-existing" data-name="API existing coverage job status quality issues backfill refresh" open>
     <summary>
       <span class="tbl-name">Existing R1 data routes</span>
       <span class="tbl-badge">Kept · extended</span>
@@ -3066,7 +3048,6 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
             <tr><td>GET</td><td><code>/instruments</code></td><td>Adds <code>fetchStatus</code>, <code>dataStatus</code> and search. Returns both statuses for sync targets.</td></tr>
             <tr><td>GET</td><td><code>/data/coverage</code></td><td>Adds <code>validationStatus</code>, <code>gapRunCount</code>, <code>maxGapMinutes</code> and <code>dailyVolume</code>.</td></tr>
             <tr><td>GET</td><td><code>/data/coverage/summary</code></td><td>Adds <code>notApplicable</code> and a validation breakdown.</td></tr>
-            <tr><td>GET</td><td><code>/data/ingestion-runs</code></td><td>Adds parent job, chunk index, duration, HTTP status and skipped/updated counts.</td></tr>
             <tr><td>GET</td><td><code>/data/quality-issues</code></td><td>Adds rule ID, occurrence count, last seen and acknowledgement fields.</td></tr>
             <tr><td>GET</td><td><code>/data/daily-stats</code></td><td>Unchanged; still reads the materialized view.</td></tr>
             <tr><td>POST</td><td><code>/data/quality-issues/:id/acknowledge</code></td><td>Requires a note for resolved/ignored; records the actor and timestamp.</td></tr>
@@ -3077,12 +3058,12 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
     </div>
   </details>
 
-  <details class="tbl" id="tbl-api-new" data-name="API backfill plans heatmap validation run detail issue detail reference sync provider status" open>
+  <details class="tbl" id="tbl-api-new" data-name="API backfill plans heatmap validation job detail issue detail reference sync provider status" open>
     <summary>
       <span class="tbl-name">New R2 routes</span>
       <span class="tbl-badge">Operator surface</span>
       <span class="tbl-purpose">Plan, preview, monitor, inspect and repair without using raw UUIDs.</span>
-      <span class="tbl-count">21 routes</span>
+      <span class="tbl-count">20 routes</span>
     </summary>
     <div class="tbl-body">
       <div class="scroll-x">
@@ -3093,15 +3074,14 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
             <tr><td>GET</td><td><code>/data/instrument-status/:instrumentId</code></td><td>Instrument status detail with the month grid, counters and target window.</td><td>No</td></tr>
             <tr><td>POST</td><td><code>/data/instrument-status/recompute</code></td><td>Recompute one or a list of rollups after a reviewed fix.</td><td>Yes · <code>data.instrument_status_recomputed</code></td></tr>
             <tr><td>POST</td><td><code>/data/instruments/fetch</code></td><td>Preview or launch a fetch for an instrument selection; creates the plan internally.</td><td>Yes · <code>data.instruments_fetch_requested</code></td></tr>
-            <tr><td>POST</td><td><code>/data/instruments/:instrumentId/cancel</code></td><td>Cooperative cancel of that instrument’s active run.</td><td>Yes · <code>data.instrument_cancelled</code></td></tr>
+            <tr><td>POST</td><td><code>/data/instruments/:instrumentId/cancel</code></td><td>Cooperative cancel of that instrument’s active job.</td><td>Yes · <code>data.instrument_cancelled</code></td></tr>
             <tr><td>POST</td><td><code>/data/backfill-plans</code></td><td>Create a plan or return a dry-run preview. Still the engine behind the catalog actions.</td><td>Yes · <code>data.backfill_plan_created</code></td></tr>
             <tr><td>GET</td><td><code>/data/backfill-plans</code></td><td>List recent plans with progress.</td><td>No</td></tr>
-            <tr><td>GET</td><td><code>/data/backfill-plans/:id</code></td><td>Plan detail, per-instrument progress and failed chunks.</td><td>No</td></tr>
+            <tr><td>GET</td><td><code>/data/backfill-plans/:id</code></td><td>Plan detail, per-instrument progress and failed instrument jobs.</td><td>No</td></tr>
             <tr><td>POST</td><td><code>/data/backfill-plans/:id/cancel</code></td><td>Cooperative cancellation between chunks.</td><td>Yes · <code>data.backfill_plan_cancelled</code></td></tr>
             <tr><td>GET</td><td><code>/data/coverage/heatmap</code></td><td>Instrument × session matrix for a date range and sync targets.</td><td>No</td></tr>
             <tr><td>GET</td><td><code>/data/coverage/:instrumentId/:date</code></td><td>Day detail: gaps, runs, oracle values and evidence.</td><td>No</td></tr>
             <tr><td>GET</td><td><code>/data/validation</code></td><td>Daily-versus-minute comparison rows.</td><td>No</td></tr>
-            <tr><td>GET</td><td><code>/data/ingestion-runs/:id</code></td><td>Run detail, request params, counts and raw payload link.</td><td>No</td></tr>
             <tr><td>GET</td><td><code>/data/quality-issues/:id</code></td><td>Issue detail, evidence and lifecycle.</td><td>No</td></tr>
             <tr><td>GET</td><td><code>/data/provider-status</code></td><td>Token presence, last successful sync, budget state.</td><td>No</td></tr>
             <tr><td>GET</td><td><code>/data/quality-rules</code></td><td>The static rule catalog used by the dashboard.</td><td>No</td></tr>
@@ -3285,13 +3265,13 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
     </div>
   </div>
 
-  <h3 style="margin:26px 0 10px">Issue and run detail</h3>
+  <h3 style="margin:26px 0 10px">Issue and job detail</h3>
   <div class="scroll-x">
     <table class="data-table">
       <thead><tr><th>Screen</th><th>Must show</th><th>Must not do</th></tr></thead>
       <tbody>
         <tr><td>Issue detail</td><td>Rule ID, severity, instrument, date, window, expected/actual, occurrence count, lifecycle, audit trail, raw payload link.</td><td>Edit a candle, delete an issue or bypass the note requirement.</td></tr>
-        <tr><td>Run detail</td><td>Parent plan, chunk index, request params, HTTP status, provider code, rows fetched/written/skipped/rejected, duration, raw payload link.</td><td>Reveal the access token or the Authorization header.</td></tr>
+        <tr><td>Instrument job detail</td><td>Parent plan, request window, attempt, result counters, duration, error message and the linked DQ evidence.</td><td>Reveal the access token or the Authorization header.</td></tr>
         <tr><td>Validation detail</td><td>Daily OHLCV, minute aggregate, deltas, verdict and the rule that fired.</td><td>Treat a zero-volume index day as a missing-volume error.</td></tr>
       </tbody>
     </table>
@@ -3381,13 +3361,13 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
         <tr><td>400 invalid window</td><td>Fail the chunk.</td><td>No infinite retry; the plan marks the instrument failed.</td></tr>
         <tr><td>404 mapping</td><td>Raise <code>mapping_missing</code>.</td><td>The rest of the plan continues.</td></tr>
         <tr><td>Malformed 200</td><td>Raise <code>schema_invalid</code>.</td><td>Raw payload archived; no candle written.</td></tr>
-        <tr><td>Worker kill mid-chunk</td><td>Run remains <code>running</code>; reconciler marks it failed.</td><td>Resume skips completed chunks and does not duplicate rows.</td></tr>
+        <tr><td>Worker kill mid-chunk</td><td>Job remains <code>running</code>; reconciler marks it failed.</td><td>Resume skips complete months and does not duplicate rows.</td></tr>
         <tr><td>Redis loss</td><td>Queue/limiter unavailable.</td><td>API returns 503; worker recovers when Redis returns.</td></tr>
-        <tr><td>Duplicate chunk replay</td><td>Identical rows skipped.</td><td><code>rows_skipped</code> increments; row count unchanged.</td></tr>
+        <tr><td>Duplicate chunk replay</td><td>Identical rows skipped by the upsert.</td><td>Row count unchanged.</td></tr>
         <tr><td>Provider revision</td><td>Old/new values recorded.</td><td><code>provider_revision</code> issue exists; final value updated.</td></tr>
         <tr><td>Partial current-day bar</td><td>Stored non-final; T+1 replaces it.</td><td>Coverage shows <code>partial_bar</code> info, then final.</td></tr>
-        <tr><td>Double fetch request</td><td>The second request returns the existing active run.</td><td>One active run and one child job per instrument; no duplicate plan.</td></tr>
-        <tr><td>Worker kill during a fetch</td><td>The run stays <code>running</code> until the reconciler marks it failed.</td><td>Catalog shows Failed, never Complete; retry resumes from the ledger.</td></tr>
+        <tr><td>Double fetch request</td><td>The second request returns the existing active job.</td><td>One active job and one child job per instrument; no duplicate plan.</td></tr>
+        <tr><td>Worker kill during a fetch</td><td>The job stays <code>running</code> until the reconciler marks it failed.</td><td>Catalog shows Failed, never Complete; retry resumes from coverage and job status.</td></tr>
         <tr><td>Status recompute delayed</td><td>The row shows Verifying.</td><td>No duplicate request is offered or accepted.</td></tr>
       </tbody>
     </table>
@@ -3439,13 +3419,13 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
     <table class="data-table">
       <thead><tr><th>Workstream</th><th>Tasks</th><th>Acceptance</th></tr></thead>
       <tbody>
-        <tr><td><b>1 · Contracts and schema</b></td><td>Freeze the data contract, add migration <code>0008</code>, update Drizzle schema and <code>verify.ts</code>, add contract fixtures.</td><td>Migration applies from empty and seeded R1; 60 tables; no edits to <code>0000</code>–<code>0007</code>.</td></tr>
+        <tr><td><b>1 · Contracts and schema</b></td><td>Freeze the data contract, add migration <code>0008</code>, update Drizzle schema and <code>verify.ts</code>, add contract fixtures.</td><td>Migration applies from empty and seeded R1; 60 tables at 0008 and 55 after <code>0012</code>; no edits to <code>0000</code>–<code>0007</code>.</td></tr>
         <tr><td><b>2 · Reference data</b></td><td>Instrument master sync, tick-size repair, mapping resolution, reviewed <code>is_sync_target</code> flags, reviewed 2022–2027 calendar, corporate-action CSV.</td><td>51 instruments flagged as sync targets, tick sizes correct, calendar complete, zero duplicate index.</td></tr>
         <tr><td><b>3 · Adapter and normalization</b></td><td>V3 historical/intraday client, holidays/timings, rate limiter, error classification, tuple parser, session math, validation rules.</td><td>Contract fixtures pass; no order method exists; limiter respects all three windows.</td></tr>
-        <tr><td><b>4 · Backfill engine</b></td><td>Plan/job model, month chunking, raw archive, batch upsert, revision recording, resume, cancellation, stale recovery, per-instrument dedupe and priority.</td><td>Kill/resume and duplicate-replay tests pass; one active run per instrument; no duplicate rows.</td></tr>
-        <tr><td><b>5 · Quality and coverage</b></td><td>Strict coverage, gap runs, daily oracle, validation table, status rollup, 25-rule catalog, issue dedupe/lifecycle, preflight contract.</td><td>Every exception has a rule, severity and evidence; status never shows <code>succeeded</code> as complete.</td></tr>
-        <tr><td><b>6 · API</b></td><td>Catalog read and fetch commands, per-instrument retry/cancel, status recompute, plan/preview/progress, heatmap, day detail, validation, run detail, issue detail, reference commands.</td><td>Every write audited; DTO validation covered; no order route.</td></tr>
-        <tr><td><b>7 · Dashboard</b></td><td>Sync-target catalog, selection and preview, status transitions, instrument detail, data health console, progress, coverage heatmap, issue/run detail.</td><td>Playwright flow passes at 1280 px and 390 px; catalog renders 51 rows alphabetically; no order controls.</td></tr>
+        <tr><td><b>4 · Backfill engine</b></td><td>Plan/job model, month chunking, raw archive, batch upsert, revision recording, resume, cancellation, stale recovery, per-instrument dedupe and priority.</td><td>Kill/resume and duplicate-replay tests pass; one active job per instrument; no duplicate rows.</td></tr>
+        <tr><td><b>5 · Quality and coverage</b></td><td>Strict coverage, gap runs, status rollup, 22-rule catalog, issue dedupe/lifecycle, preflight contract.</td><td>Every exception has a rule, severity and evidence; status never shows <code>succeeded</code> as complete.</td></tr>
+        <tr><td><b>6 · API</b></td><td>Catalog read and fetch commands, per-instrument retry/cancel, status recompute, plan/preview/progress, heatmap, day detail, validation, instrument job detail, issue detail, reference commands.</td><td>Every write audited; DTO validation covered; no order route.</td></tr>
+        <tr><td><b>7 · Dashboard</b></td><td>Sync-target catalog, selection and preview, status transitions, instrument detail, data health console, progress, coverage heatmap, issue/job detail.</td><td>Playwright flow passes at 1280 px and 390 px; catalog renders 51 rows alphabetically; no order controls.</td></tr>
         <tr><td><b>8 · Operations and tests</b></td><td>Schedules, token runbook, monitoring, retention, fault injection, performance, full gates and handover docs.</td><td>Full backfill report signed off; gates pass; runbook is executable.</td></tr>
       </tbody>
     </table>
@@ -3456,9 +3436,9 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
     <div class="step"><p class="meta">Phase 0 · Freeze</p><h3>Contracts, migration and fixtures</h3><p>Reproduce the tick-size 100× bug with a real master row. Freeze the candle, session, coverage and issue shapes. Write migration <code>0008</code>, update the schema and verify count, and check in the first contract fixtures.</p></div>
     <div class="step"><p class="meta">Phase 1 · Reference</p><h3>Mode, instruments, scope, calendar and actions</h3><p>Allow <code>offline</code>/<code>research</code>; fix the startup and account guards. Sync the master, repair tick sizes, resolve mappings and the NIFTY index. Set the reviewed <code>is_sync_target</code> flags. Load the reviewed 2022–2027 calendar and the corporate-action CSV importer.</p></div>
     <div class="step"><p class="meta">Phase 2 · Library</p><h3>Adapter, normalization and validation</h3><p>Add the V3 client, rate limiter, error classifier, tuple parser, IST/UTC conversion, session windows, row validator and gap math. Prove each with unit and contract fixtures before any database write.</p></div>
-    <div class="step"><p class="meta">Phase 3 · Engine</p><h3>Chunked backfill, dedupe and status projection</h3><p>Build the parent/child job model, monthly chunks, raw archive, batch upsert, revision recording, cancellation and stale-run recovery. Add the one-active-run index, job priority and the status rollup recompute. Run the kill/resume and duplicate-replay drills.</p></div>
-    <div class="step"><p class="meta">Phase 4 · Quality</p><h3>Coverage, oracle and issues</h3><p>Implement strict coverage, gap runs, daily OHLCV validation, the validation table, the rule catalog, dedupe, lifecycle and the R4 preflight contract. Run the targeted and full scans.</p></div>
-    <div class="step"><p class="meta">Phase 5 · Surface</p><h3>Catalog, API and dashboard</h3><p>Add the sync-target catalog, per-instrument fetch/cancel and status recompute, then planning, preview, progress, heatmap, day detail, run detail, issue detail, reference commands and provider status. Wire the catalog and data console with the existing components.</p></div>
+    <div class="step"><p class="meta">Phase 3 · Engine</p><h3>Chunked backfill, dedupe and status projection</h3><p>Build the parent/child job model, monthly chunks, raw archive, batch upsert, revision recording, cancellation and stale-job recovery. Add the one-active-job index, job priority and the status rollup recompute. Run the kill/resume and duplicate-replay drills.</p></div>
+    <div class="step"><p class="meta">Phase 4 · Quality</p><h3>Coverage and issues</h3><p>Implement strict coverage, gap runs, the rule catalog, dedupe, lifecycle and the R4 preflight contract. Run the targeted and full scans.</p></div>
+    <div class="step"><p class="meta">Phase 5 · Surface</p><h3>Catalog, API and dashboard</h3><p>Add the sync-target catalog, per-instrument fetch/cancel and status recompute, then planning, preview, progress, heatmap, day detail, instrument job detail, issue detail, reference commands and provider status. Wire the catalog and data console with the existing components.</p></div>
     <div class="step"><p class="meta">Phase 6 · Prove</p><h3>Pilot, full backfill and fault drills</h3><p>Contract probe on RELIANCE, oracle probe on one year, five-instrument pilot, then all 51 instruments. Inject 429, timeout, token expiry and a worker kill. Run the full quality scan.</p></div>
     <div class="step"><p class="meta">Phase 7 · Handover</p><h3>Acceptance report and runbook</h3><p>Publish the backfill report, update the data-quality rule reference, the runbook, <code>AGENTS.md</code> and <code>README.md</code>. Record every open check and every waiver.</p></div>
   </div>
@@ -3567,7 +3547,7 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
       <div class="ico">12</div>
       <h3>Resume/idempotency failure</h3>
       <p><b>Risk:</b> a killed worker restarts the whole instrument, duplicates rows or double-counts volumes.</p>
-      <p><b>Guardrail:</b> chunk ledger, succeeded-skip, stale-run recovery, exact conflict target and a kill/resume integration test.</p>
+      <p><b>Guardrail:</b> job timeline, coverage-based skip, stale-job recovery, exact conflict target and a kill/resume integration test.</p>
     </div>
     <div class="card r">
       <div class="ico">13</div>
@@ -3745,7 +3725,7 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
         <tr><td>4</td><td>Close</td><td><code>close</code></td><td>Decimal string; reject ≤ 0.</td></tr>
         <tr><td>5</td><td>Volume</td><td><code>volume</code></td><td>Decimal string; reject &lt; 0; zero allowed for indices.</td></tr>
         <tr><td>6</td><td>Open interest</td><td>Raw payload only</td><td>Cash equities return 0; not stored in the candle table.</td></tr>
-        <tr><td>—</td><td>Request window</td><td><code>market_data_ingestion_runs.requested_from/to</code></td><td>Record the exact inclusive dates.</td></tr>
+        <tr><td>—</td><td>Request window</td><td><code>job_runs.payload.from/to</code></td><td>Record the exact inclusive dates.</td></tr>
         <tr><td>—</td><td>Response bytes</td><td><code>raw_provider_payloads</code></td><td>Archive before parse; SHA-256 and byte count.</td></tr>
       </tbody>
     </table>
@@ -3757,14 +3737,13 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
       <thead><tr><th>Field</th><th>Allowed values</th><th>Owner</th></tr></thead>
       <tbody>
         <tr><td><code>TRADING_MODE</code></td><td><code>offline</code>, <code>research</code> in R2; <code>backtesting</code>, <code>paper</code>, <code>live</code> refused</td><td>Configuration</td></tr>
-        <tr><td><code>market_data_ingestion_runs.status</code></td><td><code>queued</code>, <code>running</code>, <code>succeeded</code>, <code>partially_failed</code>, <code>failed</code>, <code>cancelled</code></td><td>Ingestion</td></tr>
-        <tr><td><code>market_data_ingestion_runs.run_type</code></td><td><code>instrument_master</code>, <code>historical_backfill</code>, <code>historical_repair</code>, <code>intraday_sync</code>, <code>quote_snapshot</code>, <code>corporate_actions</code>, <code>calendar</code>, <code>daily_validation</code>, <code>quality_scan</code></td><td>Ingestion</td></tr>
+        <tr><td><code>job_runs.status</code></td><td><code>queued</code>, <code>running</code>, <code>succeeded</code>, <code>partially_failed</code>, <code>failed</code>, <code>retrying</code>, <code>cancelled</code></td><td>Ingestion</td></tr>
+        <tr><td><code>job_runs.job_name</code></td><td><code>instrument-sync</code>, <code>calendar-sync</code>, <code>historical-backfill</code>, <code>historical-finalize</code>, <code>intraday-sync</code>, <code>coverage-recompute</code>, <code>quality-scan</code>, <code>ingestion-reconcile</code>, <code>refresh-materialized-view</code></td><td>Ingestion</td></tr>
         <tr><td><code>market_data_coverage.status</code></td><td><code>complete</code>, <code>partial</code>, <code>missing</code>, <code>not_applicable</code></td><td>Quality</td></tr>
-        <tr><td><code>market_data_coverage.validation_status</code></td><td><code>not_checked</code>, <code>pending</code>, <code>matched</code>, <code>volume_reconciled</code>, <code>volume_mismatch</code>, <code>ohlc_mismatch</code>, <code>daily_missing</code>, <code>minute_missing</code>, <code>error</code></td><td>Quality</td></tr>
         <tr><td><code>instrument_data_status.fetch_status</code></td><td><code>not_requested</code>, <code>queued</code>, <code>fetching</code>, <code>fetched</code>, <code>partial</code>, <code>failed</code>, <code>cancelled</code>, <code>stale</code></td><td>Catalog</td></tr>
-        <tr><td><code>instrument_data_status.data_status</code></td><td><code>complete</code>, <code>partial_reconciled</code>, <code>partial_mismatch</code>, <code>missing</code>, <code>pending</code>, <code>not_applicable</code>, <code>needs_review</code></td><td>Catalog</td></tr>
+        <tr><td><code>instrument_data_status.data_status</code></td><td><code>complete</code>, <code>partial_mismatch</code>, <code>missing</code>, <code>pending</code>, <code>not_applicable</code>, <code>needs_review</code></td><td>Catalog</td></tr>
         <tr><td><code>Refresh mode</code></td><td><code>missing_only</code>, <code>force</code> (explicit reason required)</td><td>Catalog</td></tr>
-        <tr><td><code>data_quality_issues.issue_type</code></td><td><code>missing_bar</code>, <code>duplicate_bar</code>, <code>invalid_ohlc</code>, <code>stale_quote</code>, <code>gap</code>, <code>outlier</code>, <code>corporate_action_mismatch</code>, <code>mapping_missing</code>, <code>coverage_shortfall</code>, <code>calendar_mismatch</code>, <code>provider_revision</code>, <code>volume_mismatch</code>, <code>stale_ingestion</code>, <code>schema_invalid</code>, <code>instrument_missing</code>, <code>tick_size_mismatch</code>, <code>rate_limit_exhausted</code>, <code>partial_bar</code>, <code>unsupported_instrument</code>, <code>duplicate_mapping</code></td><td>Quality</td></tr>
+        <tr><td><code>data_quality_issues.issue_type</code></td><td><code>missing_bar</code>, <code>duplicate_bar</code>, <code>invalid_ohlc</code>, <code>stale_quote</code>, <code>gap</code>, <code>outlier</code>, <code>corporate_action_mismatch</code>, <code>mapping_missing</code>, <code>coverage_shortfall</code>, <code>calendar_mismatch</code>, <code>provider_revision</code>, <code>volume_mismatch</code>, <code>stale_ingestion</code>, <code>schema_invalid</code>, <code>instrument_missing</code>, <code>tick_size_mismatch</code>, <code>rate_limit_exhausted</code>, <code>partial_bar</code>, <code>unsupported_instrument</code>, <code>duplicate_mapping</code>, <code>provider_fetch_failed</code></td><td>Quality</td></tr>
         <tr><td><code>data_quality_issues.severity</code></td><td><code>info</code>, <code>warning</code>, <code>critical</code></td><td>Quality</td></tr>
         <tr><td><code>data_quality_issues.status</code></td><td><code>open</code>, <code>acknowledged</code>, <code>resolved</code>, <code>ignored</code></td><td>Quality</td></tr>
         <tr><td><code>corporate_actions.status</code></td><td><code>announced</code>, <code>confirmed</code>, <code>applied</code></td><td>Reference</td></tr>
@@ -3777,12 +3756,12 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
     <table class="data-table">
       <thead><tr><th>#</th><th>Object</th><th>Change</th><th>Purpose</th></tr></thead>
       <tbody>
-        <tr><td>01</td><td><code>market_data_ingestion_runs</code></td><td>+11 columns, +3 check groups, +3 indexes</td><td>Chunk ledger and provider diagnostics.</td></tr>
+        <tr><td>01</td><td><code>job_runs</code> · <code>job_run_events</code></td><td>+5 columns, +1 status value, +1 table, +4 indexes</td><td>Instrument ledger, timeline and provider diagnostics.</td></tr>
         <tr><td>02</td><td><code>market_data_coverage</code></td><td>+8 columns, +1 status value, +1 index</td><td>Strict completeness plus the daily oracle.</td></tr>
         <tr><td>03</td><td><code>data_quality_issues</code></td><td>+8 columns, +11 issue types, +2 indexes</td><td>Dedupe, occurrence, acknowledgement and resolution.</td></tr>
         <tr><td>04</td><td><code>raw_provider_payloads</code></td><td>+1 unique index</td><td>Archive the same request response only once.</td></tr>
-        <tr><td>05</td><td><code>market_data_daily_validation</code></td><td>New table (59th)</td><td>Daily-versus-minute evidence per instrument-day.</td></tr>
-        <tr><td>06</td><td><code>instrument_data_status</code></td><td>New table (60th)</td><td>Persisted fetch and data status per instrument for the catalog.</td></tr>
+        <tr><td>05</td><td><code>market_data_daily_validation</code></td><td>New table at 0008; dropped by 0011</td><td>Daily-versus-minute evidence was removed; strict coverage is the only verdict.</td></tr>
+        <tr><td>06</td><td><code>instrument_data_status</code></td><td>New table at 0008; run-id columns dropped by 0012</td><td>Persisted fetch and data status per instrument for the catalog.</td></tr>
       </tbody>
     </table>
   </div>

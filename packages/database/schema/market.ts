@@ -14,12 +14,10 @@ import {
   date,
   index,
   integer,
-  jsonb,
   numeric,
   pgTable,
   primaryKey,
   timestamp,
-  uniqueIndex,
   uuid,
   varchar,
 } from 'drizzle-orm/pg-core';
@@ -35,7 +33,6 @@ export const marketCandles1m = pgTable(
     close: numeric('close', { precision: 20, scale: 4 }).notNull(),
     volume: numeric('volume', { precision: 20, scale: 4 }).default('0').notNull(),
     sourceProviderId: uuid('source_provider_id').notNull(),
-    ingestionRunId: uuid('ingestion_run_id'),
     rawPayloadId: uuid('raw_payload_id'),
     isFinal: boolean('is_final').default(true).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
@@ -101,41 +98,27 @@ export const marketQuoteSnapshots = pgTable(
   ],
 );
 
-export const marketDataCoverage = pgTable(
-  'market_data_coverage',
+/**
+ * One row per instrument per expected trading day. Non-trading days and days
+ * outside the listing window have no row: the calendar and the instrument
+ * record already say nothing was expected.
+ */
+export const instrumentDayCoverage = pgTable(
+  'instrument_day_coverage',
   {
-    id: uuid('id').primaryKey().defaultRandom(),
     instrumentId: uuid('instrument_id').notNull(),
     tradingDate: date('trading_date').notNull(),
     expectedBars: integer('expected_bars').notNull(),
     storedBars: integer('stored_bars').notNull(),
-    gapCount: integer('gap_count').default(0).notNull(),
-    firstBarAt: timestamp('first_bar_at', { withTimezone: true }),
-    lastBarAt: timestamp('last_bar_at', { withTimezone: true }),
-    status: varchar('status', { length: 20 }).notNull(),
-    gapRunCount: integer('gap_run_count').default(0).notNull(),
-    maxGapMinutes: integer('max_gap_minutes').default(0).notNull(),
-    details: jsonb('details')
-      .default(sql`'{}'::jsonb`)
-      .notNull(),
     checkedAt: timestamp('checked_at', { withTimezone: true }).defaultNow().notNull(),
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
-    uniqueIndex('uq_market_data_coverage_instrument_date').on(
-      table.instrumentId,
-      table.tradingDate,
-    ),
-    index('idx_market_data_coverage_trading_date').on(table.tradingDate),
-    check('chk_market_data_coverage_expected_bars_1', sql`${table.expectedBars} >= 0`),
-    check('chk_market_data_coverage_stored_bars_2', sql`${table.storedBars} >= 0`),
-    check('chk_market_data_coverage_gap_count_3', sql`${table.gapCount} >= 0`),
+    primaryKey({ columns: [table.instrumentId, table.tradingDate] }),
+    index('idx_instrument_day_coverage_trading_date').on(table.tradingDate),
     check(
-      'chk_market_data_coverage_status_4',
-      sql`${table.status} in ('complete', 'partial', 'missing', 'not_applicable')`,
+      'chk_instrument_day_coverage_counts',
+      sql`${table.expectedBars} > 0 and ${table.storedBars} >= 0 and ${table.storedBars} <= ${table.expectedBars}`,
     ),
-    check('chk_coverage_gap_runs', sql`${table.gapRunCount} >= 0 and ${table.maxGapMinutes} >= 0`),
   ],
 );
 
@@ -151,10 +134,7 @@ export const instrumentDataStatus = pgTable(
     completeDays: integer('complete_days').default(0).notNull(),
     partialDays: integer('partial_days').default(0).notNull(),
     missingDays: integer('missing_days').default(0).notNull(),
-    notApplicableDays: integer('not_applicable_days').default(0).notNull(),
     openCriticalIssues: integer('open_critical_issues').default(0).notNull(),
-    lastRunId: uuid('last_run_id'),
-    activeRunId: uuid('active_run_id'),
     lastSuccessAt: timestamp('last_success_at', { withTimezone: true }),
     computedAt: timestamp('computed_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
@@ -165,7 +145,7 @@ export const instrumentDataStatus = pgTable(
     index('idx_instrument_status_last_success').on(table.lastSuccessAt),
     check(
       'chk_instrument_status_counters',
-      sql`${table.expectedDays} >= 0 and ${table.completeDays} >= 0 and ${table.partialDays} >= 0 and ${table.missingDays} >= 0 and ${table.notApplicableDays} >= 0 and ${table.openCriticalIssues} >= 0 and ${table.targetTo} >= ${table.targetFrom}`,
+      sql`${table.expectedDays} >= 0 and ${table.completeDays} >= 0 and ${table.partialDays} >= 0 and ${table.missingDays} >= 0 and ${table.openCriticalIssues} >= 0 and ${table.targetTo} >= ${table.targetFrom}`,
     ),
     check(
       'chk_instrument_status_fetch',

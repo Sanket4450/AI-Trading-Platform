@@ -54,13 +54,6 @@ const detailRoutes: Array<{ prefix: string; meta: RouteMeta }> = [
     },
   },
   {
-    prefix: '/instruments/runs/',
-    meta: {
-      title: 'Ingestion run',
-      description: 'Counts, timing and the archived provider payload for this download.',
-    },
-  },
-  {
     prefix: '/instruments/issues/',
     meta: {
       title: 'Data issue',

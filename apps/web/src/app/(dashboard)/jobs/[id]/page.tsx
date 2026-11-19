@@ -156,8 +156,8 @@ export default async function JobDetailPage({
       {isPlan ? (
         <SectionCard
           className="mt-4"
-          title="Chunks"
-          description="One parent plan, one child job per instrument, one run per month. A succeeded chunk is not a complete day."
+          title="Instruments"
+          description="One parent plan and one child job per instrument. Strict coverage decides completeness."
           actions={<TableRefreshButton />}
         >
           {detail.planProgress ? (
@@ -165,19 +165,19 @@ export default async function JobDetailPage({
               <StatCard
                 label="Succeeded"
                 value={formatNumber(detail.planProgress.succeeded)}
-                hint="Chunks"
+                hint="Instrument jobs"
                 tone="success"
               />
               <StatCard
                 label="Running"
                 value={formatNumber(detail.planProgress.running)}
-                hint="In-flight chunks"
+                hint="In-flight jobs"
                 tone="info"
               />
               <StatCard
                 label="Failed"
                 value={formatNumber(detail.planProgress.failed)}
-                hint="Chunks"
+                hint="Instrument jobs"
                 tone="danger"
               />
               <StatCard
@@ -195,10 +195,10 @@ export default async function JobDetailPage({
             </StatGrid>
           ) : null}
 
-          {detail.chunks.length === 0 ? (
+          {detail.children.length === 0 ? (
             <EmptyState
               className="mt-4"
-              title="No chunks"
+              title="No instrument jobs"
               description="The plan has not queued any instrument yet."
             />
           ) : (
@@ -207,49 +207,45 @@ export default async function JobDetailPage({
                 <TableHeader>
                   <TableRow>
                     <TableHead>Instrument</TableHead>
-                    <TableHead>Chunk</TableHead>
                     <TableHead>Window</TableHead>
+                    <TableHead>Attempt</TableHead>
+                    <TableHead>Chunks</TableHead>
                     <TableHead>Rows</TableHead>
-                    <TableHead>HTTP</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {detail.chunks.map((chunk) => (
-                    <TableRow key={chunk.id}>
-                      <TableCell>{chunk.symbol ?? chunk.instrumentId ?? '—'}</TableCell>
+                  {detail.children.map((child) => (
+                    <TableRow key={child.id}>
+                      <TableCell>{child.symbol ?? child.instrumentId ?? '—'}</TableCell>
                       <TableCell className="text-muted-foreground text-xs">
-                        {(chunk.chunkIndex ?? 0) + 1}/{chunk.chunkCount ?? '—'} · attempt{' '}
-                        {chunk.attempt}
+                        {child.requestedFrom ?? '—'} → {child.requestedTo ?? '—'}
                       </TableCell>
                       <TableCell className="text-muted-foreground text-xs">
-                        {chunk.requestedFrom ?? '—'} → {chunk.requestedTo ?? '—'}
+                        {child.attempt}
                       </TableCell>
                       <TableCell className="text-muted-foreground text-xs">
-                        {chunk.rowsFetched}/{chunk.rowsWritten}/{chunk.rowsRejected}
+                        {formatNumber(child.chunks)}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-xs">
+                        {child.rowsFetched}/{child.rowsWritten}/{child.rowsRejected}
                         <span className="block text-[10px]">
-                          {chunk.rowsSkipped} skipped · {chunk.rowsUpdated} updated
+                          {child.rowsSkipped} skipped chunks
                         </span>
                       </TableCell>
-                      <TableCell className="text-muted-foreground text-xs">
-                        {chunk.httpStatus ?? '—'}
-                        {chunk.providerErrorCode ? (
-                          <span className="block text-[10px]">{chunk.providerErrorCode}</span>
-                        ) : null}
-                      </TableCell>
                       <TableCell>
-                        <StatusBadge status={chunk.status} />
-                        {chunk.errorMessage ? (
+                        <StatusBadge status={child.status} />
+                        {child.errorMessage ? (
                           <p className="text-destructive mt-1 max-w-56 truncate text-[10px]">
-                            {chunk.errorMessage}
+                            {child.errorMessage}
                           </p>
                         ) : null}
                       </TableCell>
                       <TableActions>
                         <TableActionLink
-                          href={detailHref(`/instruments/runs/${chunk.id}`, back.href)}
-                          label="View run"
+                          href={detailHref(`/jobs/${child.id}`, back.href)}
+                          label="View job"
                         />
                       </TableActions>
                     </TableRow>

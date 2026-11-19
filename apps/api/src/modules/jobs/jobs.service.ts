@@ -6,7 +6,7 @@ import {
   getJobRunSummary,
   getParentPlanProgress,
   getPlanJob,
-  listPlanChunks,
+  listPlanChildJobs,
   listTrackedJobRuns,
   recordAudit,
   updateJobRun,
@@ -17,6 +17,7 @@ import type { JobQueryDto } from './dto/job-query.dto.js';
 type RunRow = NonNullable<Awaited<ReturnType<typeof getJobRun>>>;
 type EventRow = Awaited<ReturnType<typeof getJobRunEvents>>[number];
 type MetricRow = Awaited<ReturnType<typeof getJobRunMetrics>>[number];
+type ChildRow = Awaited<ReturnType<typeof listPlanChildJobs>>[number];
 
 const TERMINAL_STATUSES = new Set([
   'succeeded',
@@ -58,6 +59,32 @@ function mapRun(run: RunRow) {
     payload: recordOf(run.payload),
     result: run.result === null ? null : recordOf(run.result),
     stageKeys: stageKeysOf(run.stageKeys),
+  };
+}
+
+function resultCount(result: unknown, key: string): number {
+  const value = recordOf(result)[key];
+  return typeof value === 'number' ? value : 0;
+}
+
+function mapChildJob(row: ChildRow) {
+  return {
+    id: row.id,
+    instrumentId: row.instrumentId,
+    symbol: row.symbol,
+    status: row.status,
+    attempt: row.attempt,
+    requestedFrom: row.requestedFrom,
+    requestedTo: row.requestedTo,
+    rowsFetched: resultCount(row.result, 'fetched'),
+    rowsWritten: resultCount(row.result, 'written'),
+    rowsRejected: resultCount(row.result, 'rejected'),
+    rowsSkipped: resultCount(row.result, 'skippedChunks'),
+    chunks: resultCount(row.result, 'chunks'),
+    errorMessage: row.errorMessage,
+    startedAt: row.startedAt,
+    finishedAt: row.finishedAt,
+    createdAt: row.createdAt,
   };
 }
 
@@ -169,8 +196,8 @@ export class JobsService {
     ]);
 
     const isPlan = run.jobName === 'backfill-plan';
-    const [planProgress, chunks] = isPlan
-      ? await Promise.all([getParentPlanProgress(id), listPlanChunks(id)])
+    const [planProgress, children] = isPlan
+      ? await Promise.all([getParentPlanProgress(id), listPlanChildJobs(id)])
       : [null, []];
 
     return {
@@ -179,7 +206,7 @@ export class JobsService {
       metrics: deriveMetrics(metrics),
       events: events.map(mapEvent),
       planProgress,
-      chunks,
+      children: children.map(mapChildJob),
     };
   }
 
