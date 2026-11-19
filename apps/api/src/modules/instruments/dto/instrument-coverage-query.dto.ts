@@ -50,12 +50,6 @@ export const CORPORATE_ACTION_TYPES = [
 ] as const;
 
 export class InstrumentCoverageQueryDto {
-  @ApiPropertyOptional({ maxLength: 60, default: 'nifty-50' })
-  @IsOptional()
-  @IsString()
-  @MaxLength(60)
-  universeCode?: string;
-
   @ApiPropertyOptional({ enum: [...FETCH_STATUSES] })
   @IsOptional()
   @IsIn(FETCH_STATUSES)

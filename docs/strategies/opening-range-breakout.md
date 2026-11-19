@@ -4,7 +4,7 @@ Implementation package: `packages/strategies/opening-range-breakout`.
 
 The authoritative rule set is `context/strategy1.md`. Summary:
 
-- Universe: 20 liquid NSE cash equities, refreshed weekly using trailing 20-session median traded value.
+- Instrument scope: instruments flagged `is_sync_target` for data sync.
 - Opening range: 09:15–09:30 IST.
 - Signal timeframe: five-minute candles.
 - Entry window: 09:30–14:15 IST.

@@ -129,34 +129,6 @@ export const strategyConfigBindings = pgTable(
   ],
 );
 
-export const strategyUniverseMembers = pgTable(
-  'strategy_universe_members',
-  {
-    id: uuid('id').primaryKey().defaultRandom(),
-    strategyVersionId: uuid('strategy_version_id').notNull(),
-    instrumentId: uuid('instrument_id').notNull(),
-    universeVersionId: uuid('universe_version_id'),
-    rank: integer('rank').notNull(),
-    effectiveFrom: date('effective_from').notNull(),
-    effectiveTo: date('effective_to'),
-    isEnabled: boolean('is_enabled').default(true).notNull(),
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-  },
-  (table) => [
-    uniqueIndex('uq_strategy_universe_member').on(
-      table.strategyVersionId,
-      table.instrumentId,
-      table.effectiveFrom,
-    ),
-    index('idx_strategy_universe_members_instrument_id').on(table.instrumentId),
-    check('chk_strategy_universe_members_rank_1', sql`${table.rank} > 0`),
-    check(
-      'chk_strategy_universe_members_effective_from_2',
-      sql`${table.effectiveTo} is null or ${table.effectiveTo} > ${table.effectiveFrom}`,
-    ),
-  ],
-);
-
 export const strategyActivations = pgTable(
   'strategy_activations',
   {

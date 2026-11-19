@@ -152,7 +152,7 @@ export async function getDashboardOverview() {
     .select({
       accounts: sql<number>`(select count(*)::int from accounts where is_active)`,
       instruments: sql<number>`(select count(*)::int from instruments where is_active)`,
-      universes: sql<number>`(select count(*)::int from instrument_universes where is_active)`,
+      syncTargets: sql<number>`(select count(*)::int from instruments where is_sync_target)`,
       strategies: sql<number>`(select count(*)::int from strategies where status in ('research','active'))`,
       openIssues: sql<number>`(select count(*)::int from data_quality_issues where status = 'open')`,
       criticalIssues: sql<number>`(select count(*)::int from data_quality_issues where status = 'open' and severity = 'critical')`,

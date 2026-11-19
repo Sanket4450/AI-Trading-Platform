@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, ilike, inArray, isNull, lte, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, ilike, inArray, lte, or, sql } from 'drizzle-orm';
 import { uuidv7 } from 'uuidv7';
 import { db } from '../client.js';
 import { nseHolidays, nseSpecialSessions } from '../fixtures/nse.js';
@@ -8,9 +8,6 @@ import {
   exchanges,
   instrumentDataStatus,
   instrumentProviderMappings,
-  instrumentUniverseMembers,
-  instrumentUniverseVersions,
-  instrumentUniverses,
   instruments,
   marketDataCoverage,
   marketDataIngestionRuns,
@@ -139,93 +136,6 @@ export async function listCorporateActions(instrumentId?: string) {
     .where(instrumentId ? eq(corporateActions.instrumentId, instrumentId) : undefined)
     .orderBy(desc(corporateActions.exDate))
     .limit(200);
-}
-
-export async function listUniverses(search?: string) {
-  const term = search ? `%${search}%` : null;
-  const conditions = term
-    ? [or(ilike(instrumentUniverses.code, term), ilike(instrumentUniverses.name, term))]
-    : [];
-
-  return db
-    .select({
-      id: instrumentUniverses.id,
-      code: instrumentUniverses.code,
-      name: instrumentUniverses.name,
-      description: instrumentUniverses.description,
-      selectionMethod: instrumentUniverses.selectionMethod,
-      lookbackSessions: instrumentUniverses.lookbackSessions,
-      refreshCadence: instrumentUniverses.refreshCadence,
-      isActive: instrumentUniverses.isActive,
-      latestVersion: sql<number | null>`(
-        select v.version from instrument_universe_versions v
-        where v.universe_id = "instrument_universes"."id"
-        order by v.version desc limit 1
-      )`,
-      latestMemberCount: sql<number | null>`(
-        select v.member_count from instrument_universe_versions v
-        where v.universe_id = "instrument_universes"."id"
-        order by v.version desc limit 1
-      )`,
-      latestEffectiveFrom: sql<string | null>`(
-        select v.effective_from::text from instrument_universe_versions v
-        where v.universe_id = "instrument_universes"."id"
-        order by v.version desc limit 1
-      )`,
-      versionCount: sql<number>`(
-        select count(*)::int from instrument_universe_versions v
-        where v.universe_id = "instrument_universes"."id"
-      )`,
-    })
-    .from(instrumentUniverses)
-    .where(conditions.length > 0 ? and(...conditions) : undefined)
-    .orderBy(asc(instrumentUniverses.code));
-}
-
-export async function getUniverse(id: string) {
-  const universe = (
-    await db.select().from(instrumentUniverses).where(eq(instrumentUniverses.id, id)).limit(1)
-  )[0];
-  if (!universe) return null;
-
-  const versions = await db
-    .select()
-    .from(instrumentUniverseVersions)
-    .where(eq(instrumentUniverseVersions.universeId, id))
-    .orderBy(desc(instrumentUniverseVersions.version));
-
-  const members = versions.length
-    ? await db
-        .select({
-          id: instrumentUniverseMembers.id,
-          universeVersionId: instrumentUniverseMembers.universeVersionId,
-          instrumentId: instrumentUniverseMembers.instrumentId,
-          symbol: instruments.tradingSymbol,
-          name: instruments.name,
-          isin: instruments.isin,
-          rank: instrumentUniverseMembers.rank,
-          medianTradedValue: instrumentUniverseMembers.medianTradedValue,
-          addedAt: instrumentUniverseMembers.addedAt,
-          removedAt: instrumentUniverseMembers.removedAt,
-        })
-        .from(instrumentUniverseMembers)
-        .innerJoin(instruments, eq(instruments.id, instrumentUniverseMembers.instrumentId))
-        .where(
-          inArray(
-            instrumentUniverseMembers.universeVersionId,
-            versions.map((v) => v.id),
-          ),
-        )
-        .orderBy(asc(instrumentUniverseMembers.rank))
-    : [];
-
-  return {
-    ...universe,
-    versions: versions.map((version) => ({
-      ...version,
-      members: members.filter((member) => member.universeVersionId === version.id),
-    })),
-  };
 }
 
 export async function listTradingCalendar(filters: {
@@ -666,64 +576,17 @@ export async function syncTradingCalendarFixture(
 }
 
 // ---------------------------------------------------------------------------
-// R2 reference, membership, catalog and corporate actions
+// R2 reference, catalog and corporate actions
 // ---------------------------------------------------------------------------
 
-export interface UniverseMemberImportRow {
-  rank: number;
-  instrumentId?: string;
-  isin?: string | null;
-  symbol?: string | null;
-}
-
-export async function getUniverseByCode(code: string) {
-  const rows = await db
-    .select()
-    .from(instrumentUniverses)
-    .where(eq(instrumentUniverses.code, code))
-    .limit(1);
-  return rows[0] ?? null;
-}
-
-export async function getActiveUniverseVersion(code: string) {
-  const rows = await db
-    .select({
-      universeId: instrumentUniverses.id,
-      universeCode: instrumentUniverses.code,
-      universeName: instrumentUniverses.name,
-      versionId: instrumentUniverseVersions.id,
-      version: instrumentUniverseVersions.version,
-      effectiveFrom: instrumentUniverseVersions.effectiveFrom,
-      effectiveTo: instrumentUniverseVersions.effectiveTo,
-      memberCount: instrumentUniverseVersions.memberCount,
-    })
-    .from(instrumentUniverses)
-    .innerJoin(
-      instrumentUniverseVersions,
-      and(
-        eq(instrumentUniverseVersions.universeId, instrumentUniverses.id),
-        isNull(instrumentUniverseVersions.effectiveTo),
-      ),
-    )
-    .where(eq(instrumentUniverses.code, code))
-    .orderBy(desc(instrumentUniverseVersions.version))
-    .limit(1);
-  return rows[0] ?? null;
-}
-
-export async function listUniverseCatalog(filters: {
-  universeCode?: string;
+export async function listInstrumentCatalog(filters: {
   fetchStatus?: string;
   dataStatus?: string;
   search?: string;
   limit?: number;
   offset?: number;
 }) {
-  const universeCode = filters.universeCode ?? 'nifty-50';
-  const conditions = [
-    eq(instrumentUniverses.code, universeCode),
-    isNull(instrumentUniverseVersions.effectiveTo),
-  ];
+  const conditions = [eq(instruments.isSyncTarget, true)];
   if (filters.fetchStatus)
     conditions.push(eq(instrumentDataStatus.fetchStatus, filters.fetchStatus));
   if (filters.dataStatus) conditions.push(eq(instrumentDataStatus.dataStatus, filters.dataStatus));
@@ -738,7 +601,6 @@ export async function listUniverseCatalog(filters: {
 
   return db
     .select({
-      rank: instrumentUniverseMembers.rank,
       instrumentId: instruments.id,
       symbol: instruments.tradingSymbol,
       name: instruments.name,
@@ -749,9 +611,6 @@ export async function listUniverseCatalog(filters: {
       isActive: instruments.isActive,
       listedOn: instruments.listedOn,
       delistedOn: instruments.delistedOn,
-      universeCode: instrumentUniverses.code,
-      universeVersionId: instrumentUniverseVersions.id,
-      universeVersion: instrumentUniverseVersions.version,
       targetFrom: instrumentDataStatus.targetFrom,
       targetTo: instrumentDataStatus.targetTo,
       fetchStatus: instrumentDataStatus.fetchStatus,
@@ -771,19 +630,10 @@ export async function listUniverseCatalog(filters: {
         where m.instrument_id = "instruments"."id" and m.is_primary
       )`,
     })
-    .from(instrumentUniverses)
-    .innerJoin(
-      instrumentUniverseVersions,
-      eq(instrumentUniverseVersions.universeId, instrumentUniverses.id),
-    )
-    .innerJoin(
-      instrumentUniverseMembers,
-      eq(instrumentUniverseMembers.universeVersionId, instrumentUniverseVersions.id),
-    )
-    .innerJoin(instruments, eq(instruments.id, instrumentUniverseMembers.instrumentId))
+    .from(instruments)
     .leftJoin(instrumentDataStatus, eq(instrumentDataStatus.instrumentId, instruments.id))
     .where(and(...conditions))
-    .orderBy(asc(instrumentUniverseMembers.rank), asc(instruments.id))
+    .orderBy(asc(instruments.tradingSymbol), asc(instruments.id))
     .limit(Math.min(filters.limit ?? 200, 2000))
     .offset(filters.offset ?? 0);
 }
@@ -994,156 +844,6 @@ export async function getInstrumentStatusCounters(
       ),
     );
   return { ...counters, openCriticalIssues: issues?.count ?? 0 };
-}
-
-export async function importUniverseMembership(input: {
-  universeCode: string;
-  name: string;
-  description?: string | null;
-  effectiveFrom: string;
-  members: UniverseMemberImportRow[];
-  source: string;
-  createdBy: string;
-  sourceProviderId?: string | null;
-  targetFrom: string;
-  targetTo: string;
-}) {
-  if (input.members.length !== 51) {
-    throw new Error(
-      `nifty-50 membership must contain exactly 51 rows, received ${input.members.length}`,
-    );
-  }
-  const ranks = new Set(input.members.map((member) => member.rank));
-  if (ranks.size !== input.members.length) throw new Error('Universe member ranks must be unique');
-  if (!input.members.some((member) => member.rank === 1))
-    throw new Error('Rank 1 must be the index');
-
-  return db.transaction(async (tx) => {
-    let universe = (
-      await tx
-        .select()
-        .from(instrumentUniverses)
-        .where(eq(instrumentUniverses.code, input.universeCode))
-        .limit(1)
-    )[0];
-    if (!universe) {
-      [universe] = await tx
-        .insert(instrumentUniverses)
-        .values({
-          id: uuidv7(),
-          code: input.universeCode,
-          name: input.name,
-          description: input.description ?? null,
-          selectionMethod: 'index_constituents',
-          lookbackSessions: null,
-          refreshCadence: 'manual',
-          isActive: true,
-          createdBy: input.createdBy,
-        })
-        .returning();
-    }
-
-    const active = (
-      await tx
-        .select()
-        .from(instrumentUniverseVersions)
-        .where(
-          and(
-            eq(instrumentUniverseVersions.universeId, universe!.id),
-            isNull(instrumentUniverseVersions.effectiveTo),
-          ),
-        )
-        .orderBy(desc(instrumentUniverseVersions.version))
-        .limit(1)
-    )[0];
-    if (active && input.effectiveFrom <= active.effectiveFrom) {
-      throw new Error(
-        `A new universe version must start after ${active.effectiveFrom}; received ${input.effectiveFrom}`,
-      );
-    }
-
-    const resolved: { instrumentId: string; rank: number }[] = [];
-    for (const member of input.members) {
-      let instrumentId = member.instrumentId ?? null;
-      if (!instrumentId && member.isin) {
-        const byIsin = await tx
-          .select({ id: instruments.id })
-          .from(instruments)
-          .where(eq(instruments.isin, member.isin.toUpperCase()))
-          .limit(1);
-        instrumentId = byIsin[0]?.id ?? null;
-      }
-      if (!instrumentId && member.symbol) {
-        const bySymbol = await tx
-          .select({ id: instruments.id })
-          .from(instruments)
-          .where(eq(instruments.tradingSymbol, member.symbol))
-          .limit(1);
-        instrumentId = bySymbol[0]?.id ?? null;
-      }
-      if (!instrumentId) {
-        throw new Error(`Universe member rank ${member.rank} could not be resolved`);
-      }
-      resolved.push({ instrumentId, rank: member.rank });
-    }
-
-    if (active) {
-      const previousDay = new Date(`${input.effectiveFrom}T00:00:00Z`);
-      previousDay.setUTCDate(previousDay.getUTCDate() - 1);
-      await tx
-        .update(instrumentUniverseVersions)
-        .set({ effectiveTo: previousDay.toISOString().slice(0, 10) })
-        .where(eq(instrumentUniverseVersions.id, active.id));
-    }
-
-    const version = active ? active.version + 1 : 1;
-    const [created] = await tx
-      .insert(instrumentUniverseVersions)
-      .values({
-        id: uuidv7(),
-        universeId: universe!.id,
-        version,
-        effectiveFrom: input.effectiveFrom,
-        effectiveTo: null,
-        memberCount: resolved.length,
-        criteria: { source: input.source, importedAt: new Date().toISOString() },
-        sourceProviderId: input.sourceProviderId ?? null,
-        createdBy: input.createdBy,
-      })
-      .returning();
-
-    await tx.insert(instrumentUniverseMembers).values(
-      resolved.map((member) => ({
-        id: uuidv7(),
-        universeVersionId: created!.id,
-        instrumentId: member.instrumentId,
-        rank: member.rank,
-        medianTradedValue: null,
-        addedAt: input.effectiveFrom,
-        removedAt: null,
-      })),
-    );
-
-    await tx
-      .insert(instrumentDataStatus)
-      .values(
-        resolved.map((member) => ({
-          instrumentId: member.instrumentId,
-          targetFrom: input.targetFrom,
-          targetTo: input.targetTo,
-          fetchStatus: 'not_requested',
-          dataStatus: 'pending',
-        })),
-      )
-      .onConflictDoNothing({ target: instrumentDataStatus.instrumentId });
-
-    return {
-      universeId: universe!.id,
-      versionId: created!.id,
-      version,
-      members: resolved.length,
-    };
-  });
 }
 
 export interface CorporateActionImportRow {

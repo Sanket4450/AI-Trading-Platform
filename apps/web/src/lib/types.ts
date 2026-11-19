@@ -107,50 +107,6 @@ export interface CorporateAction {
   notes: string | null;
 }
 
-export interface Universe {
-  id: string;
-  code: string;
-  name: string;
-  description: string | null;
-  selectionMethod: string;
-  lookbackSessions: number | null;
-  refreshCadence: string;
-  isActive: boolean;
-  latestVersion: number | null;
-  latestMemberCount: number | null;
-  latestEffectiveFrom: string | null;
-  versionCount: number;
-}
-
-export interface UniverseMember {
-  id: string;
-  universeVersionId: string;
-  instrumentId: string;
-  symbol: string;
-  name: string;
-  isin: string | null;
-  rank: number;
-  medianTradedValue: string | null;
-  addedAt: string;
-  removedAt: string | null;
-}
-
-export interface UniverseVersion {
-  id: string;
-  universeId: string;
-  version: number;
-  effectiveFrom: string;
-  effectiveTo: string | null;
-  memberCount: number;
-  criteria: Record<string, unknown>;
-  createdAt: string;
-  members: UniverseMember[];
-}
-
-export interface UniverseDetail extends Universe {
-  versions: UniverseVersion[];
-}
-
 export interface Strategy {
   id: string;
   code: string;
@@ -160,7 +116,6 @@ export interface Strategy {
   latestVersion: number | null;
   latestVersionStatus: string | null;
   versionCount: number;
-  universeCount: number;
   activeActivations: number;
 }
 
@@ -176,18 +131,6 @@ export interface StrategyBinding {
   payloadHash: string;
   effectiveFrom: string;
   effectiveTo: string | null;
-}
-
-export interface StrategyMember {
-  id: string;
-  strategyVersionId: string;
-  instrumentId: string;
-  symbol: string;
-  name: string;
-  rank: number;
-  effectiveFrom: string;
-  effectiveTo: string | null;
-  isEnabled: boolean;
 }
 
 export interface StrategyActivation {
@@ -212,7 +155,6 @@ export interface StrategyVersion {
   releasedAt: string | null;
   createdAt: string;
   bindings: StrategyBinding[];
-  members: StrategyMember[];
   activations: StrategyActivation[];
 }
 
@@ -444,7 +386,6 @@ export interface JobPlanChunk {
   id: string;
   instrumentId: string | null;
   symbol: string | null;
-  rank: number | null;
   chunkIndex: number | null;
   chunkCount: number | null;
   requestedFrom: string | null;
@@ -512,7 +453,6 @@ export interface Overview {
 }
 
 export interface InstrumentCoverageRow {
-  rank: number;
   instrumentId: string;
   symbol: string;
   name: string;
@@ -523,9 +463,6 @@ export interface InstrumentCoverageRow {
   isActive: boolean;
   listedOn: string | null;
   delistedOn: string | null;
-  universeCode: string;
-  universeVersionId: string;
-  universeVersion: number;
   targetFrom: string | null;
   targetTo: string | null;
   fetchStatus: string | null;
@@ -553,10 +490,7 @@ export interface InstrumentCoverageMonth {
   mismatch: number;
 }
 
-export interface InstrumentCoverageDetail extends Omit<
-  InstrumentCoverageRow,
-  'rank' | 'universeCode' | 'universeVersionId' | 'universeVersion'
-> {
+export interface InstrumentCoverageDetail extends InstrumentCoverageRow {
   months: InstrumentCoverageMonth[];
   runs: IngestionRun[];
   issues: QualityIssue[];

@@ -16,11 +16,7 @@ const routes: Record<string, RouteMeta> = {
   '/instruments': {
     title: 'Instruments',
     description:
-      'Browse NSE cash equities, check NIFTY 50 membership and download missing data.',
-  },
-  '/universes': {
-    title: 'Universes',
-    description: 'Reusable instrument groups with versioned membership and strategy links.',
+      'Browse the instruments marked for data sync and download missing history.',
   },
   '/strategies': {
     title: 'Strategies',
@@ -80,18 +76,11 @@ const detailRoutes: Array<{ prefix: string; meta: RouteMeta }> = [
     },
   },
   {
-    prefix: '/universes/',
-    meta: {
-      title: 'Universe',
-      description: 'Version history and current members of this universe.',
-    },
-  },
-  {
     prefix: '/strategies/',
     meta: {
       title: 'Strategy',
       description:
-        'Versions, parameter bindings, member universes and activation state for this strategy.',
+        'Versions, parameter bindings and activation state for this strategy.',
     },
   },
   {

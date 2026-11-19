@@ -65,7 +65,6 @@ async function bootstrap() {
     .addTag('auth', 'Session login, logout and current-user lookup.')
     .addTag('accounts', 'Broker accounts, permissions, credentials and equity.')
     .addTag('instruments', 'Instrument master, provider mappings and minute candles.')
-    .addTag('universes', 'Instrument universes and their versions.')
     .addTag('strategies', 'Strategies, versions and effective configuration lookup.')
     .addTag('configuration', 'Versioned strategy, risk and system configuration.')
     .addTag('data', 'Reference ingestion, backfills, coverage, validation and catalog.')

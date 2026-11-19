@@ -2,8 +2,8 @@
 
 | Rule                | Initial specification                                                                                                      |
 | ------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| Stock universe      | 20 liquid NSE cash equities selected using trailing 20-session median daily traded value                                   |
-| Universe refresh    | Weekly, using only information available before that trading session                                                       |
+| Instrument scope    | Instruments flagged `is_sync_target` in the reference master                                                             |
+| Scope refresh       | Updated whenever instrument sync changes the flag                                                                          |
 | Opening range       | High and low formed between 9:15 AM and 9:30 AM IST                                                                        |
 | Signal timeframe    | Five-minute candles                                                                                                        |
 | Entry window        | 9:30 AM to 2:15 PM IST                                                                                                     |

@@ -155,7 +155,7 @@ export default async function AccountDetailPage({
       <div className="mt-4 grid gap-4 xl:grid-cols-[1.2fr_1fr]">
         <SectionCard
           title="Permissions"
-          description="Being in a strategy universe is not enough; the account must also permit the instrument."
+          description="Being a sync target is not enough; the account must also permit the instrument."
           actions={<TableRefreshButton />}
         >
           {permissions.length === 0 ? (

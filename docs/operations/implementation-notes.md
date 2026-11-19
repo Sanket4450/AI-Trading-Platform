@@ -67,9 +67,9 @@ seed, repositories, configuration management, API, dashboard, worker jobs and au
 
 ### Database
 
-- **58 logical tables + 1 materialized view.** The six explicit M:N tables are
-  `user_account_access`, `account_instrument_permissions`, `instrument_universe_members`,
-  `strategy_config_bindings`, `strategy_universe_members` and `strategy_activations`.
+- **57 logical tables + 1 materialized view.** The explicit M:N tables are
+  `user_account_access`, `account_instrument_permissions`, `strategy_config_bindings` and
+  `strategy_activations`.
 - **Drizzle schema mirrors the database.** `packages/database/schema/*.ts` defines the tables, checks and simple
   indexes. `drizzle-kit generate` produces the base migration from `schema/drizzle.ts`.
 - **Custom SQL is explicit.** `0001_partitioned_market.sql` creates the two partitioned tables and monthly
@@ -91,9 +91,9 @@ seed, repositories, configuration management, API, dashboard, worker jobs and au
 ### Seed
 
 - The seed is idempotent and refuses to run without `SEED_OPERATOR_EMAIL` and `SEED_OPERATOR_PASSWORD`.
-- Reference fixture: NIFTY 50 index, 50 NSE cash equities with known ISINs, 20-symbol `orb-liquid-20` universe,
-  NSE/BSE exchanges, Upstox/simulated/CSV providers, two years of weekday calendar rows, the `orb-15m` strategy,
-  parameter/risk/system configuration versions and their bindings.
+- Reference fixture: NIFTY 50 index and 50 NSE cash equities with known ISINs, all flagged
+  `is_sync_target`, NSE/BSE exchanges, Upstox/simulated/CSV providers, two years of weekday calendar
+  rows, the `orb-15m` strategy, parameter/risk/system configuration versions and their bindings.
 - Upstox keys for the fixture are `NSE_EQ|<ISIN>` or `PENDING:<SYMBOL>` until the real instrument master is
   synced. The canonical `instruments.id` never changes.
 - The seed writes one audit row per run. Reference and configuration counts remain stable.
@@ -110,7 +110,7 @@ seed, repositories, configuration management, API, dashboard, worker jobs and au
   releases.
 - **Credentials.** `CONFIG_ENCRYPTION_KEY` drives AES-256-GCM envelope encryption. The API returns credential
   metadata only; ciphertext is never exposed.
-- **API surface.** Health, auth, accounts, instruments (including coverage and ingestion runs), universes,
+- **API surface.** Health, auth, accounts, instruments (including coverage and ingestion runs),
   strategies, configuration, jobs, audit, settings (including provider state and provider-wide issues) and
   system status. See Swagger at `/api/docs`.
 - **Ingestion writes.** A per-instrument fetch and a materialized-view refresh create `job_runs` and enqueue
@@ -131,7 +131,7 @@ seed, repositories, configuration management, API, dashboard, worker jobs and au
 
 ### Dashboard
 
-- Eight operator routes: `/`, `/accounts`, `/instruments`, `/universes`, `/strategies`, `/jobs`, `/audit`
+- Seven operator routes: `/`, `/accounts`, `/instruments`, `/strategies`, `/jobs`, `/audit`
   and `/settings`.
 - Server components read the API through `apps/web/src/lib/api.ts`; server actions perform configuration,
   strategy, credential, ingestion and settings writes.
@@ -205,13 +205,14 @@ modular monolith or the R1 lifecycle tables.
   `market_data_daily_validation`.
 - The migration is additive. It preflights duplicate raw payloads before creating the unique index and
   preserves legacy resolved/ignored issues with an explicit migration note.
-- The seed creates the `nifty-50` universe with rank 1 = NIFTY 50 index, ranks 2–51 in reviewed
-  display order, one status row per member, a 2022–2027 NSE calendar, corrected tick sizes and a
-  research-mode account/system setting.
+- The seed flags the 51 reference instruments as `is_sync_target`, creates one status row per target,
+  a 2022–2027 NSE calendar, corrected tick sizes and a research-mode account/system setting.
 - `0009_process_tracking.sql` adds stage columns to `job_runs` and the append-only
   `job_run_events` stream behind `/jobs`. Every worker job now records start, stage, step,
-  metric and terminal events with timestamps. The database ends at 61 logical tables.
-- `pnpm db:verify` asserts 61 tables, the R2 tables and indexes, 51 ranked members, 51 status rows,
+  metric and terminal events with timestamps.
+- `0010_drop_universes.sql` replaces versioned instrument universes and strategy membership rows with
+  `instruments.is_sync_target`. The database ends at 57 logical tables.
+- `pnpm db:verify` asserts 57 tables, the R2 tables and indexes, 51 sync targets, 51 status rows,
   51 primary mappings, valid tick sizes, calendar coverage and zero orders.
 
 ### Provider and pipeline
@@ -259,7 +260,8 @@ pnpm nx run-many -t test -p domain configuration market-data adapters api worker
 
 The external PostgreSQL migration 0008 applied successfully, the R2 seed completed and `db:verify`
 reported 61 logical tables, 1 materialized view, 63 candle partitions, 15 quote partitions, 51
-nifty-50 members with status rows and primary mappings, 2191 calendar days and zero orders.
+sync targets with status rows and primary mappings, 2191 calendar days and zero orders. The
+subsequent `0010_drop_universes.sql` migration leaves 57 logical tables.
 
 ### Live read-only checks (2026-10-27)
 

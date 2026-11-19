@@ -14,7 +14,6 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiParam,
-  ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
 import type { Request } from 'express';
@@ -52,18 +51,17 @@ export class InstrumentCoverageController {
   ) {}
 
   @Get('status')
-  @ApiOperation({ summary: 'List universe instruments with fetch and coverage status' })
+  @ApiOperation({ summary: 'List sync-target instruments with fetch and coverage status' })
   @ApiOkResponse({ type: InstrumentCoverageRowDto, isArray: true })
   list(@Query() query: InstrumentCoverageQueryDto) {
     return this.coverage.list(query);
   }
 
   @Get('status/summary')
-  @ApiOperation({ summary: 'Summarise catalog fetch and coverage status for a universe' })
-  @ApiQuery({ name: 'universeCode', required: false, example: 'nifty-50' })
+  @ApiOperation({ summary: 'Summarise catalog fetch and coverage status for sync targets' })
   @ApiOkResponse({ type: InstrumentCoverageSummaryDto })
-  summary(@Query('universeCode') universeCode?: string) {
-    return this.coverage.summary(universeCode);
+  summary() {
+    return this.coverage.summary();
   }
 
   @Get(':instrumentId/coverage')

@@ -50,6 +50,7 @@ export function TableActions({ children, className }: { children: ReactNode; cla
 type TableActionButtonProps = ComponentProps<typeof Button> & {
   icon?: TableActionIcon;
   label: string;
+  tooltip?: string;
   tone?: TableActionTone;
 };
 
@@ -57,6 +58,7 @@ type TableActionButtonProps = ComponentProps<typeof Button> & {
 export function TableActionButton({
   icon = 'view',
   label,
+  tooltip,
   tone = 'view',
   className,
   ...props
@@ -64,7 +66,7 @@ export function TableActionButton({
   const Icon = actionIcons[icon];
 
   return (
-    <InfoTooltip content={label}>
+    <InfoTooltip content={tooltip ?? label}>
       <Button
         type="button"
         variant="ghost"

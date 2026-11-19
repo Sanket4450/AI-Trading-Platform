@@ -43,43 +43,6 @@ export class StrategyBindingDto {
   effectiveTo!: string | null;
 }
 
-export class StrategyMemberDto {
-  @ApiProperty({ format: 'uuid' })
-  id!: string;
-
-  @ApiProperty({ format: 'uuid' })
-  strategyVersionId!: string;
-
-  @ApiProperty({ format: 'uuid' })
-  instrumentId!: string;
-
-  @ApiProperty({ example: 'RELIANCE' })
-  symbol!: string;
-
-  @ApiProperty()
-  name!: string;
-
-  @ApiProperty({ example: 1 })
-  rank!: number;
-
-  @ApiProperty({ type: String, format: 'date' })
-  effectiveFrom!: string;
-
-  @ApiProperty({ type: String, format: 'date', nullable: true })
-  effectiveTo!: string | null;
-
-  @ApiProperty()
-  isEnabled!: boolean;
-
-  @ApiProperty({
-    type: String,
-    format: 'uuid',
-    nullable: true,
-    required: false,
-  })
-  universeVersionId?: string | null;
-}
-
 export class StrategyActivationDto {
   @ApiProperty({ format: 'uuid' })
   id!: string;
@@ -145,9 +108,6 @@ export class StrategyVersionDto {
   @ApiProperty({ type: [StrategyBindingDto], required: false })
   bindings?: StrategyBindingDto[];
 
-  @ApiProperty({ type: [StrategyMemberDto], required: false })
-  members?: StrategyMemberDto[];
-
   @ApiProperty({ type: [StrategyActivationDto], required: false })
   activations?: StrategyActivationDto[];
 }
@@ -176,9 +136,6 @@ export class StrategyDto {
 
   @ApiProperty()
   versionCount!: number;
-
-  @ApiProperty({ required: false })
-  universeCount?: number;
 
   @ApiProperty({ required: false })
   activeActivations?: number;

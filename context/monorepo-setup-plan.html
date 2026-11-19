@@ -585,7 +585,7 @@
     <div class="arch-row four">
       <div class="node lib"><b>execution-engine</b><span>Orders, state, positions, execution modes.</span></div>
       <div class="node lib"><b>backtesting</b><span>Replay, simulated execution, costs, metrics.</span></div>
-      <div class="node lib"><b>market-data</b><span>Models, normalisation, validation, universe.</span></div>
+      <div class="node lib"><b>market-data</b><span>Models, normalisation and validation.</span></div>
       <div class="node lib"><b>adapters</b><span>Upstox and simulated broker implementations.</span></div>
     </div>
 
@@ -770,8 +770,7 @@
 │   ├── <span class="d">market-data/</span>
 │   │   ├── <span class="d">models/</span>
 │   │   ├── <span class="d">normalization/</span>
-│   │   ├── <span class="d">validation/</span>
-│   │   ├── <span class="d">instrument-universe/</span>
+│   │   └── <span class="d">validation/</span>
 │   │   └── <span class="f">index.ts</span>
 │   ├── <span class="d">adapters/</span>
 │   │   ├── <span class="d">upstox/</span>
@@ -2020,7 +2019,7 @@ pnpm --filter @ai-trading/worker dev</code></pre>
         <tr><td><strong>@ai-trading/risk-engine</strong></td><td>Position sizing, risk policies, exposure controls and kill switch.</td><td><code>position-sizing</code>, <code>risk-policies</code>, <code>exposure-controls</code>, <code>kill-switch</code></td><td><code>domain</code></td></tr>
         <tr><td><strong>@ai-trading/execution-engine</strong></td><td>Order management, order state, positions and execution modes; owns broker ports.</td><td><code>order-management</code>, <code>order-state</code>, <code>position-management</code>, <code>execution-modes</code></td><td><code>domain</code></td></tr>
         <tr><td><strong>@ai-trading/backtesting</strong></td><td>Historical replay, simulated execution, cost/slippage models and metrics.</td><td><code>historical-replay</code>, <code>simulated-execution</code>, <code>cost-models</code>, <code>slippage-models</code>, <code>performance-metrics</code></td><td><code>domain</code>, <code>trading-engine</code>, <code>risk-engine</code>, <code>execution-engine</code></td></tr>
-        <tr><td><strong>@ai-trading/market-data</strong></td><td>Normalised bars, validation, normalisation and instrument universe.</td><td><code>models</code>, <code>normalization</code>, <code>validation</code>, <code>instrument-universe</code></td><td><code>domain</code></td></tr>
+        <tr><td><strong>@ai-trading/market-data</strong></td><td>Normalised bars, validation and normalisation.</td><td><code>models</code>, <code>normalization</code>, <code>validation</code></td><td><code>domain</code></td></tr>
         <tr><td><strong>@ai-trading/adapters</strong></td><td>Upstox and simulated broker implementations of the ports.</td><td><code>upstox</code>, <code>simulated-broker</code></td><td><code>domain</code>, <code>market-data</code>, <code>execution-engine</code></td></tr>
         <tr><td><strong>@ai-trading/database</strong></td><td>Drizzle schema, migrations and repositories.</td><td><code>schema</code>, <code>migrations</code>, <code>repositories</code></td><td><code>domain</code></td></tr>
         <tr><td><strong>@ai-trading/configuration</strong></td><td>Validated, versioned settings for strategies, risk and trading modes.</td><td><code>strategies</code>, <code>risk</code>, <code>trading-modes</code></td><td><code>domain</code></td></tr>
@@ -2151,7 +2150,7 @@ mkdir -p packages/strategies/opening-range-breakout
 mkdir -p packages/risk-engine/{position-sizing,risk-policies,exposure-controls,kill-switch}
 mkdir -p packages/execution-engine/{order-management,order-state,position-management,execution-modes}
 mkdir -p packages/backtesting/{historical-replay,simulated-execution,cost-models,slippage-models,performance-metrics}
-mkdir -p packages/market-data/{models,normalization,validation,instrument-universe}
+mkdir -p packages/market-data/{models,normalization,validation}
 mkdir -p packages/adapters/upstox/{market-data,order-execution,order-updates,sandbox}
 mkdir -p packages/adapters/simulated-broker
 mkdir -p packages/database/{schema,migrations,repositories}

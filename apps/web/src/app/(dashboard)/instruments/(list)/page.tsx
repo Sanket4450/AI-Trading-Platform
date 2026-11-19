@@ -9,11 +9,12 @@ import { StatusBadge } from '@/components/dashboard/status-badge';
 import { EmptyState } from '@/components/dashboard/empty-state';
 import { AutoRefresh } from '@/components/dashboard/auto-refresh';
 import {
+  TableActionButton,
   TableActionLink,
   TableActions,
-  TableActionSubmit,
   TableRefreshButton,
 } from '@/components/dashboard/table-actions';
+import { ConfirmDialog } from '@/components/dashboard/confirm-dialog';
 import { FilterSelect, SearchFilter, TableFilters } from '@/components/dashboard/table-filters';
 import { detailHref, originHref } from '@/lib/navigation';
 import { Badge } from '@/components/ui/badge';
@@ -26,9 +27,9 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { cancelInstrumentAction, fetchInstrumentsAction } from '../actions';
+import { coverageCancelCopy, coverageFetchCopy } from '@/lib/coverage-actions';
 
 type SearchParams = Promise<{
-  universeCode?: string;
   dataStatus?: string;
   search?: string;
 }>;
@@ -45,17 +46,14 @@ const dataStatuses = [
 
 export default async function InstrumentsPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams;
-  const universeCode = params.universeCode ?? 'nifty-50';
   const from = originHref('/instruments', params);
-  const query = new URLSearchParams({ universeCode, limit: '200' });
+  const query = new URLSearchParams({ limit: '200' });
   if (params.dataStatus) query.set('dataStatus', params.dataStatus);
   if (params.search) query.set('search', params.search);
 
   const [rows, summary] = await Promise.all([
     apiFetch<InstrumentCoverageRow[]>(`/instruments/status?${query.toString()}`),
-    apiFetch<Record<string, number>>(
-      `/instruments/status/summary?universeCode=${encodeURIComponent(universeCode)}`,
-    ),
+    apiFetch<Record<string, number>>('/instruments/status/summary'),
   ]);
 
   const active = rows.some(
@@ -77,7 +75,7 @@ export default async function InstrumentsPage({ searchParams }: { searchParams: 
               {
                 label: 'Catalog rows',
                 value: formatNumber(summary?.total ?? rows.length),
-                hint: 'nifty-50 active version',
+                hint: 'Sync targets',
                 tone: 'info',
               },
               {
@@ -105,7 +103,6 @@ export default async function InstrumentsPage({ searchParams }: { searchParams: 
         }
         filters={
           <TableFilters>
-            <input type="hidden" name="universeCode" value={universeCode} />
             <SearchFilter defaultValue={params.search ?? ''} placeholder="Search symbol or name…" />
             <FilterSelect
               id="dataStatus"
@@ -134,7 +131,6 @@ export default async function InstrumentsPage({ searchParams }: { searchParams: 
           <Table containerClassName="h-full overflow-auto">
             <TableHeader className="bg-card sticky top-0 z-10">
               <TableRow>
-                <TableHead>Rank</TableHead>
                 <TableHead>Instrument</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Target window</TableHead>
@@ -147,11 +143,11 @@ export default async function InstrumentsPage({ searchParams }: { searchParams: 
             <TableBody>
               {rows.map((row) => {
                 const status = displayStatus(row);
+                const fetchCopy = coverageFetchCopy(row);
+                const cancelCopy = coverageCancelCopy(row.symbol);
+                const fetching = row.fetchStatus === 'queued' || row.fetchStatus === 'fetching';
                 return (
                   <TableRow key={row.instrumentId}>
-                    <TableCell className="text-muted-foreground font-mono text-xs">
-                      {row.rank}
-                    </TableCell>
                     <TableCell>
                       <p className="font-medium">{row.symbol}</p>
                       <p className="text-muted-foreground max-w-52 truncate text-xs">{row.name}</p>
@@ -192,30 +188,47 @@ export default async function InstrumentsPage({ searchParams }: { searchParams: 
                         href={detailHref(`/instruments/${row.instrumentId}`, from)}
                         label="View instrument"
                       />
-                      {row.fetchStatus === 'queued' || row.fetchStatus === 'fetching' ? (
-                        <form action={cancelInstrumentAction}>
-                          <input type="hidden" name="instrumentId" value={row.instrumentId} />
-                          <input type="hidden" name="returnTo" value="/instruments" />
-                          <TableActionSubmit
-                            icon="cancel"
-                            tone="destructive"
-                            label="Cancel fetch"
-                          />
-                        </form>
+                      {fetching ? (
+                        <ConfirmDialog
+                          trigger={
+                            <TableActionButton
+                              icon="cancel"
+                              tone="destructive"
+                              label={cancelCopy.label}
+                              tooltip={cancelCopy.tooltip}
+                            />
+                          }
+                          title={cancelCopy.title}
+                          description={cancelCopy.description}
+                          confirmLabel={cancelCopy.label}
+                          tone="destructive"
+                          action={cancelInstrumentAction}
+                          hiddenFields={{
+                            instrumentId: row.instrumentId,
+                            returnTo: '/instruments',
+                          }}
+                        />
                       ) : null}
-                      {row.fetchStatus !== 'queued' && row.fetchStatus !== 'fetching' ? (
-                        <form action={fetchInstrumentsAction}>
-                          <input type="hidden" name="instrumentIds" value={row.instrumentId} />
-                          <input type="hidden" name="mode" value="missing_only" />
-                          <input type="hidden" name="returnTo" value="/instruments" />
-                          <TableActionSubmit
-                            label={
-                              row.fetchStatus === 'not_requested' || !row.fetchStatus
-                                ? 'Fetch missing months'
-                                : 'Refresh missing months'
-                            }
-                          />
-                        </form>
+                      {fetchCopy && !fetching ? (
+                        <ConfirmDialog
+                          trigger={
+                            <TableActionButton
+                              icon="refresh"
+                              tone="refresh"
+                              label={fetchCopy.label}
+                              tooltip={fetchCopy.tooltip}
+                            />
+                          }
+                          title={fetchCopy.title}
+                          description={fetchCopy.description}
+                          confirmLabel={fetchCopy.label}
+                          action={fetchInstrumentsAction}
+                          hiddenFields={{
+                            instrumentIds: row.instrumentId,
+                            mode: 'missing_only',
+                            returnTo: '/instruments',
+                          }}
+                        />
                       ) : null}
                     </TableActions>
                   </TableRow>

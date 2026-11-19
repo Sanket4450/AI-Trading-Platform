@@ -48,27 +48,23 @@ try {
     )
   `;
 
-  const [nifty] = await sql<{ members: number; status_rows: number; missing_mappings: number }[]>`
+  const [syncTargets] = await sql<{
+    targets: number;
+    status_rows: number;
+    missing_mappings: number;
+  }[]>`
     SELECT
+      (SELECT count(*)::int FROM instruments WHERE is_sync_target) AS targets,
       (SELECT count(*)::int
-         FROM instrument_universe_members m
-         JOIN instrument_universe_versions v ON v.id = m.universe_version_id
-         JOIN instrument_universes u ON u.id = v.universe_id
-        WHERE u.code = 'nifty-50' AND v.effective_to IS NULL) AS members,
+         FROM instruments i
+         JOIN instrument_data_status s ON s.instrument_id = i.id
+        WHERE i.is_sync_target) AS status_rows,
       (SELECT count(*)::int
-         FROM instrument_universe_members m
-         JOIN instrument_universe_versions v ON v.id = m.universe_version_id
-         JOIN instrument_universes u ON u.id = v.universe_id
-         JOIN instrument_data_status s ON s.instrument_id = m.instrument_id
-        WHERE u.code = 'nifty-50' AND v.effective_to IS NULL) AS status_rows,
-      (SELECT count(*)::int
-         FROM instrument_universe_members m
-         JOIN instrument_universe_versions v ON v.id = m.universe_version_id
-         JOIN instrument_universes u ON u.id = v.universe_id
-        WHERE u.code = 'nifty-50' AND v.effective_to IS NULL
+         FROM instruments i
+        WHERE i.is_sync_target
           AND NOT EXISTS (
             SELECT 1 FROM instrument_provider_mappings p
-            WHERE p.instrument_id = m.instrument_id AND p.is_primary AND p.valid_to IS NULL
+            WHERE p.instrument_id = i.id AND p.is_primary AND p.valid_to IS NULL
           )) AS missing_mappings
   `;
 
@@ -103,8 +99,7 @@ try {
       accounts: number;
       instruments: number;
       mappings: number;
-      universe_members: number;
-      nifty_members: number;
+      sync_targets: number;
       status_rows: number;
       strategies: number;
       strategy_versions: number;
@@ -118,12 +113,7 @@ try {
       (SELECT count(*)::int FROM accounts) AS accounts,
       (SELECT count(*)::int FROM instruments) AS instruments,
       (SELECT count(*)::int FROM instrument_provider_mappings) AS mappings,
-      (SELECT count(*)::int FROM instrument_universe_members) AS universe_members,
-      (SELECT count(*)::int
-         FROM instrument_universe_members m
-         JOIN instrument_universe_versions v ON v.id = m.universe_version_id
-         JOIN instrument_universes u ON u.id = v.universe_id
-        WHERE u.code = 'nifty-50' AND v.effective_to IS NULL) AS nifty_members,
+      (SELECT count(*)::int FROM instruments WHERE is_sync_target) AS sync_targets,
       (SELECT count(*)::int FROM instrument_data_status) AS status_rows,
       (SELECT count(*)::int FROM strategies) AS strategies,
       (SELECT count(*)::int FROM strategy_versions) AS strategy_versions,
@@ -133,7 +123,7 @@ try {
   `;
 
   const checks = [
-    { name: '61 logical tables', ok: schema.logical_tables === 61, value: schema.logical_tables },
+    { name: '57 logical tables', ok: schema.logical_tables === 57, value: schema.logical_tables },
     { name: 'materialized view present', ok: schema.matviews >= 1, value: schema.matviews },
     {
       name: 'candle partitions >= 63',
@@ -152,19 +142,19 @@ try {
       value: missingBindings.count,
     },
     {
-      name: 'nifty-50 active version has 51 members',
-      ok: nifty.members === 51,
-      value: nifty.members,
+      name: '51 instruments are sync targets',
+      ok: syncTargets.targets === 51,
+      value: syncTargets.targets,
     },
     {
-      name: 'every nifty-50 member has a status row',
-      ok: nifty.status_rows === 51,
-      value: nifty.status_rows,
+      name: 'every sync target has a status row',
+      ok: syncTargets.status_rows === 51,
+      value: syncTargets.status_rows,
     },
     {
-      name: 'every nifty-50 member has a primary mapping',
-      ok: nifty.missing_mappings === 0,
-      value: nifty.missing_mappings,
+      name: 'every sync target has a primary mapping',
+      ok: syncTargets.missing_mappings === 0,
+      value: syncTargets.missing_mappings,
     },
     { name: 'tick sizes are valid', ok: tickSizes.invalid === 0, value: tickSizes.invalid },
     { name: 'calendar covers 2022–2027', ok: calendar.days === 2191, value: calendar.days },
@@ -184,8 +174,8 @@ try {
     'candle partitions': candlePartitions.count,
     'quote partitions': quotePartitions.count,
     'live orders': orders.count,
-    'nifty-50 members': nifty.members,
-    'status rows': nifty.status_rows,
+    'sync targets': syncTargets.targets,
+    'status rows': syncTargets.status_rows,
     'calendar days': calendar.days,
   });
   console.table(seed);

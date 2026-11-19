@@ -69,7 +69,7 @@ export default async function StrategyDetailPage({
     <div>
       <PageMeta
         title={`${detail.code} · Strategy`}
-        description="Versions, parameter bindings, universes and activation state for this strategy."
+        description="Versions, parameter bindings and activation state for this strategy."
       />
 
       <DetailHeader
@@ -80,7 +80,7 @@ export default async function StrategyDetailPage({
             <StatusBadge status={detail.status} />
           </>
         }
-        meta={`${detail.versions.length} versions · ${detail.universeCount} universes`}
+        meta={`${detail.versions.length} versions`}
         actions={
           <FormDialog
             trigger={
@@ -142,12 +142,6 @@ export default async function StrategyDetailPage({
           hint="None while research-only"
           tone="warning"
         />
-        <StatCard
-          label="Universes"
-          value={formatNumber(detail.universeCount)}
-          hint="Bound membership sets"
-          tone="highlight"
-        />
       </StatGrid>
 
       <SectionCard
@@ -174,7 +168,7 @@ export default async function StrategyDetailPage({
             <SectionCard
               key={version.id}
               title={`Version ${version.version}`}
-              description={`${version.codeRef} · released ${formatDate(version.releasedAt)} · ${version.members.length} universe members`}
+              description={`${version.codeRef} · released ${formatDate(version.releasedAt)}`}
               actions={
                 <>
                   <StatusBadge status={version.status} />
@@ -266,23 +260,6 @@ export default async function StrategyDetailPage({
                       ))}
                     </TableBody>
                   </Table>
-                )}
-              </div>
-
-              <div>
-                <h3 className="mb-2 text-sm font-medium">Tradable universe</h3>
-                {version.members.length === 0 ? (
-                  <p className="text-muted-foreground text-sm">
-                    No instruments bound to this version.
-                  </p>
-                ) : (
-                  <div className="flex flex-wrap gap-1.5">
-                    {version.members.map((member) => (
-                      <Badge key={member.id} variant="outline" className="text-[10px]">
-                        {member.rank}. {member.symbol}
-                      </Badge>
-                    ))}
-                  </div>
                 )}
               </div>
 

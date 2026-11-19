@@ -22,7 +22,6 @@ const ORIGIN_PATHS = new Set([
   '/',
   '/accounts',
   '/instruments',
-  '/universes',
   '/strategies',
   '/jobs',
   '/audit',

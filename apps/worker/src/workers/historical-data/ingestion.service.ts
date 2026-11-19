@@ -35,7 +35,7 @@ import {
   getPlanJob,
   getTradingCalendarRow,
   getTradingSessionsForRange,
-  getUniverseMembersForBackfill,
+  getSyncTargetInstruments,
   isMonthComplete,
   listChildJobRuns,
   refreshDailyStats,
@@ -667,12 +667,12 @@ export class IngestionService {
         ? new Date(calendar.session_close)
         : null,
     });
-    const members = await getUniverseMembersForBackfill('nifty-50');
+    const targets = await getSyncTargetInstruments();
     let instruments = 0;
     let rowsWritten = 0;
-    for (const member of members) {
+    for (const target of targets) {
       const mapping = await findProviderMapping(
-        member.instrumentId,
+        target.instrumentId,
         provider.id,
       );
       if (!mapping) continue;
@@ -710,7 +710,7 @@ export class IngestionService {
         const run = await createIngestionRun({
           providerId: provider.id,
           runType: 'intraday_sync',
-          instrumentId: member.instrumentId,
+          instrumentId: target.instrumentId,
           timeframeUnit: 'minutes',
           timeframeInterval: 1,
           requestedFrom: today,
@@ -724,7 +724,7 @@ export class IngestionService {
         const rows = [];
         for (const [index, candle] of parsed.data.candles.entries()) {
           const result = normalizeCandle(candle, {
-            instrumentId: member.instrumentId,
+            instrumentId: target.instrumentId,
             sourceProviderId: provider.id,
             ingestionRunId: run.id,
             rawPayloadId: raw.id,
@@ -747,18 +747,18 @@ export class IngestionService {
           ruleId: 'DQ-004',
           severity: 'info',
           providerId: provider.id,
-          instrumentId: member.instrumentId,
+          instrumentId: target.instrumentId,
           tradingDate: today,
           windowStart: session?.open ?? null,
           windowEnd: session?.close ?? null,
           details: { reason: 'current-session final bar is not final' },
           detectedBy: 'ingestion',
         });
-        await this.quality.recomputeCoverage(member.instrumentId, today, today);
-        await this.quality.recomputeInstrumentStatus(member.instrumentId);
+        await this.quality.recomputeCoverage(target.instrumentId, today, today);
+        await this.quality.recomputeInstrumentStatus(target.instrumentId);
       } catch (error) {
         this.logger.warn(
-          `Intraday sync failed for ${member.symbol}: ${String(error)}`,
+          `Intraday sync failed for ${target.symbol}: ${String(error)}`,
         );
       }
     }
@@ -801,12 +801,12 @@ export class IngestionService {
       return result;
     }
     const dates = await this.finalizeDates(latest, Boolean(payload.catchUp));
-    const members = await getUniverseMembersForBackfill('nifty-50');
+    const targets = await getSyncTargetInstruments();
     let instruments = 0;
     let rowsWritten = 0;
-    for (const member of members) {
+    for (const target of targets) {
       const mapping = await findProviderMapping(
-        member.instrumentId,
+        target.instrumentId,
         provider.id,
       );
       if (!mapping) continue;
@@ -814,7 +814,7 @@ export class IngestionService {
         const run = await createIngestionRun({
           providerId: provider.id,
           runType: 'historical_repair',
-          instrumentId: member.instrumentId,
+          instrumentId: target.instrumentId,
           timeframeUnit: 'minutes',
           timeframeInterval: 1,
           requestedFrom: date,
@@ -832,7 +832,7 @@ export class IngestionService {
           const result = await this.runChunk({
             providerId: provider.id,
             parentJobRunId: jobRunId,
-            instrumentId: member.instrumentId,
+            instrumentId: target.instrumentId,
             externalKey: mapping.externalKey,
             from: date,
             to: date,
@@ -853,14 +853,14 @@ export class IngestionService {
             finishedAt: new Date(),
           });
           await this.quality.validateDaily(
-            member.instrumentId,
+            target.instrumentId,
             mapping.externalKey,
             date,
             date,
             run.id,
           );
-          await this.quality.recomputeCoverage(member.instrumentId, date, date);
-          await this.quality.recomputeInstrumentStatus(member.instrumentId);
+          await this.quality.recomputeCoverage(target.instrumentId, date, date);
+          await this.quality.recomputeInstrumentStatus(target.instrumentId);
           instruments += 1;
         } catch (error) {
           await updateIngestionRun(run.id, {
@@ -918,16 +918,16 @@ export class IngestionService {
       : [];
     const instrumentId =
       typeof payload.instrumentId === 'string' ? payload.instrumentId : null;
-    const members =
+    const targets =
       requestedIds.length > 0
         ? requestedIds.map((id) => ({ instrumentId: id }))
         : instrumentId
           ? [{ instrumentId }]
-          : await getUniverseMembersForBackfill('nifty-50');
+          : await getSyncTargetInstruments();
     let recomputed = 0;
-    for (const member of members) {
-      await this.quality.recomputeCoverage(member.instrumentId, from, to);
-      await this.quality.recomputeInstrumentStatus(member.instrumentId);
+    for (const target of targets) {
+      await this.quality.recomputeCoverage(target.instrumentId, from, to);
+      await this.quality.recomputeInstrumentStatus(target.instrumentId);
       recomputed += 1;
     }
     const result = { recomputed, from, to };
@@ -972,16 +972,16 @@ export class IngestionService {
     from.setUTCDate(from.getUTCDate() - days);
     const provider = await findProviderByCode('upstox');
     if (!provider) throw new Error('Upstox provider is not seeded');
-    const members = await getUniverseMembersForBackfill('nifty-50');
+    const targets = await getSyncTargetInstruments();
     let validated = 0;
-    for (const member of members) {
+    for (const target of targets) {
       const mapping = await findProviderMapping(
-        member.instrumentId,
+        target.instrumentId,
         provider.id,
       );
       if (!mapping) continue;
       const result = await this.quality.validateDaily(
-        member.instrumentId,
+        target.instrumentId,
         mapping.externalKey,
         from.toISOString().slice(0, 10),
         latest,
@@ -989,11 +989,11 @@ export class IngestionService {
       );
       if (!('skipped' in result) || !result.skipped) validated += 1;
       await this.quality.recomputeCoverage(
-        member.instrumentId,
+        target.instrumentId,
         from.toISOString().slice(0, 10),
         latest,
       );
-      await this.quality.recomputeInstrumentStatus(member.instrumentId);
+      await this.quality.recomputeInstrumentStatus(target.instrumentId);
     }
     const result = {
       validated,

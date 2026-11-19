@@ -1,6 +1,6 @@
 # R2 backfill acceptance report
 
-Fill this in after the full nifty-50 backfill. The release question is not "did the backfill finish?"
+Fill this in after the full sync-target backfill. The release question is not "did the backfill finish?"
 It is "can every bar, every gap and every exclusion be explained from stored evidence?"
 
 ## Run metadata

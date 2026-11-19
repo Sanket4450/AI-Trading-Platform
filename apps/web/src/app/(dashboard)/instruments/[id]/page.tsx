@@ -1,10 +1,6 @@
 import Link from 'next/link';
 import { apiFetch } from '@/lib/api';
-import type {
-  CorporateAction,
-  InstrumentCoverageDetail,
-  InstrumentMapping,
-} from '@/lib/types';
+import type { CorporateAction, InstrumentCoverageDetail, InstrumentMapping } from '@/lib/types';
 import { formatDate, formatNumber } from '@/lib/format';
 import { label } from '@/lib/labels';
 import { displayStatus, statusTone } from '@/lib/status';
@@ -18,7 +14,7 @@ import { EmptyState } from '@/components/dashboard/empty-state';
 import { JsonBlock } from '@/components/dashboard/json-block';
 import { KeyValueGrid } from '@/components/dashboard/key-value-grid';
 import { DetailDialog } from '@/components/dashboard/detail-dialog';
-import { SubmitButton } from '@/components/dashboard/submit-button';
+import { ConfirmDialog } from '@/components/dashboard/confirm-dialog';
 import {
   TableActionButton,
   TableActionLink,
@@ -26,6 +22,7 @@ import {
   TableRefreshButton,
 } from '@/components/dashboard/table-actions';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
   Table,
   TableBody,
@@ -35,6 +32,11 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { cancelInstrumentAction, fetchInstrumentsAction, recomputeStatusAction } from '../actions';
+import {
+  coverageCancelCopy,
+  coverageFetchCopy,
+  coverageRecomputeCopy,
+} from '@/lib/coverage-actions';
 
 export default async function InstrumentDetailPage({
   params,
@@ -52,6 +54,10 @@ export default async function InstrumentDetailPage({
     apiFetch<CorporateAction[]>(`/instruments/${id}/corporate-actions`),
   ]);
   const status = displayStatus(detail);
+  const fetching = detail.fetchStatus === 'queued' || detail.fetchStatus === 'fetching';
+  const fetchCopy = coverageFetchCopy(detail);
+  const cancelCopy = coverageCancelCopy(detail.symbol);
+  const recomputeCopy = coverageRecomputeCopy(detail.symbol);
 
   return (
     <div>
@@ -78,39 +84,56 @@ export default async function InstrumentDetailPage({
         meta={`Target ${detail.targetFrom ?? '—'} → ${detail.targetTo ?? '—'}`}
         actions={
           <>
-            <form action={recomputeStatusAction}>
-              <input type="hidden" name="instrumentId" value={detail.instrumentId} />
-              <input type="hidden" name="returnTo" value={`/instruments/${detail.instrumentId}`} />
-              <SubmitButton size="sm" variant="outline" pendingLabel="Recomputing…">
-                Recompute
-              </SubmitButton>
-            </form>
-            {detail.fetchStatus === 'queued' || detail.fetchStatus === 'fetching' ? (
-              <form action={cancelInstrumentAction}>
-                <input type="hidden" name="instrumentId" value={detail.instrumentId} />
-                <input
-                  type="hidden"
-                  name="returnTo"
-                  value={`/instruments/${detail.instrumentId}`}
-                />
-                <SubmitButton size="sm" variant="outline" pendingLabel="Cancelling…">
-                  Cancel
-                </SubmitButton>
-              </form>
-            ) : (
-              <form action={fetchInstrumentsAction}>
-                <input type="hidden" name="instrumentIds" value={detail.instrumentId} />
-                <input type="hidden" name="mode" value="missing_only" />
-                <input
-                  type="hidden"
-                  name="returnTo"
-                  value={`/instruments/${detail.instrumentId}`}
-                />
-                <SubmitButton size="sm" pendingLabel="Refreshing…">
-                  Refresh missing months
-                </SubmitButton>
-              </form>
-            )}
+            <ConfirmDialog
+              trigger={
+                <Button type="button" size="sm" variant="outline">
+                  Recompute
+                </Button>
+              }
+              title={recomputeCopy.title}
+              description={recomputeCopy.description}
+              confirmLabel={recomputeCopy.label}
+              action={recomputeStatusAction}
+              hiddenFields={{
+                instrumentId: detail.instrumentId,
+                returnTo: `/instruments/${detail.instrumentId}`,
+              }}
+            />
+            {fetching ? (
+              <ConfirmDialog
+                trigger={
+                  <Button type="button" size="sm" variant="outline">
+                    Cancel fetch
+                  </Button>
+                }
+                title={cancelCopy.title}
+                description={cancelCopy.description}
+                confirmLabel={cancelCopy.label}
+                tone="destructive"
+                action={cancelInstrumentAction}
+                hiddenFields={{
+                  instrumentId: detail.instrumentId,
+                  returnTo: `/instruments/${detail.instrumentId}`,
+                }}
+              />
+            ) : fetchCopy ? (
+              <ConfirmDialog
+                trigger={
+                  <Button type="button" size="sm">
+                    {fetchCopy.label}
+                  </Button>
+                }
+                title={fetchCopy.title}
+                description={fetchCopy.description}
+                confirmLabel={fetchCopy.label}
+                action={fetchInstrumentsAction}
+                hiddenFields={{
+                  instrumentIds: detail.instrumentId,
+                  mode: 'missing_only',
+                  returnTo: `/instruments/${detail.instrumentId}`,
+                }}
+              />
+            ) : null}
           </>
         }
       />

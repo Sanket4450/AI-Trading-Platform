@@ -12,7 +12,7 @@ import {
   getCatalogSummary,
   getCoverageDayDetail,
   getInstrumentStatusDetail,
-  listUniverseCatalog,
+  listInstrumentCatalog,
   recordAudit,
   updateJobRun,
 } from '@ai-trading/database';
@@ -29,8 +29,7 @@ export class InstrumentCoverageService {
   ) {}
 
   list(query: InstrumentCoverageQueryDto) {
-    return listUniverseCatalog({
-      universeCode: query.universeCode,
+    return listInstrumentCatalog({
       fetchStatus: query.fetchStatus,
       dataStatus: query.dataStatus,
       search: query.search,
@@ -39,8 +38,8 @@ export class InstrumentCoverageService {
     });
   }
 
-  summary(universeCode?: string) {
-    return getCatalogSummary(universeCode);
+  summary() {
+    return getCatalogSummary();
   }
 
   async detail(instrumentId: string) {

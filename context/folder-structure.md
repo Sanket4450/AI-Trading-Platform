@@ -86,8 +86,7 @@ ai-trading-system/
 │ ├── market-data/ # Normalized market data
 │ │ ├── models/
 │ │ ├── normalization/
-│ │ ├── validation/
-│ │ └── instrument-universe/
+│ │ └── validation/
 │ │
 │ ├── adapters/
 │ │ ├── upstox/

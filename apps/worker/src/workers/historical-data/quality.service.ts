@@ -45,7 +45,7 @@ import {
   getPrimaryMappingCount,
   getStoredCandleStarts,
   getTradingSessionsForRange,
-  getUniverseMembersForBackfill,
+  getSyncTargetInstruments,
   upsertCoverageBatch,
   upsertDailyValidation,
   upsertInstrumentStatus,
@@ -648,18 +648,18 @@ export class QualityService {
     const from = new Date(`${latest}T00:00:00Z`);
     from.setUTCDate(from.getUTCDate() - days);
     const fromDate = from.toISOString().slice(0, 10);
-    const members = await getUniverseMembersForBackfill('nifty-50');
+    const targets = await getSyncTargetInstruments();
 
     let scanned = 0;
-    for (const member of members) {
-      await this.recomputeCoverage(member.instrumentId, fromDate, latest);
-      await this.recomputeInstrumentStatus(member.instrumentId);
+    for (const target of targets) {
+      await this.recomputeCoverage(target.instrumentId, fromDate, latest);
+      await this.recomputeInstrumentStatus(target.instrumentId);
       await this.detectCorporateActionMismatch(
-        member.instrumentId,
+        target.instrumentId,
         fromDate,
         latest,
       );
-      await this.detectCoverageAge(member.instrumentId, latest);
+      await this.detectCoverageAge(target.instrumentId, latest);
       scanned += 1;
     }
     await this.detectDuplicateMappings(provider.id);
@@ -719,11 +719,11 @@ export class QualityService {
   }
 
   async detectDuplicateMappings(providerId: string) {
-    const members = await getUniverseMembersForBackfill('nifty-50');
+    const targets = await getSyncTargetInstruments();
     let findings = 0;
-    for (const member of members) {
+    for (const target of targets) {
       const count = await getPrimaryMappingCount(
-        member.instrumentId,
+        target.instrumentId,
         providerId,
       );
       if (count > 1) {
@@ -731,7 +731,7 @@ export class QualityService {
           ruleId: 'DQ-025',
           severity: 'warning',
           providerId,
-          instrumentId: member.instrumentId,
+          instrumentId: target.instrumentId,
           tradingDate: null,
           windowStart: null,
           windowEnd: null,
@@ -774,19 +774,19 @@ export class QualityService {
   async detectStaleIngestion() {
     const provider = await findProviderByCode('upstox');
     if (!provider) return 0;
-    const members = await getUniverseMembersForBackfill('nifty-50');
+    const targets = await getSyncTargetInstruments();
     const staleHours = this.config.get<number>('DATA_QUALITY_STALE_HOURS', 24);
     let findings = 0;
-    for (const member of members) {
+    for (const target of targets) {
       const lastSuccess = await getLastSuccessfulRunForInstrument(
-        member.instrumentId,
+        target.instrumentId,
       );
       if (!lastSuccess?.finishedAt) {
         await this.issue({
           ruleId: 'DQ-021',
           severity: 'warning',
           providerId: provider.id,
-          instrumentId: member.instrumentId,
+          instrumentId: target.instrumentId,
           tradingDate: null,
           windowStart: null,
           windowEnd: null,
@@ -803,7 +803,7 @@ export class QualityService {
           ruleId: 'DQ-021',
           severity: 'warning',
           providerId: provider.id,
-          instrumentId: member.instrumentId,
+          instrumentId: target.instrumentId,
           tradingDate: null,
           windowStart: null,
           windowEnd: null,

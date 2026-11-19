@@ -13,7 +13,6 @@ import { JobsModule } from './modules/jobs/jobs.module.js';
 import { SettingsModule } from './modules/settings/settings.module.js';
 import { StrategiesModule } from './modules/strategies/strategies.module.js';
 import { SystemControlModule } from './modules/system-control/system-control.module.js';
-import { UniversesModule } from './modules/universes/universes.module.js';
 
 @Module({
   imports: [
@@ -41,7 +40,6 @@ import { UniversesModule } from './modules/universes/universes.module.js';
     AuthModule,
     AccountsModule,
     InstrumentsModule,
-    UniversesModule,
     StrategiesModule,
     ConfigurationModule,
     JobsModule,

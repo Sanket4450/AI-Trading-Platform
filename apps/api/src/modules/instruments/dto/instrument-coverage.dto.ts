@@ -41,9 +41,6 @@ export class InstrumentCoverageSummaryDto {
 }
 
 export class InstrumentCoverageRowDto {
-  @ApiProperty()
-  rank!: number;
-
   @ApiProperty({ format: 'uuid' })
   instrumentId!: string;
 
@@ -73,15 +70,6 @@ export class InstrumentCoverageRowDto {
 
   @ApiProperty({ type: String, format: 'date', nullable: true })
   delistedOn!: string | null;
-
-  @ApiProperty()
-  universeCode!: string;
-
-  @ApiProperty({ format: 'uuid' })
-  universeVersionId!: string;
-
-  @ApiProperty()
-  universeVersion!: number;
 
   @ApiProperty({ type: String, format: 'date', nullable: true })
   targetFrom!: string | null;

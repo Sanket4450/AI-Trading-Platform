@@ -82,6 +82,7 @@ export const instruments = pgTable(
     tickSize: numeric('tick_size', { precision: 10, scale: 4 }).default('0.05').notNull(),
     freezeQuantity: numeric('freeze_quantity', { precision: 20, scale: 4 }),
     isActive: boolean('is_active').default(true).notNull(),
+    isSyncTarget: boolean('is_sync_target').default(false).notNull(),
     listedOn: date('listed_on'),
     delistedOn: date('delisted_on'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
@@ -92,6 +93,7 @@ export const instruments = pgTable(
     index('idx_instruments_exchange_id').on(table.exchangeId),
     index('idx_instruments_trading_symbol').on(table.tradingSymbol),
     index('idx_instruments_is_active').on(table.isActive),
+    index('idx_instruments_is_sync_target').on(table.isSyncTarget),
     check('chk_instruments_lot_size_1', sql`${table.lotSize} > 0`),
     check('chk_instruments_tick_size_2', sql`${table.tickSize} > 0`),
     check('chk_instruments_freeze_quantity_3', sql`${table.freezeQuantity} > 0`),
@@ -204,90 +206,6 @@ export const corporateActions = pgTable(
     check(
       'chk_corporate_actions_status_6',
       sql`${table.status} in ('announced', 'confirmed', 'applied')`,
-    ),
-  ],
-);
-
-export const instrumentUniverses = pgTable(
-  'instrument_universes',
-  {
-    id: uuid('id').primaryKey().defaultRandom(),
-    code: varchar('code', { length: 60 }).notNull(),
-    name: varchar('name', { length: 120 }).notNull(),
-    description: text('description'),
-    selectionMethod: varchar('selection_method', { length: 40 }).notNull(),
-    lookbackSessions: integer('lookback_sessions'),
-    refreshCadence: varchar('refresh_cadence', { length: 20 }).notNull(),
-    isActive: boolean('is_active').default(true).notNull(),
-    createdBy: uuid('created_by').notNull(),
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
-  },
-  (table) => [
-    uniqueIndex('uq_instrument_universes_code').on(table.code),
-    check(
-      'chk_instrument_universes_selection_method_1',
-      sql`${table.selectionMethod} in ('manual', 'liquidity_median_value', 'index_constituents')`,
-    ),
-    check('chk_instrument_universes_lookback_sessions_2', sql`${table.lookbackSessions} > 0`),
-    check(
-      'chk_instrument_universes_refresh_cadence_3',
-      sql`${table.refreshCadence} in ('daily', 'weekly', 'monthly', 'manual')`,
-    ),
-  ],
-);
-
-export const instrumentUniverseVersions = pgTable(
-  'instrument_universe_versions',
-  {
-    id: uuid('id').primaryKey().defaultRandom(),
-    universeId: uuid('universe_id').notNull(),
-    version: integer('version').notNull(),
-    effectiveFrom: date('effective_from').notNull(),
-    effectiveTo: date('effective_to'),
-    memberCount: integer('member_count').default(0).notNull(),
-    criteria: jsonb('criteria')
-      .default(sql`'{}'::jsonb`)
-      .notNull(),
-    sourceProviderId: uuid('source_provider_id'),
-    createdBy: uuid('created_by'),
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-  },
-  (table) => [
-    uniqueIndex('uq_instrument_universe_versions_number').on(table.universeId, table.version),
-    check('chk_instrument_universe_versions_version_1', sql`${table.version} > 0`),
-    check(
-      'chk_instrument_universe_versions_effective_from_2',
-      sql`${table.effectiveTo} is null or ${table.effectiveTo} > ${table.effectiveFrom}`,
-    ),
-    check('chk_instrument_universe_versions_member_count_3', sql`${table.memberCount} >= 0`),
-  ],
-);
-
-export const instrumentUniverseMembers = pgTable(
-  'instrument_universe_members',
-  {
-    id: uuid('id').primaryKey().defaultRandom(),
-    universeVersionId: uuid('universe_version_id').notNull(),
-    instrumentId: uuid('instrument_id').notNull(),
-    rank: integer('rank').notNull(),
-    medianTradedValue: numeric('median_traded_value', { precision: 20, scale: 2 }),
-    addedAt: date('added_at').notNull(),
-    removedAt: date('removed_at'),
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-  },
-  (table) => [
-    uniqueIndex('uq_instrument_universe_member').on(table.universeVersionId, table.instrumentId),
-    uniqueIndex('uq_instrument_universe_rank').on(table.universeVersionId, table.rank),
-    index('idx_instrument_universe_members_instrument_id').on(table.instrumentId),
-    check('chk_instrument_universe_members_rank_1', sql`${table.rank} > 0`),
-    check(
-      'chk_instrument_universe_members_median_traded_value_2',
-      sql`${table.medianTradedValue} >= 0`,
-    ),
-    check(
-      'chk_instrument_universe_members_added_at_3',
-      sql`${table.removedAt} is null or ${table.removedAt} >= ${table.addedAt}`,
     ),
   ],
 );

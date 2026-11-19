@@ -12,12 +12,13 @@ import { KeyValueGrid } from '@/components/dashboard/key-value-grid';
 import { JsonBlock } from '@/components/dashboard/json-block';
 import { EmptyState } from '@/components/dashboard/empty-state';
 import { AutoRefresh } from '@/components/dashboard/auto-refresh';
-import { SubmitButton } from '@/components/dashboard/submit-button';
+import { ConfirmDialog } from '@/components/dashboard/confirm-dialog';
 import {
   TableActionLink,
   TableActions,
   TableRefreshButton,
 } from '@/components/dashboard/table-actions';
+import { Button } from '@/components/ui/button';
 import {
   Table,
   TableBody,
@@ -81,13 +82,19 @@ export default async function JobDetailPage({
         }
         actions={
           isPlan && active ? (
-            <form action={cancelPlanAction}>
-              <input type="hidden" name="jobId" value={run.id} />
-              <input type="hidden" name="returnTo" value={`/jobs/${run.id}`} />
-              <SubmitButton size="sm" variant="outline" pendingLabel="Cancelling…">
-                Cancel plan
-              </SubmitButton>
-            </form>
+            <ConfirmDialog
+              trigger={
+                <Button type="button" size="sm" variant="outline">
+                  Cancel plan
+                </Button>
+              }
+              title="Cancel this backfill plan?"
+              description="The plan stops queuing new instrument chunks. Chunks already in flight finish cleanly, and candles already written are kept."
+              confirmLabel="Cancel plan"
+              tone="destructive"
+              action={cancelPlanAction}
+              hiddenFields={{ jobId: run.id, returnTo: `/jobs/${run.id}` }}
+            />
           ) : null
         }
       />
@@ -213,7 +220,6 @@ export default async function JobDetailPage({
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Rank</TableHead>
                     <TableHead>Instrument</TableHead>
                     <TableHead>Chunk</TableHead>
                     <TableHead>Window</TableHead>
@@ -226,9 +232,6 @@ export default async function JobDetailPage({
                 <TableBody>
                   {detail.chunks.map((chunk) => (
                     <TableRow key={chunk.id}>
-                      <TableCell className="text-muted-foreground font-mono text-xs">
-                        {chunk.rank ?? '—'}
-                      </TableCell>
                       <TableCell>{chunk.symbol ?? chunk.instrumentId ?? '—'}</TableCell>
                       <TableCell className="text-muted-foreground text-xs">
                         {(chunk.chunkIndex ?? 0) + 1}/{chunk.chunkCount ?? '—'} · attempt{' '}

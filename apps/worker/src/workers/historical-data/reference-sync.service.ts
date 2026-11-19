@@ -14,7 +14,7 @@ import {
   findProviderByCode,
   getLatestCompletedSession,
   getTradingCalendarRow,
-  getUniverseMembersForBackfill,
+  getSyncTargetInstruments,
   isR2Instrument,
   paiseToTickSize,
   syncTradingCalendarFixture,
@@ -133,12 +133,12 @@ export class ReferenceSyncService {
         indexTickFallback: '0.1000',
       });
 
-      const members = await getUniverseMembersForBackfill('nifty-50');
+      const targets = await getSyncTargetInstruments();
       const lastCompleted =
         (await getLatestCompletedSession()) ??
         new Date().toISOString().slice(0, 10);
       await createInstrumentStatusRows(
-        members.map((member) => member.instrumentId),
+        targets.map((target) => target.instrumentId),
         '2022-01-01',
         lastCompleted,
       );
@@ -168,7 +168,7 @@ export class ReferenceSyncService {
       const summary = {
         fetched: master.length,
         ...result,
-        statusRows: members.length,
+        statusRows: targets.length,
         rawPayloadId: raw.id,
       };
       await updateJobRun(jobRunId, {

@@ -12,7 +12,7 @@ import {
   nifty50Constituents,
   nseHolidays,
   nseSpecialSessions,
-  orbUniverseSymbols,
+  orbLiquidSymbols,
   reviewedTickSizes,
 } from './fixtures/nse.js';
 
@@ -117,6 +117,7 @@ async function getInstrument(
         segment: values.segment,
         instrumentType: values.instrumentType,
         tickSize,
+        isSyncTarget: true,
         updatedAt: new Date(),
       })
       .where(eq(schema.instruments.id, existing[0].id))
@@ -138,6 +139,7 @@ async function getInstrument(
       lotSize: 1,
       tickSize,
       isActive: true,
+      isSyncTarget: true,
       listedOn: '2000-01-01',
     })
     .returning();
@@ -428,204 +430,19 @@ export async function seedDatabase(options: SeedOptions) {
       );
     }
 
-    let universe = (
-      await tx
-        .select()
-        .from(schema.instrumentUniverses)
-        .where(eq(schema.instrumentUniverses.code, 'orb-liquid-20'))
-        .limit(1)
-    )[0];
-    if (!universe) {
-      [universe] = await tx
-        .insert(schema.instrumentUniverses)
-        .values({
-          id: uuidv7(),
-          code: 'orb-liquid-20',
-          name: 'ORB Liquid 20',
-          description:
-            'Twenty liquid NSE cash equities selected by trailing 20-session median traded value.',
-          selectionMethod: 'liquidity_median_value',
-          lookbackSessions: 20,
-          refreshCadence: 'weekly',
-          isActive: true,
-          createdBy: user.id,
-        })
-        .returning();
-    }
-
-    let universeVersion = (
-      await tx
-        .select()
-        .from(schema.instrumentUniverseVersions)
-        .where(
-          and(
-            eq(schema.instrumentUniverseVersions.universeId, universe.id),
-            eq(schema.instrumentUniverseVersions.version, 1),
-          ),
-        )
-        .limit(1)
-    )[0];
-    if (!universeVersion) {
-      [universeVersion] = await tx
-        .insert(schema.instrumentUniverseVersions)
-        .values({
-          id: uuidv7(),
-          universeId: universe.id,
-          version: 1,
-          effectiveFrom: today,
-          effectiveTo: null,
-          memberCount: orbUniverseSymbols.length,
-          criteria: {
-            source: 'r1-fixture',
-            selectionMethod: 'liquidity_median_value',
-            lookbackSessions: 20,
-            seedDate: today,
-          },
-          sourceProviderId: upstox.id,
-          createdBy: user.id,
-        })
-        .returning();
-    }
-
-    for (const [index, symbol] of orbUniverseSymbols.entries()) {
-      const instrument = instrumentBySymbol.get(symbol);
-      if (!instrument) throw new Error(`Seed universe references unknown symbol ${symbol}`);
-      const member = await tx
-        .select()
-        .from(schema.instrumentUniverseMembers)
-        .where(
-          and(
-            eq(schema.instrumentUniverseMembers.universeVersionId, universeVersion.id),
-            eq(schema.instrumentUniverseMembers.instrumentId, instrument.id),
-          ),
-        )
-        .limit(1);
-      if (!member[0]) {
-        await tx.insert(schema.instrumentUniverseMembers).values({
-          id: uuidv7(),
-          universeVersionId: universeVersion.id,
-          instrumentId: instrument.id,
-          rank: index + 1,
-          medianTradedValue: null,
-          addedAt: today,
-          removedAt: null,
-        });
-      }
-    }
-
-    // R2: the index-ranked nifty-50 catalog. Rank 1 is the index; ranks 2–51
-    // are the reviewed constituent order. Rank is display order, never weight.
     const completedSessions = calendarRows
       .filter((row) => row.isTradingDay && row.sessionClose && row.sessionClose <= now)
       .map((row) => row.tradingDate)
       .sort();
     const lastCompletedSession = completedSessions.at(-1) ?? today;
 
-    let niftyUniverse = (
-      await tx
-        .select()
-        .from(schema.instrumentUniverses)
-        .where(eq(schema.instrumentUniverses.code, 'nifty-50'))
-        .limit(1)
-    )[0];
-    if (!niftyUniverse) {
-      [niftyUniverse] = await tx
-        .insert(schema.instrumentUniverses)
-        .values({
-          id: uuidv7(),
-          code: 'nifty-50',
-          name: 'NIFTY 50',
-          description:
-            'Current NIFTY 50 candidate pool in reviewed display order. Rank 1 is the NIFTY 50 index; no weights are stored.',
-          selectionMethod: 'index_constituents',
-          lookbackSessions: null,
-          refreshCadence: 'manual',
-          isActive: true,
-          createdBy: user.id,
-        })
-        .returning();
-    }
-
-    let niftyVersion = (
-      await tx
-        .select()
-        .from(schema.instrumentUniverseVersions)
-        .where(
-          and(
-            eq(schema.instrumentUniverseVersions.universeId, niftyUniverse.id),
-            eq(schema.instrumentUniverseVersions.version, 1),
-          ),
-        )
-        .limit(1)
-    )[0];
-    if (!niftyVersion) {
-      [niftyVersion] = await tx
-        .insert(schema.instrumentUniverseVersions)
-        .values({
-          id: uuidv7(),
-          universeId: niftyUniverse.id,
-          version: 1,
-          effectiveFrom: today,
-          effectiveTo: null,
-          memberCount: nifty50Constituents.length + 1,
-          criteria: {
-            source: 'r2-reviewed-fixture',
-            selectionMethod: 'index_constituents',
-            seedDate: today,
-            provisional: true,
-          },
-          sourceProviderId: upstox.id,
-          createdBy: user.id,
-        })
-        .returning();
-    }
-
-    const rankedMembers: { instrumentId: string; rank: number }[] = [
-      { instrumentId: indexInstrument.id, rank: 1 },
-      ...nifty50Constituents.map((equity, index) => {
-        const instrument = instrumentBySymbol.get(equity.symbol);
-        if (!instrument)
-          throw new Error(`Seed universe references unknown symbol ${equity.symbol}`);
-        return { instrumentId: instrument.id, rank: index + 2 };
-      }),
-    ];
-
-    for (const member of rankedMembers) {
-      const existingMember = await tx
-        .select()
-        .from(schema.instrumentUniverseMembers)
-        .where(
-          and(
-            eq(schema.instrumentUniverseMembers.universeVersionId, niftyVersion.id),
-            eq(schema.instrumentUniverseMembers.instrumentId, member.instrumentId),
-          ),
-        )
-        .limit(1);
-      if (existingMember[0]) {
-        if (existingMember[0].rank !== member.rank) {
-          await tx
-            .update(schema.instrumentUniverseMembers)
-            .set({ rank: member.rank })
-            .where(eq(schema.instrumentUniverseMembers.id, existingMember[0].id));
-        }
-      } else {
-        await tx.insert(schema.instrumentUniverseMembers).values({
-          id: uuidv7(),
-          universeVersionId: niftyVersion.id,
-          instrumentId: member.instrumentId,
-          rank: member.rank,
-          medianTradedValue: null,
-          addedAt: today,
-          removedAt: null,
-        });
-      }
-    }
+    const syncTargets = [indexInstrument, ...instrumentBySymbol.values()];
 
     await tx
       .insert(schema.instrumentDataStatus)
       .values(
-        rankedMembers.map((member) => ({
-          instrumentId: member.instrumentId,
+        syncTargets.map((instrument) => ({
+          instrumentId: instrument.id,
           targetFrom: '2022-01-01',
           targetTo: lastCompletedSession,
           fetchStatus: 'not_requested',
@@ -813,33 +630,9 @@ export async function seedDatabase(options: SeedOptions) {
       }
     }
 
-    for (const [index, symbol] of orbUniverseSymbols.entries()) {
+    for (const symbol of orbLiquidSymbols) {
       const instrument = instrumentBySymbol.get(symbol);
       if (!instrument) continue;
-
-      const strategyMember = await tx
-        .select()
-        .from(schema.strategyUniverseMembers)
-        .where(
-          and(
-            eq(schema.strategyUniverseMembers.strategyVersionId, strategyVersion.id),
-            eq(schema.strategyUniverseMembers.instrumentId, instrument.id),
-            eq(schema.strategyUniverseMembers.effectiveFrom, today),
-          ),
-        )
-        .limit(1);
-      if (!strategyMember[0]) {
-        await tx.insert(schema.strategyUniverseMembers).values({
-          id: uuidv7(),
-          strategyVersionId: strategyVersion.id,
-          instrumentId: instrument.id,
-          universeVersionId: universeVersion.id,
-          rank: index + 1,
-          effectiveFrom: today,
-          effectiveTo: null,
-          isEnabled: true,
-        });
-      }
 
       const permission = await tx
         .select()
@@ -861,7 +654,7 @@ export async function seedDatabase(options: SeedOptions) {
           productAllowlist: ['intraday'],
           maxQuantity: null,
           maxOpenQuantity: null,
-          reason: 'R1 seed: ORB universe membership',
+          reason: 'R1 seed: ORB candidate permissions',
           effectiveFrom: today,
           effectiveTo: null,
           createdBy: user.id,
@@ -961,8 +754,7 @@ export async function seedDatabase(options: SeedOptions) {
       afterState: {
         fixtureVersion: 'r2-2026-10',
         instruments: nifty50Constituents.length + 1,
-        orbUniverse: orbUniverseSymbols.length,
-        niftyUniverse: rankedMembers.length,
+        syncTargets: syncTargets.length,
         tradingMode,
         strategy: 'orb-15m',
         configurationVersions: [strategyConfig.id, riskConfig.id, systemConfig.id],
@@ -978,8 +770,7 @@ export async function seedDatabase(options: SeedOptions) {
       mode: tradingMode,
       exchanges: [nse.code, bse.code],
       instruments: instrumentBySymbol.size + 1,
-      orbUniverse: orbUniverseSymbols.length,
-      niftyUniverse: rankedMembers.length,
+      syncTargets: syncTargets.length,
       lastCompletedSession,
       strategy: strategy.code,
       configurationVersions: 3,

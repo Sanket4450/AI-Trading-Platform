@@ -4,12 +4,10 @@ import { db } from '../client.js';
 import {
   accounts,
   configurationVersions,
-  instruments,
   riskEvents,
   strategies,
   strategyActivations,
   strategyConfigBindings,
-  strategyUniverseMembers,
   strategyVersions,
   tradingSessions,
 } from '../schema/index.js';
@@ -38,11 +36,6 @@ export async function listStrategies(search?: string) {
       versionCount: sql<number>`(
         select count(*)::int from strategy_versions v
         where v.strategy_id = "strategies"."id"
-      )`,
-      universeCount: sql<number>`(
-        select count(*)::int from strategy_universe_members m
-        join strategy_versions v on v.id = m.strategy_version_id
-        where v.strategy_id = "strategies"."id" and m.is_enabled
       )`,
       activeActivations: sql<number>`(
         select count(*)::int from strategy_activations a
@@ -95,31 +88,6 @@ export async function getStrategy(id: string) {
         .orderBy(asc(strategyConfigBindings.role))
     : [];
 
-  const members = versions.length
-    ? await db
-        .select({
-          id: strategyUniverseMembers.id,
-          strategyVersionId: strategyUniverseMembers.strategyVersionId,
-          instrumentId: strategyUniverseMembers.instrumentId,
-          symbol: instruments.tradingSymbol,
-          name: instruments.name,
-          rank: strategyUniverseMembers.rank,
-          effectiveFrom: strategyUniverseMembers.effectiveFrom,
-          effectiveTo: strategyUniverseMembers.effectiveTo,
-          isEnabled: strategyUniverseMembers.isEnabled,
-          universeVersionId: strategyUniverseMembers.universeVersionId,
-        })
-        .from(strategyUniverseMembers)
-        .innerJoin(instruments, eq(instruments.id, strategyUniverseMembers.instrumentId))
-        .where(
-          inArray(
-            strategyUniverseMembers.strategyVersionId,
-            versions.map((v) => v.id),
-          ),
-        )
-        .orderBy(asc(strategyUniverseMembers.rank))
-    : [];
-
   const activations = versions.length
     ? await db
         .select({
@@ -147,7 +115,6 @@ export async function getStrategy(id: string) {
     versions: versions.map((version) => ({
       ...version,
       bindings: bindings.filter((binding) => binding.strategyVersionId === version.id),
-      members: members.filter((member) => member.strategyVersionId === version.id),
       activations: activations.filter((activation) => activation.strategyVersionId === version.id),
     })),
   };

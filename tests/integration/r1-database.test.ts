@@ -66,14 +66,14 @@ describe('R2 database lifecycle', () => {
     expect(partitions.count).toBeGreaterThanOrEqual(63);
   });
 
-  it('seeds the operator, account, instruments, universe and bindings', async () => {
+  it('seeds the operator, account, instruments, sync targets and bindings', async () => {
     const [counts] = await sql<
       {
         users: number;
         accounts: number;
         instruments: number;
         mappings: number;
-        universe_members: number;
+        sync_targets: number;
         strategy_versions: number;
         configurations: number;
         bindings: number;
@@ -85,7 +85,7 @@ describe('R2 database lifecycle', () => {
         (select count(*)::int from accounts) as accounts,
         (select count(*)::int from instruments) as instruments,
         (select count(*)::int from instrument_provider_mappings) as mappings,
-        (select count(*)::int from instrument_universe_members) as universe_members,
+        (select count(*)::int from instruments where is_sync_target) as sync_targets,
         (select count(*)::int from strategy_versions) as strategy_versions,
         (select count(*)::int from configuration_versions) as configurations,
         (select count(*)::int from strategy_config_bindings) as bindings,
@@ -95,7 +95,7 @@ describe('R2 database lifecycle', () => {
     expect(counts.accounts).toBe(1);
     expect(counts.instruments).toBe(51);
     expect(counts.mappings).toBe(51);
-    expect(counts.universe_members).toBe(71);
+    expect(counts.sync_targets).toBe(51);
     expect(counts.strategy_versions).toBe(1);
     expect(counts.configurations).toBe(3);
     expect(counts.bindings).toBe(3);
@@ -193,31 +193,23 @@ describe('R2 database lifecycle', () => {
     expect(missing.count).toBe(0);
   });
 
-  it('seeds the nifty-50 catalog with rank order, status rows and corrected ticks', async () => {
-    const [nifty] = await sql<{ members: number; status_rows: number; index_rank: number }[]>`
+  it('seeds the sync-target catalog with status rows and corrected ticks', async () => {
+    const [syncTargets] = await sql<
+      { targets: number; status_rows: number; index_targets: number }[]
+    >`
       select
+        (select count(*)::int from instruments where is_sync_target) as targets,
         (select count(*)::int
-           from instrument_universe_members m
-           join instrument_universe_versions v on v.id = m.universe_version_id
-           join instrument_universes u on u.id = v.universe_id
-          where u.code = 'nifty-50' and v.effective_to is null) as members,
+           from instruments i
+           join instrument_data_status s on s.instrument_id = i.id
+          where i.is_sync_target) as status_rows,
         (select count(*)::int
-           from instrument_universe_members m
-           join instrument_universe_versions v on v.id = m.universe_version_id
-           join instrument_universes u on u.id = v.universe_id
-           join instrument_data_status s on s.instrument_id = m.instrument_id
-          where u.code = 'nifty-50' and v.effective_to is null) as status_rows,
-        (select m.rank
-           from instrument_universe_members m
-           join instrument_universe_versions v on v.id = m.universe_version_id
-           join instrument_universes u on u.id = v.universe_id
-           join instruments i on i.id = m.instrument_id
-          where u.code = 'nifty-50' and v.effective_to is null and i.segment = 'NSE_INDEX'
-          limit 1) as index_rank
+           from instruments
+          where is_sync_target and segment = 'NSE_INDEX') as index_targets
     `;
-    expect(nifty.members).toBe(51);
-    expect(nifty.status_rows).toBe(51);
-    expect(nifty.index_rank).toBe(1);
+    expect(syncTargets.targets).toBe(51);
+    expect(syncTargets.status_rows).toBe(51);
+    expect(syncTargets.index_targets).toBe(1);
 
     const ticks = await sql<{ symbol: string; tick_size: string }[]>`
       select trading_symbol as symbol, tick_size::text
@@ -232,12 +224,12 @@ describe('R2 database lifecycle', () => {
   });
 
   it('resolves the primary provider external key for backfill planning', async () => {
-    const { getInstrumentsByIds, getUniverseMembersForBackfill } = await import(
+    const { getInstrumentsByIds, getSyncTargetInstruments } = await import(
       '../../packages/database/index.js'
     );
-    const members = await getUniverseMembersForBackfill('nifty-50');
-    expect(members).toHaveLength(51);
-    expect(members.every((member) => member.externalKey)).toBe(true);
+    const targets = await getSyncTargetInstruments();
+    expect(targets).toHaveLength(51);
+    expect(targets.every((target) => target.externalKey)).toBe(true);
 
     const [reliance] = await sql<{ id: string }[]>`
       select id from instruments where trading_symbol = 'RELIANCE' limit 1

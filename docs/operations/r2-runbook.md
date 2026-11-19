@@ -25,8 +25,8 @@ pnpm db:seed
 pnpm db:verify
 ```
 
-`pnpm db:seed` creates the `nifty-50` universe with 51 ranked members, a 2022–2027 NSE calendar
-fixture, corrected tick sizes and one `instrument_data_status` row per member. The fixture is
+`pnpm db:seed` flags the 51 seeded instruments as `is_sync_target`, creates a 2022–2027 NSE calendar
+fixture, corrected tick sizes and one `instrument_data_status` row per target. The fixture is
 provisional where marked; reconcile it with NSE circulars before relying on it for promotion.
 
 ## Daily operation
@@ -104,7 +104,7 @@ pnpm build
 pnpm db:verify
 ```
 
-`pnpm db:verify` expects 61 logical tables, the R2 tables and indexes, 51 nifty-50 members with status
+`pnpm db:verify` expects 57 logical tables, the R2 tables and indexes, 51 sync targets with status
 rows and primary mappings, a 2022–2027 calendar, valid tick sizes and zero orders.
 
 The daily-versus-minute volume tolerance defaults to 2% (`0.02`) provisionally. A live RELIANCE

@@ -2,8 +2,8 @@
  * Deterministic R1 reference fixture.
  *
  * The live Upstox instrument master replaces these mappings when the worker
- * runs with credentials. Until then the seed gives the dashboard, universe
- * selector and strategy registry a complete, offline-safe data set.
+ * runs with credentials. Until then the seed gives the dashboard, data sync
+ * targets and strategy registry a complete, offline-safe data set.
  */
 export interface EquityFixture {
   symbol: string;
@@ -70,7 +70,7 @@ export const nifty50Constituents: EquityFixture[] = [
   { symbol: 'SHRIRAMFIN', name: 'Shriram Finance', isin: 'INE721A01013' },
 ];
 
-export const orbUniverseSymbols = [
+export const orbLiquidSymbols = [
   'RELIANCE',
   'TCS',
   'HDFCBANK',

@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>R2 Implementation Plan — Upstox Historical Ingestion &amp; Data Quality</title>
-<meta name="description" content="Release 2 implementation plan for the AI Trading System: Upstox V3 historical ingestion, an index-ranked instrument catalog with per-instrument fetch status, resumable queue-backed backfills, strict coverage, daily OHLCV reconciliation and data-quality operations." />
+<meta name="description" content="Release 2 implementation plan for the AI Trading System: Upstox V3 historical ingestion, an sync-target instrument catalog with per-instrument fetch status, resumable queue-backed backfills, strict coverage, daily OHLCV reconciliation and data-quality operations." />
 <style>
   :root{
     color-scheme: dark;
@@ -446,14 +446,14 @@
   <h1>Trustworthy history before the <em>first signal</em>.</h1>
   <p class="lede">
     R2 turns Upstox historical market data into a complete, traceable 1-minute record for the current
-    NIFTY 50 candidate pool and the NIFTY 50 index. The operator works from an index-ranked instrument
+    NIFTY 50 candidate pool and the NIFTY 50 index. The operator works from an sync-target instrument
     catalog: select an instrument or a list, queue a fetch or refresh, and watch a persisted status move
     from not fetched to complete. Underneath, chunked fetches, raw payloads, strict coverage and a resumable
     backfill do the work. No strategy is evaluated and no order is sent.
   </p>
   <div class="chips">
     <span class="chip g">Trading mode: research</span>
-    <span class="chip c">51 instruments · index rank order</span>
+    <span class="chip c">51 instruments · alphabetical order</span>
     <span class="chip v">1-minute source of truth</span>
     <span class="chip a">Strict coverage · no synthesis</span>
     <span class="chip">Per-instrument fetch status</span>
@@ -496,7 +496,7 @@
         <li>Reviewed NSE trading calendar for 2022–2027, including special sessions and Muhurat timings.</li>
         <li>Upstox BOD instrument sync for NSE cash equities and indices, with the tick-size unit corrected.</li>
         <li>Corporate-action CSV import, validation and adjustment factors; no automatic vendor feed.</li>
-        <li>An index-ranked instrument catalog with per-instrument and multi-select fetch, refresh, retry and cancel.</li>
+        <li>An sync-target instrument catalog with per-instrument and multi-select fetch, refresh, retry and cancel.</li>
         <li>Persisted per-instrument fetch and data status, driven by the queue and proved by coverage.</li>
         <li>Historical V3 1-minute backfill for the current NIFTY 50 candidate pool and the NIFTY 50 index from January 2022.</li>
         <li>Daily incremental ingestion through the intraday/historical endpoints, with T+1 finalization.</li>
@@ -514,7 +514,7 @@
         <li>Live market data, order placement, positions and reconciliation (R5).</li>
         <li>Upstox OAuth, production auth, static IP and algo registration (R6).</li>
         <li>All NSE cash equities; R2 is the NIFTY 50 candidate pool, not the full market.</li>
-        <li>Index weights, weight-based ranking and historical index constituent snapshots.</li>
+        <li>Index weights and historical index constituent snapshots.</li>
         <li>BSE cash equities, futures, options, ETFs as a first-class instrument type.</li>
         <li>An automatic corporate-action vendor or exchange scrape.</li>
         <li>Per-instrument tick-size history; current tick size is stored in R2.</li>
@@ -588,9 +588,9 @@
     <table class="data-table">
       <thead><tr><th>Decision</th><th>Choice</th><th>Consequence</th></tr></thead>
       <tbody>
-        <tr><td>Initial universe</td><td><span class="tag g">Current NIFTY 50 + index</span></td><td>51 instruments, stored as a ranked <code>nifty-50</code> universe version. The ORB liquidity selector gets a credible candidate pool; historical membership and the full NSE universe are deferred.</td></tr>
-        <tr><td>Catalog ordering</td><td><span class="tag g">Index rank, no weights</span></td><td>Rows sort by <code>instrument_universe_members.rank</code>. Rank 1 is the index. R2 stores and displays order only; weights are out of scope.</td></tr>
-        <tr><td>Index membership source</td><td><span class="tag a">Reviewed CSV / seed</span></td><td>Versioned universe membership with effective dates, same treatment as corporate actions. No provider scrape and no automatic rewrite of an old version.</td></tr>
+        <tr><td>Initial scope</td><td><span class="tag g">Current NIFTY 50 + index</span></td><td>51 instruments flagged <code>is_sync_target</code>. The sync set is the candidate pool; historical membership and the full NSE catalog are deferred.</td></tr>
+        <tr><td>Catalog ordering</td><td><span class="tag g">Alphabetical, no weights</span></td><td>Rows sort by trading symbol. No rank or weight is stored or displayed.</td></tr>
+        <tr><td>Scope source</td><td><span class="tag a">Reviewed seed</span></td><td>The checked-in NSE fixture sets <code>is_sync_target</code>. No provider scrape and no membership snapshots.</td></tr>
         <tr><td>Status model</td><td><span class="tag c">Two persisted axes</span></td><td><code>fetch_status</code> and <code>data_status</code> live in <code>instrument_data_status</code>. A successful HTTP call is never shown as complete.</td></tr>
         <tr><td>Fetch entry point</td><td><span class="tag g">Per instrument, one plan underneath</span></td><td>A row action or a selection creates a normal backfill plan with one child per instrument. There is no second ingestion path.</td></tr>
         <tr><td>Refresh policy</td><td><span class="tag a">Missing months only</span></td><td>The default skips months whose coverage is complete. A force refresh is explicit, requires a reason and records revisions.</td></tr>
@@ -632,7 +632,7 @@
         <li>One maximum of one calendar month per 1-minute historical request.</li>
         <li>The initial backfill is an operator-triggered, resumable operation, not a cron job; it is launched from the catalog.</li>
         <li>“Complete” is measured over the fixed 2022-01-01 → last completed session window, never over an implicit recent range.</li>
-        <li>Index membership is a reviewed snapshot with an explicit rank order; R2 does not store or display weights.</li>
+        <li>Scope is a reviewed <code>is_sync_target</code> flag; R2 does not store or display weights.</li>
         <li>PostgreSQL 17+ is external; Redis is required for BullMQ and the distributed limiter.</li>
       </ul>
     </div>
@@ -640,7 +640,7 @@
       <div class="ico">↗</div>
       <h3>Deliberately deferred</h3>
       <ul>
-        <li>Full NSE/BSE universe and exchange-wide reference sync.</li>
+        <li>Full NSE/BSE instrument catalog and exchange-wide reference sync.</li>
         <li>ETF classification as a first-class instrument type.</li>
         <li>Per-instrument tick-size history and historical tick rounding.</li>
         <li>Websocket live bars and quote persistence (R5).</li>
@@ -1198,36 +1198,29 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
     </div>
   </div>
 
-  <h3 style="margin:26px 0 10px">Index membership and rank</h3>
+  <h3 style="margin:26px 0 10px">Instrument scope</h3>
   <div class="grid-2">
     <div class="card g">
       <div class="ico">▤</div>
-      <h3>Reviewed membership snapshot</h3>
+      <h3>Reviewed sync-target flag</h3>
       <p>
-        R2 seeds one universe, <code>nifty-50</code>, with <code>selection_method='index_constituents'</code>.
-        Membership arrives as a reviewed CSV or fixture row set with <code>universe_code</code>,
-        <code>effective_from</code>, <code>rank</code>, <code>isin</code> or <code>symbol</code>,
-        <code>source</code> and <code>notes</code>. Import validates resolution, rank uniqueness and a 51-row
-        total before writing a new <code>instrument_universe_versions</code> row and its members.
+        R2 seeds 51 instruments, the NIFTY 50 index and its constituents, with
+        <code>is_sync_target=true</code>. The flag is the only scope input: the catalog, worker
+        backfills, quality scans and daily validation all read it. The universe tables and
+        <code>strategy_universe_members</code> were removed by
+        <code>0010_drop_universes.sql</code>.
       </p>
       <p style="margin-top:8px">
-        Rank 1 is the NIFTY 50 index; ranks 2–51 are the constituents in the reviewed order. Rank is display
-        order only. No weight column is added, derived or shown in R2.
+        No rank, weight or membership snapshot is stored. The catalog sorts alphabetically by trading
+        symbol.
       </p>
     </div>
     <div class="card c">
       <div class="ico">＋</div>
-      <h3>Adding another index later</h3>
+      <h3>Changing the scope later</h3>
       <p>
-        A second index is another <code>instrument_universes</code> row plus a new version and member set.
-        The catalog filters by <code>universeCode</code>, so no schema change and no second status table are
-        needed. An instrument can belong to more than one universe; its data status is per instrument, not per
-        universe.
-      </p>
-      <p style="margin-top:8px">
-        A membership change creates a new version with a later <code>effective_from</code>; the previous
-        version is closed with <code>effective_to</code>, never edited. The catalog always reads the active
-        version.
+        Toggling <code>is_sync_target</code> changes the fetch and validation set immediately. There is
+        no version history; the reference master and the audit log are the record of change.
       </p>
     </div>
   </div>
@@ -1235,9 +1228,9 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
   <div class="callout info" style="margin-top:14px">
     <span class="ico">i</span>
     <div>
-      <b>Membership is current, not historical.</b> The <code>nifty-50</code> version is today’s reviewed
-      constituent list. It is not a point-in-time index reconstruction. R4 must not claim otherwise until a
-      historical constituent series exists.
+      <b>Scope is current, not historical.</b> The flag describes today’s sync set. It is not a
+      point-in-time index reconstruction. R4 must not claim otherwise until a historical constituent
+      series exists.
     </div>
   </div>
 
@@ -1852,7 +1845,7 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
         <table class="fields">
           <thead><tr><th>Column</th><th>Type</th><th>Purpose</th></tr></thead>
           <tbody>
-            <tr><td><code>instrument_id</code></td><td><code>uuid</code> PK · FK</td><td>One row per instrument. Also the join to the universe member list.</td></tr>
+            <tr><td><code>instrument_id</code></td><td><code>uuid</code> PK · FK</td><td>One row per instrument. Also carries the sync-target flag.</td></tr>
             <tr><td><code>target_from</code> · <code>target_to</code></td><td><code>date</code></td><td>The window the status describes: <code>max(2022-01-01, listed_on)</code> → the last completed session, capped at <code>delisted_on</code> when set.</td></tr>
             <tr><td><code>fetch_status</code></td><td><code>varchar(20)</code></td><td><code>not_requested</code>, <code>queued</code>, <code>fetching</code>, <code>fetched</code>, <code>partial</code>, <code>failed</code>, <code>cancelled</code>, <code>stale</code>.</td></tr>
             <tr><td><code>data_status</code></td><td><code>varchar(20)</code></td><td><code>complete</code>, <code>partial_reconciled</code>, <code>partial_mismatch</code>, <code>missing</code>, <code>pending</code>, <code>not_applicable</code>, <code>needs_review</code>.</td></tr>
@@ -1872,7 +1865,7 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
           <li><code>idx_instrument_status_fetch</code> <span class="idx-type">btree</span> — <code>(fetch_status, data_status)</code> for filtered catalog queries.</li>
           <li><code>idx_instrument_status_last_success</code> <span class="idx-type">btree</span> — <code>(last_success_at)</code> for stale sweeps.</li>
           <li><code>uq_ingestion_active_instrument</code> <span class="idx-type">unique btree</span> — on <code>market_data_ingestion_runs (instrument_id)</code> where <code>run_type='historical_backfill'</code> and <code>status in ('queued','running')</code>. One active backfill per instrument; scheduled finalize and intraday sync are unaffected.</li>
-          <li>A row is written for every active universe member during reference sync, and for any instrument requested explicitly. Its absence renders as <code>Not fetched</code>.</li>
+          <li>A row is written for every sync target during reference sync, and for any instrument requested explicitly. Its absence renders as <code>Not fetched</code>.</li>
           <li>Recompute runs on chunk close, T+1 finalization, the quality scan, the 08:30 reconcile and an explicit API call. The catalog never computes status on read.</li>
           <li><code>chk_instrument_status_counters</code> — every counter is non-negative; <code>target_to &gt;= target_from</code>.</li>
         </ul>
@@ -2067,7 +2060,7 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
     <div class="card g">
       <div class="ico">2</div>
       <h3>Verify</h3>
-      <p>Assert 60 logical tables, the new columns, both new tables, the partial unique indexes and zero orders. Assert a status row exists for every <code>nifty-50</code> member.</p>
+      <p>Assert the R2 tables, indexes and columns, and zero orders. Assert a status row exists for every sync target.</p>
     </div>
     <div class="card a">
       <div class="ico">3</div>
@@ -2523,24 +2516,22 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
     <span class="ico">✓</span>
     <div>
       <b>The catalog is a view over evidence, not a second source of truth.</b> A row projects
-      <code>instrument_universe_members</code>, <code>market_data_ingestion_runs</code>,
+      <code>instruments</code>, <code>market_data_ingestion_runs</code>,
       <code>market_data_coverage</code> and <code>data_quality_issues</code> into a persisted
       <code>instrument_data_status</code> row. The catalog cannot claim data that the coverage rows do not
       prove.
     </div>
   </div>
 
-  <h3 style="margin:26px 0 10px">Ordering by index rank</h3>
+  <h3 style="margin:26px 0 10px">Catalog scope and ordering</h3>
   <div class="scroll-x">
     <table class="data-table">
       <thead><tr><th>Rule</th><th>Behaviour</th><th>Source</th></tr></thead>
       <tbody>
-        <tr><td>Membership defines the list</td><td><code>nifty-50</code> is the only universe in R2. A future index is an additional <code>instrument_universes</code> row with <code>selection_method='index_constituents'</code>; no schema change.</td><td>Versioned universe membership</td></tr>
-        <tr><td>Rank is display order</td><td>Read <code>instrument_universe_members.rank</code> from the active universe version. Rank 1 is the NIFTY 50 index; ranks 2–51 are the constituents in the reviewed order.</td><td><code>uq_instrument_universe_rank</code></td></tr>
+        <tr><td>The flag defines the list</td><td>The catalog reads instruments where <code>is_sync_target</code> is true. New instruments join the set by setting the flag; no second table or schema change is needed.</td><td><code>instruments.is_sync_target</code></td></tr>
+        <tr><td>Alphabetical order</td><td>Rows sort by trading symbol, then instrument id. No rank or weight is stored or displayed.</td><td>Read model query</td></tr>
         <tr><td>No weights</td><td>R2 stores and displays order only. No weight column, no derived weight, no percentage in the UI.</td><td>Deliberate scope limit</td></tr>
-        <tr><td>Active version only</td><td>The catalog reads the version where <code>effective_to is null</code>. Superseded versions stay for audit and are never edited.</td><td><code>instrument_universe_versions</code></td></tr>
-        <tr><td>Stable pagination</td><td>Default sort is <code>rank asc, instrument_id</code>. Alphabetical order is an explicit operator choice, never the default.</td><td>Read model query</td></tr>
-        <tr><td>Suspended rows stay visible</td><td>A suspended or delisted member is shown with its status, not removed. Filtering is a UI choice.</td><td>Reference rules</td></tr>
+        <tr><td>Suspended rows stay visible</td><td>A suspended or delisted sync target is shown with its status, not removed. Filtering is a UI choice.</td><td>Reference rules</td></tr>
       </tbody>
     </table>
   </div>
@@ -2548,11 +2539,9 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
   <div class="callout info" style="margin-top:14px">
     <span class="ico">i</span>
     <div>
-      <b>Membership is a reviewed snapshot, not a provider scrape.</b> The same treatment as corporate
-      actions: a checked-in CSV with <code>universe_code</code>, <code>effective_from</code>, <code>rank</code>,
-      <code>isin</code> or <code>symbol</code>, <code>source</code> and <code>notes</code>. Import validates
-      resolution, uniqueness of rank and a 51-row total. A membership change creates a new universe version;
-      the catalog never rewrites an old one.
+      <b>Scope is a reviewed flag, not a provider scrape.</b> The seed sets <code>is_sync_target</code> from
+      the checked-in NSE fixture. Changing the set is an explicit reference-master update recorded in the
+      audit log; there is no versioned membership snapshot.
     </div>
   </div>
 
@@ -2669,7 +2658,7 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
         <tr><td>Priority</td><td>Scheduled <code>historical-finalize</code> and <code>intraday-sync</code> run above operator requests; a long catalog backfill cannot starve the daily job.</td><td>The T+1 finalization is the freshness guarantee.</td></tr>
         <tr><td>Rate budget</td><td>All jobs share one Redis token bucket at 80% of every provider window.</td><td>A manual “refresh all” cannot exceed the account limit.</td></tr>
         <tr><td>Cancel and retry</td><td>Per instrument, cooperative between chunks. Retry reuses the same run and skips succeeded chunks.</td><td>No partial batch and no duplicate rows.</td></tr>
-        <tr><td>Request scope</td><td>1–100 instruments per request, or one universe. A per-instrument request creates a one-instrument plan.</td><td>One orchestration path; no parallel ingestion code.</td></tr>
+        <tr><td>Request scope</td><td>1–100 instruments per request, or the full sync-target set. A per-instrument request creates a one-instrument plan.</td><td>One orchestration path; no parallel ingestion code.</td></tr>
       </tbody>
     </table>
   </div>
@@ -2679,7 +2668,7 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
     <div class="card g">
       <div class="ico">1</div>
       <h3>Browse</h3>
-      <p>Filter by index, status or symbol. Rows are in rank order with a badge, coverage counts, last fetch and open issues. The target window sits beside the badge.</p>
+      <p>Filter by index, status or symbol. Rows are alphabetical with a badge, coverage counts, last fetch and open issues. The target window sits beside the badge.</p>
     </div>
     <div class="card c">
       <div class="ico">2</div>
@@ -2731,7 +2720,7 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
         <tr><td>Delisted</td><td>Target window ends at <code>delisted_on</code>; the row remains.</td><td>History is never deleted.</td></tr>
         <tr><td>Missing mapping</td><td>Row is marked Needs review and fetch is blocked in the preview.</td><td>No queue entry for an unresolvable instrument.</td></tr>
         <tr><td>Force refresh</td><td>Explicit control with a required reason; revisions are recorded.</td><td>Never the default and never silent.</td></tr>
-        <tr><td>Membership change</td><td>A new universe version reorders or replaces rows; the old version remains.</td><td>No historical-constituent claim in R2.</td></tr>
+        <tr><td>Sync-target change</td><td>Toggling <code>is_sync_target</code> adds or removes an instrument from the fetch and validation set immediately.</td><td>No historical-constituent claim in R2.</td></tr>
       </tbody>
     </table>
   </div>
@@ -2756,7 +2745,7 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
     <table class="data-table">
       <thead><tr><th>Parameter</th><th>Value</th><th>Rationale</th></tr></thead>
       <tbody>
-        <tr><td>Instruments</td><td>50 current NIFTY 50 constituents + <code>NSE_INDEX|Nifty 50</code></td><td>Members of the <code>nifty-50</code> universe version, in rank order. The ORB universe is a subset; the index is required for market confirmation in R3.</td></tr>
+        <tr><td>Instruments</td><td>50 current NIFTY 50 constituents + <code>NSE_INDEX|Nifty 50</code></td><td>Instruments with <code>is_sync_target</code> true. The index is required for market confirmation in R3.</td></tr>
         <tr><td>Entry point</td><td>Instrument catalog selection</td><td>One row or many; the request creates one plan with one child per instrument.</td></tr>
         <tr><td>History</td><td><code>2022-01-01</code> → last completed trading session</td><td>Upstox 1-minute availability; covers development, validation and holdout windows.</td></tr>
         <tr><td>Timeframe</td><td><code>minutes/1</code> only</td><td>One stored timeframe; higher timeframes are derived.</td></tr>
@@ -2849,7 +2838,7 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
     <div class="card g">
       <div class="ico">1</div>
       <h3>Select</h3>
-      <p>The catalog lists the <code>nifty-50</code> members in rank order. The operator picks one row or a set, and the selection bar summarizes status counts and blocking problems.</p>
+      <p>The catalog lists the sync targets in alphabetical order. The operator picks one row or a set, and the selection bar summarizes status counts and blocking problems.</p>
     </div>
     <div class="card c">
       <div class="ico">2</div>
@@ -3074,7 +3063,7 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
         <table class="fields">
           <thead><tr><th>Method</th><th>Path</th><th>R2 change</th></tr></thead>
           <tbody>
-            <tr><td>GET</td><td><code>/instruments</code></td><td>Adds <code>universeCode</code>, <code>sort=universeRank</code>, <code>fetchStatus</code>, <code>dataStatus</code> and search. Returns the rank and both statuses.</td></tr>
+            <tr><td>GET</td><td><code>/instruments</code></td><td>Adds <code>fetchStatus</code>, <code>dataStatus</code> and search. Returns both statuses for sync targets.</td></tr>
             <tr><td>GET</td><td><code>/data/coverage</code></td><td>Adds <code>validationStatus</code>, <code>gapRunCount</code>, <code>maxGapMinutes</code> and <code>dailyVolume</code>.</td></tr>
             <tr><td>GET</td><td><code>/data/coverage/summary</code></td><td>Adds <code>notApplicable</code> and a validation breakdown.</td></tr>
             <tr><td>GET</td><td><code>/data/ingestion-runs</code></td><td>Adds parent job, chunk index, duration, HTTP status and skipped/updated counts.</td></tr>
@@ -3100,7 +3089,7 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
         <table class="fields">
           <thead><tr><th>Method</th><th>Path</th><th>Purpose</th><th>Writes / audit</th></tr></thead>
           <tbody>
-            <tr><td>GET</td><td><code>/data/instrument-status</code></td><td>Bulk status rows for a universe or an instrument list, filterable by both status axes.</td><td>No</td></tr>
+            <tr><td>GET</td><td><code>/data/instrument-status</code></td><td>Bulk status rows for the sync-target set or an instrument list, filterable by both status axes.</td><td>No</td></tr>
             <tr><td>GET</td><td><code>/data/instrument-status/:instrumentId</code></td><td>Instrument status detail with the month grid, counters and target window.</td><td>No</td></tr>
             <tr><td>POST</td><td><code>/data/instrument-status/recompute</code></td><td>Recompute one or a list of rollups after a reviewed fix.</td><td>Yes · <code>data.instrument_status_recomputed</code></td></tr>
             <tr><td>POST</td><td><code>/data/instruments/fetch</code></td><td>Preview or launch a fetch for an instrument selection; creates the plan internally.</td><td>Yes · <code>data.instruments_fetch_requested</code></td></tr>
@@ -3109,7 +3098,7 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
             <tr><td>GET</td><td><code>/data/backfill-plans</code></td><td>List recent plans with progress.</td><td>No</td></tr>
             <tr><td>GET</td><td><code>/data/backfill-plans/:id</code></td><td>Plan detail, per-instrument progress and failed chunks.</td><td>No</td></tr>
             <tr><td>POST</td><td><code>/data/backfill-plans/:id/cancel</code></td><td>Cooperative cancellation between chunks.</td><td>Yes · <code>data.backfill_plan_cancelled</code></td></tr>
-            <tr><td>GET</td><td><code>/data/coverage/heatmap</code></td><td>Instrument × session matrix for a date range and universe.</td><td>No</td></tr>
+            <tr><td>GET</td><td><code>/data/coverage/heatmap</code></td><td>Instrument × session matrix for a date range and sync targets.</td><td>No</td></tr>
             <tr><td>GET</td><td><code>/data/coverage/:instrumentId/:date</code></td><td>Day detail: gaps, runs, oracle values and evidence.</td><td>No</td></tr>
             <tr><td>GET</td><td><code>/data/validation</code></td><td>Daily-versus-minute comparison rows.</td><td>No</td></tr>
             <tr><td>GET</td><td><code>/data/ingestion-runs/:id</code></td><td>Run detail, request params, counts and raw payload link.</td><td>No</td></tr>
@@ -3130,10 +3119,10 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
     <table class="data-table">
       <thead><tr><th>DTO</th><th>Fields</th><th>Validation</th></tr></thead>
       <tbody>
-        <tr><td><code>FetchInstrumentsDto</code></td><td><code>instrumentIds[]</code> or <code>universeCode</code>, <code>mode</code>, <code>from?</code>, <code>to?</code>, <code>reason?</code>, <code>dryRun?</code></td><td>1–100 instruments; <code>from ≥ 2022-01-01</code>; <code>to ≤ last completed session</code>; mode is <code>missing_only</code> or <code>force</code>; <code>force</code> requires <code>reason</code>; <code>dryRun</code> defaults to true. A second request for an active instrument returns the existing run, not a new plan.</td></tr>
-        <tr><td><code>InstrumentStatusQueryDto</code></td><td><code>universeCode?</code>, <code>instrumentIds?</code>, <code>fetchStatus?</code>, <code>dataStatus?</code>, <code>limit?</code>, <code>offset?</code></td><td>At least one of universe or instrument list; ≤100 IDs; limit ≤ 2,000; status values from the two enums.</td></tr>
-        <tr><td><code>CreateBackfillPlanDto</code></td><td><code>universeCode?</code>, <code>instrumentIds?</code>, <code>from</code>, <code>to</code>, <code>mode</code>, <code>dryRun?</code></td><td>At least one scope; ≤100 instruments; <code>from ≥ 2022-01-01</code>; <code>to ≤ last completed session</code>; <code>from ≤ to</code>; mode is <code>missing_only</code> or <code>force</code>; <code>dryRun</code> defaults to true and must be explicitly false to launch.</td></tr>
-        <tr><td><code>CoverageHeatmapQueryDto</code></td><td><code>from</code>, <code>to</code>, <code>universeCode?</code>, <code>limit?</code></td><td>Date regex; range ≤ 370 days; limit ≤ 2,000.</td></tr>
+        <tr><td><code>FetchInstrumentsDto</code></td><td><code>instrumentIds[]</code>, <code>mode</code>, <code>from?</code>, <code>to?</code>, <code>reason?</code>, <code>dryRun?</code></td><td>1–100 instruments; <code>from ≥ 2022-01-01</code>; <code>to ≤ last completed session</code>; mode is <code>missing_only</code> or <code>force</code>; <code>force</code> requires <code>reason</code>; <code>dryRun</code> defaults to true. A second request for an active instrument returns the existing run, not a new plan.</td></tr>
+        <tr><td><code>InstrumentStatusQueryDto</code></td><td><code>instrumentIds?</code>, <code>fetchStatus?</code>, <code>dataStatus?</code>, <code>limit?</code>, <code>offset?</code></td><td>Defaults to all sync targets; ≤100 IDs; limit ≤ 2,000; status values from the two enums.</td></tr>
+        <tr><td><code>CreateBackfillPlanDto</code></td><td><code>instrumentIds?</code>, <code>from</code>, <code>to</code>, <code>mode</code>, <code>dryRun?</code></td><td>Defaults to all sync targets; ≤100 instruments; <code>from ≥ 2022-01-01</code>; <code>to ≤ last completed session</code>; <code>from ≤ to</code>; mode is <code>missing_only</code> or <code>force</code>; <code>dryRun</code> defaults to true and must be explicitly false to launch.</td></tr>
+        <tr><td><code>CoverageHeatmapQueryDto</code></td><td><code>from</code>, <code>to</code>, <code>limit?</code></td><td>Date regex; range ≤ 370 days; limit ≤ 2,000; defaults to all sync targets.</td></tr>
         <tr><td><code>ValidationQueryDto</code></td><td><code>instrumentId?</code>, <code>from?</code>, <code>to?</code>, <code>status?</code></td><td>UUID and date regex; status in the validation enum.</td></tr>
         <tr><td><code>QualityIssueActionDto</code></td><td><code>status</code>, <code>note?</code></td><td><code>acknowledged</code>, <code>resolved</code> or <code>ignored</code>; note required for resolved/ignored; ≤1,000 chars.</td></tr>
         <tr><td><code>CorporateActionImportDto</code></td><td><code>rows</code> or <code>csv</code>, <code>source</code>, <code>dryRun?</code></td><td>At most 5,000 rows; ISIN/symbol resolves; parseable dates; positive ratios; dry-run returns per-row verdicts.</td></tr>
@@ -3194,7 +3183,7 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
     <table class="data-table">
       <thead><tr><th>Route</th><th>Screen</th><th>Reads</th><th>Primary action</th></tr></thead>
       <tbody>
-        <tr><td><code>/instruments</code></td><td>Instrument catalog</td><td>Universe members in rank order, both statuses, coverage counts, last fetch, open issues</td><td>Fetch, refresh or cancel for one row or a selection</td></tr>
+        <tr><td><code>/instruments</code></td><td>Instrument catalog</td><td>Sync targets, both statuses, coverage counts, last fetch, open issues</td><td>Fetch, refresh or cancel for one row or a selection</td></tr>
         <tr><td><code>/instruments/[id]</code></td><td>Instrument detail</td><td>Target window, month grid, runs, issues, mappings, tick size</td><td>Refresh missing months; inspect evidence</td></tr>
         <tr><td><code>/data</code></td><td>Data health</td><td>Coverage summary, heatmap, active plans, runs, issues, provider status</td><td>Inspect a plan or acknowledge an issue</td></tr>
         <tr><td><code>/data/backfills/[id]</code></td><td>Backfill detail</td><td>Plan progress, per-instrument chunks, failures, ETA</td><td>Cancel the plan</td></tr>
@@ -3232,7 +3221,7 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
   <h3 style="margin:26px 0 10px">Coverage heatmap</h3>
   <div class="card">
     <p>
-      Rows are instruments in the selected universe; columns are the last 60 or 120 trading sessions. Each cell
+      Rows are sync-target instruments; columns are the last 60 or 120 trading sessions. Each cell
       uses the strict status and a small validation marker:
     </p>
     <div class="grid-3" style="margin-top:10px">
@@ -3253,7 +3242,7 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
       <tbody>
         <tr><td>Row</td><td>Rank, symbol, name, index, status badge, complete/expected days, last fetch, open issues.</td><td>Hide a suspended or delisted member by default.</td></tr>
         <tr><td>Status badge</td><td>One badge from the precedence list, plus the target window on hover or in the detail</td><td>Show “Complete” when the fetch status is failed or an issue is critical.</td></tr>
-        <tr><td>Filters</td><td>Index, fetch status, data status, symbol search; default sort is rank</td><td>Default to alphabetical or “most recent”.</td></tr>
+        <tr><td>Filters</td><td>Index, fetch status, data status, symbol search; default sort is alphabetical</td><td>Default to alphabetical or “most recent”.</td></tr>
         <tr><td>Selection bar</td><td>Counts by status, blocked mappings, default mode <code>missing_only</code></td><td>Allow launch with an unresolved instrument.</td></tr>
         <tr><td>Row action</td><td>Fetch, Refresh, Retry or Cancel depending on the current state</td><td>Offer an action that contradicts the state, such as Fetch on a fetching row.</td></tr>
         <tr><td>Expanded view</td><td>Month grid with complete, partial, missing and queued cells</td><td>Recompute status in the browser.</td></tr>
@@ -3277,7 +3266,7 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
     <div class="card g">
       <div class="ico">1</div>
       <h3>Scope</h3>
-      <p>Opened from the catalog with the current selection, or directly with a universe and date range. The form keeps <code>missing_only</code> as the default and warns about missing mappings before enabling launch.</p>
+      <p>Opened from the catalog with the current selection, or directly with a date range. The form keeps <code>missing_only</code> as the default and warns about missing mappings before enabling launch.</p>
     </div>
     <div class="card c">
       <div class="ico">2</div>
@@ -3409,7 +3398,7 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
     <table class="data-table">
       <thead><tr><th>Workload</th><th>Target</th><th>Environment</th></tr></thead>
       <tbody>
-        <tr><td>51-instrument catalog, filtered</td><td>&lt; 300 ms</td><td>Single read of <code>instrument_data_status</code> joined to the universe version</td></tr>
+        <tr><td>51-instrument catalog, filtered</td><td>&lt; 300 ms</td><td>Single read of <code>instrument_data_status</code> filtered by is_sync_target</td></tr>
         <tr><td>Status recompute, 51 instruments</td><td>&lt; 5 seconds</td><td>Coverage aggregate for the target window</td></tr>
         <tr><td>51 instrument-month chunks</td><td>&lt; 3 minutes</td><td>Fixture provider, local PostgreSQL, 4 workers</td></tr>
         <tr><td>Full 22M-row backfill</td><td>&lt; 3 hours</td><td>Provider budget dominates; no index bloat</td></tr>
@@ -3451,12 +3440,12 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
       <thead><tr><th>Workstream</th><th>Tasks</th><th>Acceptance</th></tr></thead>
       <tbody>
         <tr><td><b>1 · Contracts and schema</b></td><td>Freeze the data contract, add migration <code>0008</code>, update Drizzle schema and <code>verify.ts</code>, add contract fixtures.</td><td>Migration applies from empty and seeded R1; 60 tables; no edits to <code>0000</code>–<code>0007</code>.</td></tr>
-        <tr><td><b>2 · Reference data</b></td><td>Instrument master sync, tick-size repair, mapping resolution, reviewed <code>nifty-50</code> membership and rank order, reviewed 2022–2027 calendar, corporate-action CSV.</td><td>51 instruments resolved and ranked, tick sizes correct, calendar complete, zero duplicate index.</td></tr>
+        <tr><td><b>2 · Reference data</b></td><td>Instrument master sync, tick-size repair, mapping resolution, reviewed <code>is_sync_target</code> flags, reviewed 2022–2027 calendar, corporate-action CSV.</td><td>51 instruments flagged as sync targets, tick sizes correct, calendar complete, zero duplicate index.</td></tr>
         <tr><td><b>3 · Adapter and normalization</b></td><td>V3 historical/intraday client, holidays/timings, rate limiter, error classification, tuple parser, session math, validation rules.</td><td>Contract fixtures pass; no order method exists; limiter respects all three windows.</td></tr>
         <tr><td><b>4 · Backfill engine</b></td><td>Plan/job model, month chunking, raw archive, batch upsert, revision recording, resume, cancellation, stale recovery, per-instrument dedupe and priority.</td><td>Kill/resume and duplicate-replay tests pass; one active run per instrument; no duplicate rows.</td></tr>
         <tr><td><b>5 · Quality and coverage</b></td><td>Strict coverage, gap runs, daily oracle, validation table, status rollup, 25-rule catalog, issue dedupe/lifecycle, preflight contract.</td><td>Every exception has a rule, severity and evidence; status never shows <code>succeeded</code> as complete.</td></tr>
         <tr><td><b>6 · API</b></td><td>Catalog read and fetch commands, per-instrument retry/cancel, status recompute, plan/preview/progress, heatmap, day detail, validation, run detail, issue detail, reference commands.</td><td>Every write audited; DTO validation covered; no order route.</td></tr>
-        <tr><td><b>7 · Dashboard</b></td><td>Index-ranked catalog, selection and preview, status transitions, instrument detail, data health console, progress, coverage heatmap, issue/run detail.</td><td>Playwright flow passes at 1280 px and 390 px; catalog renders 51 rows in rank order; no order controls.</td></tr>
+        <tr><td><b>7 · Dashboard</b></td><td>Sync-target catalog, selection and preview, status transitions, instrument detail, data health console, progress, coverage heatmap, issue/run detail.</td><td>Playwright flow passes at 1280 px and 390 px; catalog renders 51 rows alphabetically; no order controls.</td></tr>
         <tr><td><b>8 · Operations and tests</b></td><td>Schedules, token runbook, monitoring, retention, fault injection, performance, full gates and handover docs.</td><td>Full backfill report signed off; gates pass; runbook is executable.</td></tr>
       </tbody>
     </table>
@@ -3465,11 +3454,11 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
   <h3 style="margin:28px 0 10px">Phases</h3>
   <div class="timeline">
     <div class="step"><p class="meta">Phase 0 · Freeze</p><h3>Contracts, migration and fixtures</h3><p>Reproduce the tick-size 100× bug with a real master row. Freeze the candle, session, coverage and issue shapes. Write migration <code>0008</code>, update the schema and verify count, and check in the first contract fixtures.</p></div>
-    <div class="step"><p class="meta">Phase 1 · Reference</p><h3>Mode, instruments, membership, calendar and actions</h3><p>Allow <code>offline</code>/<code>research</code>; fix the startup and account guards. Sync the master, repair tick sizes, resolve mappings and the NIFTY index. Import the reviewed <code>nifty-50</code> membership with its rank order. Load the reviewed 2022–2027 calendar and the corporate-action CSV importer.</p></div>
+    <div class="step"><p class="meta">Phase 1 · Reference</p><h3>Mode, instruments, scope, calendar and actions</h3><p>Allow <code>offline</code>/<code>research</code>; fix the startup and account guards. Sync the master, repair tick sizes, resolve mappings and the NIFTY index. Set the reviewed <code>is_sync_target</code> flags. Load the reviewed 2022–2027 calendar and the corporate-action CSV importer.</p></div>
     <div class="step"><p class="meta">Phase 2 · Library</p><h3>Adapter, normalization and validation</h3><p>Add the V3 client, rate limiter, error classifier, tuple parser, IST/UTC conversion, session windows, row validator and gap math. Prove each with unit and contract fixtures before any database write.</p></div>
     <div class="step"><p class="meta">Phase 3 · Engine</p><h3>Chunked backfill, dedupe and status projection</h3><p>Build the parent/child job model, monthly chunks, raw archive, batch upsert, revision recording, cancellation and stale-run recovery. Add the one-active-run index, job priority and the status rollup recompute. Run the kill/resume and duplicate-replay drills.</p></div>
     <div class="step"><p class="meta">Phase 4 · Quality</p><h3>Coverage, oracle and issues</h3><p>Implement strict coverage, gap runs, daily OHLCV validation, the validation table, the rule catalog, dedupe, lifecycle and the R4 preflight contract. Run the targeted and full scans.</p></div>
-    <div class="step"><p class="meta">Phase 5 · Surface</p><h3>Catalog, API and dashboard</h3><p>Add the index-ranked catalog, per-instrument fetch/cancel and status recompute, then planning, preview, progress, heatmap, day detail, run detail, issue detail, reference commands and provider status. Wire the catalog and data console with the existing components.</p></div>
+    <div class="step"><p class="meta">Phase 5 · Surface</p><h3>Catalog, API and dashboard</h3><p>Add the sync-target catalog, per-instrument fetch/cancel and status recompute, then planning, preview, progress, heatmap, day detail, run detail, issue detail, reference commands and provider status. Wire the catalog and data console with the existing components.</p></div>
     <div class="step"><p class="meta">Phase 6 · Prove</p><h3>Pilot, full backfill and fault drills</h3><p>Contract probe on RELIANCE, oracle probe on one year, five-instrument pilot, then all 51 instruments. Inject 429, timeout, token expiry and a worker kill. Run the full quality scan.</p></div>
     <div class="step"><p class="meta">Phase 7 · Handover</p><h3>Acceptance report and runbook</h3><p>Publish the backfill report, update the data-quality rule reference, the runbook, <code>AGENTS.md</code> and <code>README.md</code>. Record every open check and every waiver.</p></div>
   </div>
@@ -3614,7 +3603,7 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
       <div class="ico">18</div>
       <h3>Index order drift</h3>
       <p><b>Risk:</b> the catalog order slowly diverges from the reviewed index because someone edits rows or trusts a provider list.</p>
-      <p><b>Guardrail:</b> membership only through a versioned reviewed import; rank unique per version; the catalog reads the active version and never sorts by insertion order.</p>
+      <p><b>Guardrail:</b> the sync-target flag is the only scope input; the catalog sorts by trading symbol and never by insertion order.</p>
     </div>
   </div>
 
@@ -3649,8 +3638,8 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
       <ul class="list-check">
         <li>A fresh setup starts with <code>TRADING_MODE=research</code> and refuses <code>paper</code>/<code>live</code>.</li>
         <li>51 instruments resolve to canonical IDs; tick sizes are correct; the NIFTY index is not duplicated.</li>
-        <li>The <code>nifty-50</code> universe version holds 51 ranked members from a reviewed source; rank 1 is the index; no weight is stored or displayed.</li>
-        <li>The catalog lists 51 rows in rank order with a persisted fetch status and data status.</li>
+        <li>51 instruments are flagged <code>is_sync_target</code> from a reviewed source; no rank or weight is stored or displayed.</li>
+        <li>The catalog lists 51 rows alphabetically with a persisted fetch status and data status.</li>
         <li>A per-instrument or multi-select fetch creates exactly one plan; a second request while active returns the existing run.</li>
         <li>Status survives a worker restart; <code>succeeded</code> is never displayed as complete; a delayed recompute shows as Verifying.</li>
         <li>A <code>missing_only</code> refresh skips months whose coverage is complete.</li>
@@ -3684,8 +3673,8 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
     <table class="data-table">
       <thead><tr><th>Gate</th><th>Threshold</th><th>How it is measured</th></tr></thead>
       <tbody>
-        <tr><td>Instrument resolution</td><td>51 / 51</td><td>Catalog row count and <code>instruments</code> count for the <code>nifty-50</code> version.</td></tr>
-        <tr><td>Catalog order</td><td>51 / 51 match rank</td><td>API response compared with <code>instrument_universe_members.rank</code>; rank 1 is the index.</td></tr>
+        <tr><td>Instrument resolution</td><td>51 / 51</td><td>Sync-target count and <code>instruments</code> count.</td></tr>
+        <tr><td>Catalog order</td><td>51 / 51 alphabetical</td><td>API response compared with <code>instruments.trading_symbol</code>.</td></tr>
         <tr><td>Status coverage</td><td>100% of catalog rows</td><td>Every member has an <code>instrument_data_status</code> row; absent rows render as Not fetched.</td></tr>
         <tr><td>Duplicate fetch</td><td>1 active backfill per instrument</td><td>Two concurrent requests for the same ID return one run; the partial unique index holds.</td></tr>
         <tr><td>Refresh efficiency</td><td>0 requests for complete months</td><td>Re-run a complete instrument in <code>missing_only</code>; request counts show only incomplete months plus T+1.</td></tr>
@@ -3810,8 +3799,8 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
         <tr><td>Dedupe key</td><td>A stable SHA-256 that makes repeated quality findings collapse into one issue.</td></tr>
         <tr><td>Fetch status</td><td>The lifecycle of the request: not requested, queued, fetching, fetched, partial, failed, cancelled or stale.</td></tr>
         <tr><td>Data status</td><td>The usability verdict from coverage and issues: complete, partial reconciled, partial mismatch, missing, pending, not applicable or needs review.</td></tr>
-        <tr><td>Instrument catalog</td><td>The index-ranked list of universe members with their persisted fetch and data status.</td></tr>
-        <tr><td>Rank</td><td>The reviewed display position of a universe member. Rank 1 is the index. It is not a weight.</td></tr>
+        <tr><td>Instrument catalog</td><td>The sync-target list with their persisted fetch and data status.</td></tr>
+        <tr><td>Rank</td><td>Removed with the universe tables; the catalog sorts by trading symbol.</td></tr>
         <tr><td>Gap run</td><td>A consecutive sequence of missing minutes; its length drives severity.</td></tr>
         <tr><td>Raw payload</td><td>The original provider response, archived before parsing for replay and audit.</td></tr>
         <tr><td>Research mode</td><td>The R2 mode that allows data ingestion and analysis but no order placement.</td></tr>
@@ -3842,9 +3831,9 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
         <tr><td>13</td><td>Confirm <code>UPSTOX_BASE_URL</code> can point at the local fixture server for contract and e2e tests.</td><td>Phase 2 adapter</td></tr>
         <tr><td>14</td><td>Confirm the exact rate-limit scope (per API, per user) with the account’s app configuration.</td><td>Phase 3 limiter</td></tr>
         <tr><td>15</td><td>Confirm the NIFTY 50 index tick band and whether index rows should carry a reviewed tick or remain null.</td><td>Phase 1 reference</td></tr>
-        <tr><td>16</td><td>Confirm the reviewed NIFTY 50 membership source, rank order and update cadence; decide who signs off a new universe version.</td><td>Phase 1 membership import</td></tr>
+        <tr><td>16</td><td>Confirm the reviewed sync-target list and its update cadence; decide who signs off a flag change.</td><td>Phase 1 reference import</td></tr>
         <tr><td>17</td><td>Confirm the status freshness target after a chunk closes, and whether an operator may force a recompute after a reviewed repair.</td><td>Phase 3 status projection</td></tr>
-        <tr><td>18</td><td>Confirm that rank 1 is reserved for the index and ranks 2–51 are constituents; confirm no weight is required for R2 or R3.</td><td>Phase 1 catalog review</td></tr>
+        <tr><td>18</td><td>Confirm the NIFTY 50 index stays a sync target so market confirmation has data.</td><td>Phase 1 catalog review</td></tr>
       </tbody>
     </table>
   </div>
@@ -3889,7 +3878,7 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
 
 <footer class="footer">
   <p><b>R2 Implementation Plan</b> · AI Trading System · Release 2, research mode.</p>
-  <p>51 instruments · index-ranked catalog · ~22M 1-minute bars · strict coverage · daily OHLCV oracle · 0 orders.</p>
+  <p>51 instruments · sync-target catalog · ~22M 1-minute bars · strict coverage · daily OHLCV oracle · 0 orders.</p>
   <p>Companion documents: <code>context/r1-implementation-plan.html</code>, <code>context/backtesting.md</code>, <code>context/deployment-order.md</code>.</p>
 </footer>
 </div>

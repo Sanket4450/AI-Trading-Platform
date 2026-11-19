@@ -78,9 +78,9 @@ export default async function OverviewPage() {
           tone={Number(counts.criticalIssues ?? 0) > 0 ? 'danger' : 'warning'}
         />
         <StatCard
-          label="Universes"
-          value={formatNumber(counts.universes)}
-          hint="Weekly snapshots"
+          label="Sync targets"
+          value={formatNumber(counts.syncTargets)}
+          hint="Flagged for ingestion"
           tone="success"
         />
         <StatCard

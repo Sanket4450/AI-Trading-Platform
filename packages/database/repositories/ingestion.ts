@@ -7,9 +7,6 @@ import {
   exchanges,
   instrumentDataStatus,
   instrumentProviderMappings,
-  instrumentUniverseMembers,
-  instrumentUniverseVersions,
-  instrumentUniverses,
   instruments,
   jobRuns,
   marketCandles1m,
@@ -682,7 +679,7 @@ export async function getProviderStatus() {
   return { ...runs, ...payloads };
 }
 
-export async function getCatalogSummary(universeCode = 'nifty-50') {
+export async function getCatalogSummary() {
   const [row] = await db
     .select({
       total: sql<number>`count(*)::int`,
@@ -698,35 +695,21 @@ export async function getCatalogSummary(universeCode = 'nifty-50') {
       missing: sql<number>`count(*) filter (where ${instrumentDataStatus.dataStatus} = 'missing')::int`,
       needsReview: sql<number>`count(*) filter (where ${instrumentDataStatus.dataStatus} = 'needs_review')::int`,
     })
-    .from(instrumentUniverseMembers)
-    .innerJoin(
-      instrumentUniverseVersions,
-      eq(instrumentUniverseVersions.id, instrumentUniverseMembers.universeVersionId),
-    )
-    .innerJoin(
-      instrumentUniverses,
-      eq(instrumentUniverses.id, instrumentUniverseVersions.universeId),
-    )
+    .from(instruments)
     .leftJoin(
       instrumentDataStatus,
-      eq(instrumentDataStatus.instrumentId, instrumentUniverseMembers.instrumentId),
+      eq(instrumentDataStatus.instrumentId, instruments.id),
     )
-    .where(
-      and(
-        eq(instrumentUniverses.code, universeCode),
-        sql`${instrumentUniverseVersions.effectiveTo} is null`,
-      ),
-    );
+    .where(eq(instruments.isSyncTarget, true));
   return row ?? null;
 }
 
-export async function getUniverseMembersForBackfill(universeCode = 'nifty-50') {
+export async function getSyncTargetInstruments() {
   return db
     .select({
       instrumentId: instruments.id,
       symbol: instruments.tradingSymbol,
       name: instruments.name,
-      rank: instrumentUniverseMembers.rank,
       tickSize: instruments.tickSize,
       listedOn: instruments.listedOn,
       delistedOn: instruments.delistedOn,
@@ -737,27 +720,13 @@ export async function getUniverseMembersForBackfill(universeCode = 'nifty-50') {
         order by m.valid_from desc limit 1
       )`,
     })
-    .from(instrumentUniverseMembers)
-    .innerJoin(
-      instrumentUniverseVersions,
-      eq(instrumentUniverseVersions.id, instrumentUniverseMembers.universeVersionId),
-    )
-    .innerJoin(
-      instrumentUniverses,
-      eq(instrumentUniverses.id, instrumentUniverseVersions.universeId),
-    )
-    .innerJoin(instruments, eq(instruments.id, instrumentUniverseMembers.instrumentId))
-    .where(
-      and(
-        eq(instrumentUniverses.code, universeCode),
-        sql`${instrumentUniverseVersions.effectiveTo} is null`,
-      ),
-    )
-    .orderBy(asc(instrumentUniverseMembers.rank));
+    .from(instruments)
+    .where(eq(instruments.isSyncTarget, true))
+    .orderBy(asc(instruments.tradingSymbol));
 }
 
-export async function getInstrumentIdsForUniverse(universeCode = 'nifty-50') {
-  const rows = await getUniverseMembersForBackfill(universeCode);
+export async function getSyncTargetInstrumentIds() {
+  const rows = await getSyncTargetInstruments();
   return rows.map((row) => row.instrumentId);
 }
 
@@ -903,15 +872,6 @@ export async function listPlanChunks(parentJobRunId: string) {
       id: marketDataIngestionRuns.id,
       instrumentId: marketDataIngestionRuns.instrumentId,
       symbol: instruments.tradingSymbol,
-      rank: sql<number | null>`(
-        select m.rank from instrument_universe_members m
-        join instrument_universe_versions v on v.id = m.universe_version_id
-        join instrument_universes u on u.id = v.universe_id
-        where m.instrument_id = "market_data_ingestion_runs"."instrument_id"
-          and u.code = 'nifty-50'
-          and v.effective_to is null
-        limit 1
-      )`,
       chunkIndex: marketDataIngestionRuns.chunkIndex,
       chunkCount: marketDataIngestionRuns.chunkCount,
       requestedFrom: marketDataIngestionRuns.requestedFrom,

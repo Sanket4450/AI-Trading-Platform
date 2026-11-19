@@ -43,7 +43,6 @@ export default async function StrategiesPage({
     (total, strategy) => total + strategy.activeActivations,
     0,
   );
-  const universeTotal = strategies.reduce((total, strategy) => total + strategy.universeCount, 0);
   const hasFilters = Boolean(params.search);
 
   return (
@@ -69,12 +68,6 @@ export default async function StrategiesPage({
                 value: formatNumber(activationTotal),
                 hint: 'None while research-only',
                 tone: 'warning',
-              },
-              {
-                label: 'Universes',
-                value: formatNumber(universeTotal),
-                hint: 'Bound membership sets',
-                tone: 'highlight',
               },
             ]}
           />
@@ -103,7 +96,6 @@ export default async function StrategiesPage({
                 <TableHead>Status</TableHead>
                 <TableHead>Latest version</TableHead>
                 <TableHead>Versions</TableHead>
-                <TableHead>Universes</TableHead>
                 <TableHead>Activations</TableHead>
                 <TableHead />
               </TableRow>
@@ -131,7 +123,6 @@ export default async function StrategiesPage({
                     )}
                   </TableCell>
                   <TableCell>{strategy.versionCount}</TableCell>
-                  <TableCell>{strategy.universeCount}</TableCell>
                   <TableCell>{strategy.activeActivations}</TableCell>
                   <TableActions>
                     <TableActionLink

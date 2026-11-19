@@ -108,7 +108,7 @@ export class OverviewDto {
     example: {
       accounts: 1,
       instruments: 50,
-      universes: 1,
+      syncTargets: 51,
       strategies: 1,
       openIssues: 0,
       criticalIssues: 0,
