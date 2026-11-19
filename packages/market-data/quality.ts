@@ -91,44 +91,12 @@ export const QUALITY_RULES: readonly QualityRule[] = [
     blocksPreflightWhenCritical: false,
   },
   {
-    ruleId: 'DQ-012',
-    issueType: 'volume_mismatch',
-    dimension: 'consistency',
-    defaultSeverity: 'critical',
-    description: 'Minute volume differs from the daily volume beyond tolerance.',
-    blocksPreflightWhenCritical: true,
-  },
-  {
-    ruleId: 'DQ-013',
-    issueType: 'volume_reconciled',
-    dimension: 'consistency',
-    defaultSeverity: 'info',
-    description: 'Missing minutes had no trades; the daily volume proves it.',
-    blocksPreflightWhenCritical: false,
-  },
-  {
-    ruleId: 'DQ-014',
-    issueType: 'outlier',
-    dimension: 'consistency',
-    defaultSeverity: 'warning',
-    description: 'The minute aggregate differs from the daily candle by more than one tick.',
-    blocksPreflightWhenCritical: false,
-  },
-  {
     ruleId: 'DQ-015',
     issueType: 'provider_revision',
     dimension: 'consistency',
     defaultSeverity: 'warning',
     description: 'A refetch returned a different final value for an existing final bar.',
     blocksPreflightWhenCritical: false,
-  },
-  {
-    ruleId: 'DQ-016',
-    issueType: 'coverage_shortfall',
-    dimension: 'consistency',
-    defaultSeverity: 'critical',
-    description: 'The daily oracle or the minute side is missing for a scheduled day.',
-    blocksPreflightWhenCritical: true,
   },
   {
     ruleId: 'DQ-017',
@@ -253,10 +221,8 @@ export function gapSeverity(input: {
   tradingDate: string;
   gapStart: Date;
   gapMinutes: number;
-  volumeReconciled: boolean;
   maxAcceptedGapMinutes: number;
 }): 'warning' | 'critical' {
-  if (input.volumeReconciled) return 'warning';
   const istMinutes = input.gapStart.getUTCHours() * 60 + input.gapStart.getUTCMinutes() + 330;
   const minuteOfDay = ((istMinutes % (24 * 60)) + 24 * 60) % (24 * 60);
   const inProtectedWindow =

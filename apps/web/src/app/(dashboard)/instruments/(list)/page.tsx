@@ -29,7 +29,6 @@ type SearchParams = Promise<{
 
 const dataStatuses = [
   'complete',
-  'partial_reconciled',
   'partial_mismatch',
   'missing',
   'pending',
@@ -74,15 +73,13 @@ export default async function InstrumentsPage({ searchParams }: { searchParams: 
               {
                 label: 'Complete',
                 value: formatNumber(summary?.complete ?? 0),
-                hint: 'Coverage + oracle',
+                hint: 'Coverage complete',
                 tone: 'success',
               },
               {
                 label: 'Gaps',
-                value: formatNumber(
-                  (summary?.partialReconciled ?? 0) + (summary?.partialMismatch ?? 0),
-                ),
-                hint: 'Reconciled or mismatch',
+                value: formatNumber(summary?.partialMismatch ?? 0),
+                hint: 'Partial coverage',
                 tone: 'warning',
               },
               {

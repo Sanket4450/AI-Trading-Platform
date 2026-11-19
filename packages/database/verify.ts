@@ -85,7 +85,7 @@ try {
       (SELECT count(*)::int
          FROM information_schema.tables
         WHERE table_schema = 'public'
-          AND table_name IN ('instrument_data_status', 'market_data_daily_validation')) AS tables,
+          AND table_name = 'instrument_data_status') AS tables,
       (SELECT count(*)::int
          FROM pg_indexes
         WHERE schemaname = 'public'
@@ -123,7 +123,7 @@ try {
   `;
 
   const checks = [
-    { name: '57 logical tables', ok: schema.logical_tables === 57, value: schema.logical_tables },
+    { name: '56 logical tables', ok: schema.logical_tables === 56, value: schema.logical_tables },
     { name: 'materialized view present', ok: schema.matviews >= 1, value: schema.matviews },
     {
       name: 'candle partitions >= 63',
@@ -160,7 +160,7 @@ try {
     { name: 'calendar covers 2022–2027', ok: calendar.days === 2191, value: calendar.days },
     {
       name: 'R2 tables and indexes exist',
-      ok: r2Objects.tables === 2 && r2Objects.indexes === 4,
+      ok: r2Objects.tables === 1 && r2Objects.indexes === 4,
       value: `${r2Objects.tables} tables / ${r2Objects.indexes} indexes`,
     },
   ];

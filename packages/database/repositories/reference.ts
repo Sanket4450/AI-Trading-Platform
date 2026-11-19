@@ -684,8 +684,6 @@ export async function getInstrumentStatusDetail(instrumentId: string) {
       partial: sql<number>`count(*) filter (where ${marketDataCoverage.status} = 'partial')::int`,
       missing: sql<number>`count(*) filter (where ${marketDataCoverage.status} = 'missing')::int`,
       notApplicable: sql<number>`count(*) filter (where ${marketDataCoverage.status} = 'not_applicable')::int`,
-      reconciled: sql<number>`count(*) filter (where ${marketDataCoverage.validationStatus} = 'volume_reconciled')::int`,
-      mismatch: sql<number>`count(*) filter (where ${marketDataCoverage.validationStatus} in ('volume_mismatch','ohlc_mismatch'))::int`,
     })
     .from(marketDataCoverage)
     .where(
@@ -813,8 +811,6 @@ export async function getInstrumentStatusCounters(
       partialDays: sql<number>`count(*) filter (where ${marketDataCoverage.status} = 'partial')::int`,
       missingDays: sql<number>`count(*) filter (where ${marketDataCoverage.status} = 'missing')::int`,
       notApplicableDays: sql<number>`count(*) filter (where ${marketDataCoverage.status} = 'not_applicable')::int`,
-      reconciledDays: sql<number>`count(*) filter (where ${marketDataCoverage.validationStatus} = 'volume_reconciled')::int`,
-      mismatchDays: sql<number>`count(*) filter (where ${marketDataCoverage.validationStatus} in ('volume_mismatch','ohlc_mismatch','daily_missing','minute_missing'))::int`,
     })
     .from(marketDataCoverage)
     .where(
@@ -830,8 +826,6 @@ export async function getInstrumentStatusCounters(
     partialDays: 0,
     missingDays: 0,
     notApplicableDays: 0,
-    reconciledDays: 0,
-    mismatchDays: 0,
   };
   const [issues] = await db
     .select({ count: sql<number>`count(*)::int` })

@@ -205,7 +205,6 @@ export class IngestionService {
     let skippedChunks = 0;
     let failedChunks = 0;
     let cancelled = false;
-    let lastRunId: string | null = null;
 
     this.tracking.completeStage(childJobRunId, 'prepare');
     this.tracking.enterStage(childJobRunId, 'chunks');
@@ -271,7 +270,6 @@ export class IngestionService {
         startedAt: new Date(),
         attempt: (run.attempt ?? 0) + 1,
       });
-      lastRunId = run.id;
 
       try {
         const result = await this.runChunk({
@@ -366,15 +364,6 @@ export class IngestionService {
     this.tracking.enterStage(childJobRunId, 'close');
 
     await this.quality.recomputeCoverage(instrumentId, from, to);
-    if (lastRunId) {
-      await this.quality.validateDaily(
-        instrumentId,
-        mapping.externalKey,
-        from,
-        to,
-        lastRunId,
-      );
-    }
     await this.quality.recomputeInstrumentStatus(instrumentId);
 
     const status = cancelled
@@ -852,13 +841,6 @@ export class IngestionService {
             durationMs: result.durationMs,
             finishedAt: new Date(),
           });
-          await this.quality.validateDaily(
-            target.instrumentId,
-            mapping.externalKey,
-            date,
-            date,
-            run.id,
-          );
           await this.quality.recomputeCoverage(target.instrumentId, date, date);
           await this.quality.recomputeInstrumentStatus(target.instrumentId);
           instruments += 1;
@@ -954,56 +936,6 @@ export class IngestionService {
       status: 'succeeded',
       finishedAt: new Date(),
       result: { ...result, stale },
-    });
-    return result;
-  }
-
-  async dailyValidationJob(jobRunId: string, payload: Record<string, unknown>) {
-    await updateJobRun(jobRunId, {
-      status: 'running',
-      startedAt: new Date(),
-      attempt: 1,
-    });
-    const latest =
-      (await getLatestCompletedSession()) ??
-      new Date().toISOString().slice(0, 10);
-    const days = Number(payload.days ?? 1);
-    const from = new Date(`${latest}T00:00:00Z`);
-    from.setUTCDate(from.getUTCDate() - days);
-    const provider = await findProviderByCode('upstox');
-    if (!provider) throw new Error('Upstox provider is not seeded');
-    const targets = await getSyncTargetInstruments();
-    let validated = 0;
-    for (const target of targets) {
-      const mapping = await findProviderMapping(
-        target.instrumentId,
-        provider.id,
-      );
-      if (!mapping) continue;
-      const result = await this.quality.validateDaily(
-        target.instrumentId,
-        mapping.externalKey,
-        from.toISOString().slice(0, 10),
-        latest,
-        null,
-      );
-      if (!('skipped' in result) || !result.skipped) validated += 1;
-      await this.quality.recomputeCoverage(
-        target.instrumentId,
-        from.toISOString().slice(0, 10),
-        latest,
-      );
-      await this.quality.recomputeInstrumentStatus(target.instrumentId);
-    }
-    const result = {
-      validated,
-      from: from.toISOString().slice(0, 10),
-      to: latest,
-    };
-    await updateJobRun(jobRunId, {
-      status: 'succeeded',
-      finishedAt: new Date(),
-      result,
     });
     return result;
   }

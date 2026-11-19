@@ -115,11 +115,6 @@ export const marketDataCoverage = pgTable(
     status: varchar('status', { length: 20 }).notNull(),
     gapRunCount: integer('gap_run_count').default(0).notNull(),
     maxGapMinutes: integer('max_gap_minutes').default(0).notNull(),
-    dailyVolume: numeric('daily_volume', { precision: 20, scale: 4 }),
-    minuteVolume: numeric('minute_volume', { precision: 20, scale: 4 }),
-    volumeDeltaPct: numeric('volume_delta_pct', { precision: 10, scale: 6 }),
-    ohlcMatch: boolean('ohlc_match'),
-    validationStatus: varchar('validation_status', { length: 30 }).default('not_checked').notNull(),
     details: jsonb('details')
       .default(sql`'{}'::jsonb`)
       .notNull(),
@@ -133,7 +128,6 @@ export const marketDataCoverage = pgTable(
       table.tradingDate,
     ),
     index('idx_market_data_coverage_trading_date').on(table.tradingDate),
-    index('idx_coverage_date_validation').on(table.tradingDate, table.validationStatus),
     check('chk_market_data_coverage_expected_bars_1', sql`${table.expectedBars} >= 0`),
     check('chk_market_data_coverage_stored_bars_2', sql`${table.storedBars} >= 0`),
     check('chk_market_data_coverage_gap_count_3', sql`${table.gapCount} >= 0`),
@@ -142,10 +136,6 @@ export const marketDataCoverage = pgTable(
       sql`${table.status} in ('complete', 'partial', 'missing', 'not_applicable')`,
     ),
     check('chk_coverage_gap_runs', sql`${table.gapRunCount} >= 0 and ${table.maxGapMinutes} >= 0`),
-    check(
-      'chk_coverage_validation_status',
-      sql`${table.validationStatus} in ('not_checked','pending','matched','volume_reconciled','volume_mismatch','ohlc_mismatch','daily_missing','minute_missing','error')`,
-    ),
   ],
 );
 
@@ -183,49 +173,7 @@ export const instrumentDataStatus = pgTable(
     ),
     check(
       'chk_instrument_status_data',
-      sql`${table.dataStatus} in ('complete','partial_reconciled','partial_mismatch','missing','pending','not_applicable','needs_review')`,
-    ),
-  ],
-);
-
-export const marketDataDailyValidation = pgTable(
-  'market_data_daily_validation',
-  {
-    id: uuid('id').primaryKey().defaultRandom(),
-    instrumentId: uuid('instrument_id').notNull(),
-    tradingDate: date('trading_date').notNull(),
-    sourceProviderId: uuid('source_provider_id').notNull(),
-    dailyOpen: numeric('daily_open', { precision: 20, scale: 4 }),
-    dailyHigh: numeric('daily_high', { precision: 20, scale: 4 }),
-    dailyLow: numeric('daily_low', { precision: 20, scale: 4 }),
-    dailyClose: numeric('daily_close', { precision: 20, scale: 4 }),
-    dailyVolume: numeric('daily_volume', { precision: 20, scale: 4 }),
-    minuteOpen: numeric('minute_open', { precision: 20, scale: 4 }),
-    minuteHigh: numeric('minute_high', { precision: 20, scale: 4 }),
-    minuteLow: numeric('minute_low', { precision: 20, scale: 4 }),
-    minuteClose: numeric('minute_close', { precision: 20, scale: 4 }),
-    minuteVolume: numeric('minute_volume', { precision: 20, scale: 4 }),
-    volumeDeltaPct: numeric('volume_delta_pct', { precision: 10, scale: 6 }),
-    ohlcMatch: boolean('ohlc_match'),
-    volumeMatch: boolean('volume_match'),
-    status: varchar('status', { length: 30 }).notNull(),
-    ingestionRunId: uuid('ingestion_run_id'),
-    rawPayloadId: uuid('raw_payload_id'),
-    checkedAt: timestamp('checked_at', { withTimezone: true }).defaultNow().notNull(),
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
-  },
-  (table) => [
-    uniqueIndex('uq_daily_validation_instrument_date_provider').on(
-      table.instrumentId,
-      table.tradingDate,
-      table.sourceProviderId,
-    ),
-    index('idx_daily_validation_date_status').on(table.tradingDate, table.status),
-    index('idx_daily_validation_instrument_date').on(table.instrumentId, table.tradingDate),
-    check(
-      'chk_daily_validation_status',
-      sql`${table.status} in ('matched','volume_reconciled','volume_mismatch','ohlc_mismatch','daily_missing','minute_missing','error')`,
+      sql`${table.dataStatus} in ('complete','partial_mismatch','missing','pending','not_applicable','needs_review')`,
     ),
   ],
 );

@@ -26,7 +26,7 @@ export interface CoverageActionCopy {
   description: string;
 }
 
-const gapStatuses = new Set(['missing', 'partial_reconciled', 'partial_mismatch', 'needs_review']);
+const gapStatuses = new Set(['missing', 'partial_mismatch', 'needs_review']);
 
 function windowLabel(signal: CoverageSignal): string {
   if (signal.targetFrom && signal.targetTo) return `${signal.targetFrom} → ${signal.targetTo}`;
@@ -101,6 +101,6 @@ export function coverageRecomputeCopy(symbol: string): CoverageActionCopy {
     tooltip: 'Recompute coverage and data status without downloading candles',
     title: `Recompute coverage for ${symbol}?`,
     description:
-      'The action queues a status recompute that counts complete, partial and missing days and re-runs the validation rules. No candles are downloaded or modified.',
+      'The action queues a status recompute that counts complete, partial and missing days and re-runs the quality rules. No candles are downloaded or modified.',
   };
 }

@@ -35,7 +35,7 @@ export class QualityIssueDto {
   @ApiProperty({ enum: ['open', 'acknowledged', 'resolved', 'ignored'] })
   status!: string;
 
-  @ApiProperty({ example: 'daily_oracle' })
+  @ApiProperty({ example: 'validation' })
   detectedBy!: string;
 
   @ApiProperty({ type: String, format: 'date-time' })

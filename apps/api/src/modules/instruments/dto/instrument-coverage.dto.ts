@@ -28,9 +28,6 @@ export class InstrumentCoverageSummaryDto {
   complete!: number;
 
   @ApiProperty()
-  partialReconciled!: number;
-
-  @ApiProperty()
   partialMismatch!: number;
 
   @ApiProperty()
@@ -132,12 +129,6 @@ export class InstrumentCoverageMonthDto {
 
   @ApiProperty()
   notApplicable!: number;
-
-  @ApiProperty()
-  reconciled!: number;
-
-  @ApiProperty()
-  mismatch!: number;
 }
 
 export class IngestionRunDto {
@@ -388,14 +379,6 @@ export class CoverageDayDetailDto {
     description: 'Raw coverage row for the instrument/date pair.',
   })
   coverage!: Record<string, unknown> | null;
-
-  @ApiProperty({
-    type: Object,
-    additionalProperties: true,
-    nullable: true,
-    description: 'Latest daily validation row for the instrument/date pair.',
-  })
-  validation!: Record<string, unknown> | null;
 
   @ApiProperty({ type: [QualityIssueDto] })
   issues!: QualityIssueDto[];

@@ -94,7 +94,6 @@ export default async function SettingsPage({
             { label: 'Network', value: provider.networkEnabled ? 'Enabled' : 'Disabled' },
             { label: 'API key', value: provider.apiKeyConfigured ? 'Set' : 'Missing' },
             { label: 'Token', value: provider.tokenConfigured ? 'Configured' : 'Missing' },
-            { label: 'Daily oracle', value: provider.dailyOracleEnabled ? 'Enabled' : 'Disabled' },
             {
               label: 'Budget',
               value: provider.budget
@@ -129,12 +128,6 @@ export default async function SettingsPage({
               label: 'Last intraday finalize',
               value: provider.lastSuccessfulIntradayAt
                 ? formatDateTime(provider.lastSuccessfulIntradayAt)
-                : 'Never',
-            },
-            {
-              label: 'Last validation',
-              value: provider.lastSuccessfulValidationAt
-                ? formatDateTime(provider.lastSuccessfulValidationAt)
                 : 'Never',
             },
             {

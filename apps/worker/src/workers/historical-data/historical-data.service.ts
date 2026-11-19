@@ -44,11 +44,6 @@ export class HistoricalDataService {
         );
       case 'quality-scan':
         return this.ingestion.qualityScanJob(String(payload.jobRunId), payload);
-      case 'daily-validation':
-        return this.ingestion.dailyValidationJob(
-          String(payload.jobRunId),
-          payload,
-        );
       case 'ingestion-reconcile':
         return this.ingestion.ingestionReconcile(String(payload.jobRunId));
       default:

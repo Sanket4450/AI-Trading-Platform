@@ -693,12 +693,7 @@ export async function seedDatabase(options: SeedOptions) {
       {
         key: 'data.quality.max_gap_minutes',
         value: 5,
-        description: 'Bounded gap accepted when the daily volume reconciles.',
-      },
-      {
-        key: 'data.quality.volume_tolerance_pct',
-        value: 0.005,
-        description: 'Daily-versus-minute volume tolerance (0.5%).',
+        description: 'Longest gap accepted before the gap run becomes critical.',
       },
       {
         key: 'data.quality.stale_hours',
@@ -709,11 +704,6 @@ export async function seedDatabase(options: SeedOptions) {
         key: 'data.status.stale_sessions',
         value: 1,
         description: 'Completed sessions without coverage before an instrument is stale.',
-      },
-      {
-        key: 'data.validation.daily_oracle',
-        value: true,
-        description: 'Daily OHLCV witness is enabled.',
       },
       { key: 'security.session_ttl_hours', value: 12, description: 'Opaque session lifetime.' },
       {

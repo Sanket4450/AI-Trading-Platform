@@ -30,9 +30,6 @@ export class ProviderStatusDto {
   @ApiProperty()
   baseUrl!: string;
 
-  @ApiProperty()
-  dailyOracleEnabled!: boolean;
-
   @ApiProperty({ type: ProviderBudgetDto, nullable: true })
   budget!: ProviderBudgetDto | null;
 
@@ -44,9 +41,6 @@ export class ProviderStatusDto {
 
   @ApiProperty({ type: String, format: 'date-time', nullable: true })
   lastSuccessfulIntradayAt!: string | null;
-
-  @ApiProperty({ type: String, format: 'date-time', nullable: true })
-  lastSuccessfulValidationAt!: string | null;
 
   @ApiProperty()
   failedRuns24h!: number;

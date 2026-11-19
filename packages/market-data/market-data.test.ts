@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  compareDailyToMinute,
   computeCoverageVerdict,
   dedupeCandles,
   displayStatus,
@@ -124,42 +123,27 @@ describe('gaps', () => {
   });
 });
 
-describe('daily oracle', () => {
-  it('reconciles missing minutes when volume matches', () => {
-    const comparison = compareDailyToMinute({
-      daily: { open: '100', high: '102', low: '99', close: '101', volume: '1000' },
-      minute: { open: '100', high: '102', low: '99', close: '101', volume: '1000', bars: 372 },
-      tickSize: 0.05,
-      volumeTolerancePct: 0.005,
-    });
-    expect(comparison.status).toBe('matched');
-    expect(comparison.ohlcMatch).toBe(true);
-    expect(comparison.volumeMatch).toBe(true);
-  });
-
-  it('marks a volume shortfall as a mismatch', () => {
-    const comparison = compareDailyToMinute({
-      daily: { open: '100', high: '102', low: '99', close: '101', volume: '1000' },
-      minute: { open: '100', high: '102', low: '99', close: '101', volume: '900', bars: 372 },
-      tickSize: 0.05,
-      volumeTolerancePct: 0.005,
-    });
-    expect(comparison.status).toBe('volume_mismatch');
-  });
-
-  it('keeps strict status partial while validation reconciles it', () => {
+describe('coverage', () => {
+  it('marks a day partial when expected minutes are missing', () => {
     const verdict = computeCoverageVerdict({
       session,
       observed: [new Date('2026-09-01T03:45:00.000Z')],
-      daily: { open: '100', high: '102', low: '99', close: '101', volume: '1000' },
-      minute: { open: '100', high: '102', low: '99', close: '101', volume: '1000', bars: 1 },
-      tickSize: 0.05,
-      volumeTolerancePct: 0.005,
       hasCriticalIssue: false,
     });
     expect(verdict.status).toBe('partial');
-    expect(verdict.validationStatus).toBe('volume_reconciled');
     expect(verdict.expectedBars).toBe(375);
+    expect(verdict.missingBarCount).toBe(374);
+  });
+
+  it('marks a day complete only when every expected minute is present', () => {
+    const observed = Array.from({ length: 375 }, (_, index) => {
+      const value = new Date('2026-09-01T03:45:00.000Z');
+      value.setUTCMinutes(value.getUTCMinutes() + index);
+      return value;
+    });
+    const verdict = computeCoverageVerdict({ session, observed, hasCriticalIssue: false });
+    expect(verdict.status).toBe('complete');
+    expect(verdict.missingBarCount).toBe(0);
   });
 });
 

@@ -35,7 +35,7 @@ describe('coverageFetchCopy', () => {
     const copy = coverageFetchCopy({
       ...base,
       fetchStatus: 'fetched',
-      dataStatus: 'partial_reconciled',
+      dataStatus: 'partial_mismatch',
       lastSuccessAt: '2024-06-01T10:00:00Z',
       expectedDays: 200,
       completeDays: 150,

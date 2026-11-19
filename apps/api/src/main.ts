@@ -67,7 +67,7 @@ async function bootstrap() {
     .addTag('instruments', 'Instrument master, provider mappings and minute candles.')
     .addTag('strategies', 'Strategies, versions and effective configuration lookup.')
     .addTag('configuration', 'Versioned strategy, risk and system configuration.')
-    .addTag('data', 'Reference ingestion, backfills, coverage, validation and catalog.')
+    .addTag('data', 'Reference ingestion, backfills, coverage and catalog.')
     .addTag('jobs', 'Background job runs, stages, metrics and events.')
     .addTag('audit', 'Immutable operator audit trail.')
     .addTag('settings', 'Runtime system settings.')

@@ -1,37 +1,25 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
-  UpstoxClient,
-  parseCandleEnvelope,
-  type UpstoxCandleResponse,
-} from '@ai-trading/adapters';
-import { sha256Hex } from '@ai-trading/domain';
-import {
   buildSessionWindow,
   computeCoverageVerdict,
   eachDate,
-  deriveDataStatusWithValidation,
+  deriveDataStatus,
   deriveFetchStatus,
   gapSeverity,
   istToday,
-  istTradingDate,
-  parseCandleTimestamp,
   qualityFinding,
   qualityRule,
   type CalendarSessionRow,
-  type DailyCandleValues,
   type SessionWindow,
 } from '@ai-trading/market-data';
 import {
   autoResolveStaleIssues,
-  createRawProviderPayload,
   findActiveBackfillRun,
   findProviderByCode,
   getCandleUpdatedAt,
   getCoverageInputs,
   getDailyAggregatesFromMinutes,
-  getDailyValidationsForRange,
-  getDailyValidation,
   getExistingCandles,
   getInstrumentListing,
   getInstrumentStatusCounters,
@@ -41,13 +29,10 @@ import {
   getLastSuccessfulRunForInstrument,
   getLatestCompletedSession,
   getLatestRunForInstrument,
-  getMinuteAggregate,
   getPrimaryMappingCount,
-  getStoredCandleStarts,
-  getTradingSessionsForRange,
   getSyncTargetInstruments,
+  getTradingSessionsForRange,
   upsertCoverageBatch,
-  upsertDailyValidation,
   upsertInstrumentStatus,
   upsertQualityIssue,
 } from '@ai-trading/database';
@@ -57,18 +42,6 @@ export class QualityService {
   private readonly logger = new Logger(QualityService.name);
 
   constructor(private readonly config: ConfigService) {}
-
-  private client(): UpstoxClient {
-    return new UpstoxClient({
-      baseUrl: this.config.get<string>('UPSTOX_BASE_URL'),
-      apiKey: this.config.get<string>('UPSTOX_API_KEY'),
-      accessToken: this.config.get<string>('UPSTOX_ACCESS_TOKEN'),
-      timeoutMs: this.config.get<number>('UPSTOX_REQUEST_TIMEOUT_MS', 60_000),
-      networkEnabled:
-        this.config.get<boolean | string>('UPSTOX_NETWORK_ENABLED', true) ===
-          true || this.config.get<string>('UPSTOX_NETWORK_ENABLED') === 'true',
-    });
-  }
 
   private async issue(values: {
     ruleId: string;
@@ -122,22 +95,11 @@ export class QualityService {
     const provider = await findProviderByCode('upstox');
     if (!provider) throw new Error('Upstox provider is not seeded');
     const sessions = await this.sessions(from, to);
-    const tickSize = Number(await getInstrumentTickSize(instrumentId));
     const listing = await getInstrumentListing(instrumentId);
-    const volumeTolerance = this.config.get<number>(
-      'DATA_QUALITY_VOLUME_TOLERANCE_PCT',
-      0.02,
-    );
     const maxGap = this.config.get<number>('DATA_QUALITY_MAX_GAP_MINUTES', 5);
     const inputs = new Map(
       (await getCoverageInputs(instrumentId, from, to)).map((row) => [
         row.trading_date,
-        row,
-      ]),
-    );
-    const validations = new Map(
-      (await getDailyValidationsForRange(instrumentId, from, to)).map((row) => [
-        row.tradingDate,
         row,
       ]),
     );
@@ -162,7 +124,6 @@ export class QualityService {
           firstBarAt: null,
           lastBarAt: null,
           status: 'not_applicable',
-          validationStatus: 'not_checked',
           details: { reason: 'not a scheduled trading session' },
         });
         notApplicable += 1;
@@ -183,7 +144,6 @@ export class QualityService {
           firstBarAt: null,
           lastBarAt: null,
           status: 'not_applicable',
-          validationStatus: 'not_checked',
           details: {
             reason: 'outside the reviewed listing window',
             listedOn: listing.listedOn,
@@ -203,37 +163,9 @@ export class QualityService {
         volume: '0',
         isFinal: !(input?.has_partial && index === observed.length - 1),
       }));
-      const validation = validations.get(date);
-      const daily =
-        validation &&
-        validation.dailyOpen &&
-        validation.dailyHigh &&
-        validation.dailyLow &&
-        validation.dailyClose &&
-        validation.dailyVolume
-          ? {
-              open: validation.dailyOpen,
-              high: validation.dailyHigh,
-              low: validation.dailyLow,
-              close: validation.dailyClose,
-              volume: validation.dailyVolume,
-            }
-          : null;
-      const minute = {
-        open: input?.minute_open ?? null,
-        high: input?.minute_high ?? null,
-        low: input?.minute_low ?? null,
-        close: input?.minute_close ?? null,
-        volume: input?.minute_volume ?? '0',
-        bars: input?.stored_bars ?? 0,
-      };
       const verdict = computeCoverageVerdict({
         session,
         observed,
-        daily,
-        minute,
-        tickSize,
-        volumeTolerancePct: volumeTolerance,
         hasCriticalIssue: false,
       });
 
@@ -248,11 +180,6 @@ export class QualityService {
         firstBarAt: verdict.firstBarAt,
         lastBarAt: verdict.lastBarAt,
         status: verdict.status,
-        dailyVolume: validation?.dailyVolume ?? null,
-        minuteVolume: input?.minute_volume ?? null,
-        volumeDeltaPct: validation?.volumeDeltaPct ?? null,
-        ohlcMatch: validation?.ohlcMatch ?? null,
-        validationStatus: verdict.validationStatus,
         details: verdict.details,
       });
 
@@ -267,7 +194,6 @@ export class QualityService {
         session,
         verdict,
         stored,
-        validation: validation ?? null,
         maxGap,
       });
     }
@@ -288,20 +214,10 @@ export class QualityService {
     date: string;
     session: SessionWindow;
     verdict: Awaited<ReturnType<typeof computeCoverageVerdict>>;
-    stored: Awaited<ReturnType<typeof getStoredCandleStarts>>;
-    validation: Awaited<ReturnType<typeof getDailyValidation>> | null;
+    stored: { candleStart: Date; volume: string; isFinal: boolean }[];
     maxGap: number;
   }): Promise<void> {
-    const {
-      instrumentId,
-      providerId,
-      date,
-      session,
-      verdict,
-      stored,
-      validation,
-      maxGap,
-    } = input;
+    const { instrumentId, providerId, date, session, verdict, stored, maxGap } = input;
     const base = {
       providerId,
       instrumentId,
@@ -340,7 +256,6 @@ export class QualityService {
             tradingDate: date,
             gapStart: new Date(run.start),
             gapMinutes: run.minutes,
-            volumeReconciled: verdict.validationStatus === 'volume_reconciled',
             maxAcceptedGapMinutes: maxGap,
           }) === 'critical',
       );
@@ -389,50 +304,6 @@ export class QualityService {
         });
       }
     }
-
-    if (verdict.validationStatus === 'volume_mismatch') {
-      const daily = Number(validation?.dailyVolume ?? 0);
-      const minute = Number(validation?.minuteVolume ?? 0);
-      await this.issue({
-        ...base,
-        ruleId: 'DQ-012',
-        severity: minute < daily ? 'critical' : 'warning',
-        details: {
-          dailyVolume: validation?.dailyVolume,
-          minuteVolume: validation?.minuteVolume,
-        },
-      });
-    }
-    if (verdict.validationStatus === 'volume_reconciled') {
-      await this.issue({
-        ...base,
-        ruleId: 'DQ-013',
-        severity: 'info',
-        details: {
-          missingBarCount: verdict.missingBarCount,
-          dailyVolume: validation?.dailyVolume,
-        },
-      });
-    }
-    if (verdict.validationStatus === 'ohlc_mismatch') {
-      await this.issue({
-        ...base,
-        ruleId: 'DQ-014',
-        severity: 'warning',
-        details: validation?.id ? { validationId: validation.id } : {},
-      });
-    }
-    if (
-      verdict.validationStatus === 'daily_missing' ||
-      verdict.validationStatus === 'minute_missing'
-    ) {
-      await this.issue({
-        ...base,
-        ruleId: 'DQ-016',
-        severity: 'critical',
-        details: { validationStatus: verdict.validationStatus },
-      });
-    }
   }
 
   async recomputeInstrumentStatus(instrumentId: string) {
@@ -462,17 +333,13 @@ export class QualityService {
             86_400_000,
         ) >= staleSessions);
 
-    const dataStatus = deriveDataStatusWithValidation({
-      counters: {
-        expectedDays: counters.expectedDays,
-        completeDays: counters.completeDays,
-        partialDays: counters.partialDays,
-        missingDays: counters.missingDays,
-        notApplicableDays: counters.notApplicableDays,
-        openCriticalIssues: counters.openCriticalIssues,
-      },
-      reconciledDays: counters.reconciledDays,
-      mismatchDays: counters.mismatchDays,
+    const dataStatus = deriveDataStatus({
+      expectedDays: counters.expectedDays,
+      completeDays: counters.completeDays,
+      partialDays: counters.partialDays,
+      missingDays: counters.missingDays,
+      notApplicableDays: counters.notApplicableDays,
+      openCriticalIssues: counters.openCriticalIssues,
     });
     const fetchStatus = deriveFetchStatus({
       hasRun: Boolean(latestRun),
@@ -499,145 +366,6 @@ export class QualityService {
       lastSuccessAt: lastSuccess?.finishedAt ?? null,
       computedAt: new Date(),
     });
-  }
-
-  async fetchDailyOracle(
-    instrumentId: string,
-    externalKey: string,
-    from: string,
-    to: string,
-  ) {
-    const client = this.client();
-    const provider = await findProviderByCode('upstox');
-    if (!provider || client.configurationReason()) return null;
-    const response: UpstoxCandleResponse = await client.fetchDailyCandles({
-      instrumentKey: externalKey,
-      from,
-      to,
-    });
-    const serialized = JSON.stringify(response);
-    const raw = await createRawProviderPayload({
-      providerId: provider.id,
-      endpoint: '/v3/historical-candle/:instrument_key/days/1/:to/:from',
-      httpMethod: 'GET',
-      requestFingerprint: sha256Hex(`daily|${externalKey}|${from}|${to}`),
-      requestParams: {
-        instrumentKey: externalKey,
-        from,
-        to,
-        unit: 'days',
-        interval: 1,
-      },
-      httpStatus: 200,
-      contentEncoding: null,
-      payload: response,
-      payloadBytes: Buffer.byteLength(serialized, 'utf8'),
-      payloadSha256: sha256Hex(serialized),
-      retentionClass: 'extended',
-      expiresAt: new Date(Date.now() + 730 * 24 * 60 * 60 * 1000),
-    });
-    const parsed = parseCandleEnvelope(response);
-    const byDate = new Map<string, DailyCandleValues>();
-    for (const [timestamp, open, high, low, close, volume] of parsed.data
-      .candles) {
-      const date = istTradingDate(parseCandleTimestamp(timestamp));
-      byDate.set(date, {
-        open: String(open),
-        high: String(high),
-        low: String(low),
-        close: String(close),
-        volume: String(volume),
-      });
-    }
-    return { providerId: provider.id, rawPayloadId: raw.id, byDate };
-  }
-
-  async validateDaily(
-    instrumentId: string,
-    externalKey: string,
-    from: string,
-    to: string,
-    ingestionRunId: string | null,
-  ) {
-    const oracle = await this.fetchDailyOracle(
-      instrumentId,
-      externalKey,
-      from,
-      to,
-    );
-    if (!oracle) return { skipped: true, reason: 'provider not configured' };
-    const sessions = await this.sessions(from, to);
-    let matched = 0;
-    let reconciled = 0;
-    let mismatch = 0;
-    let missing = 0;
-    for (const [date, session] of sessions) {
-      const daily = oracle.byDate.get(date) ?? null;
-      const aggregate = await getMinuteAggregate(instrumentId, date);
-      const minute = {
-        open: aggregate.open,
-        high: aggregate.high,
-        low: aggregate.low,
-        close: aggregate.close,
-        volume: aggregate.volume ?? '0',
-        bars: aggregate.bars,
-      };
-      const verdict = computeCoverageVerdict({
-        session,
-        observed: (await getStoredCandleStarts(instrumentId, date)).map(
-          (row) => row.candleStart,
-        ),
-        daily,
-        minute,
-        tickSize: Number(await getInstrumentTickSize(instrumentId)),
-        volumeTolerancePct: this.config.get<number>(
-          'DATA_QUALITY_VOLUME_TOLERANCE_PCT',
-          0.02,
-        ),
-        hasCriticalIssue: false,
-      });
-      const status =
-        verdict.validationStatus === 'matched' && verdict.missingBarCount > 0
-          ? 'volume_reconciled'
-          : verdict.validationStatus;
-      const dailyVolume = Number(daily?.volume ?? 0);
-      const minuteVolume = Number(minute.volume ?? 0);
-      const volumeDeltaPct =
-        dailyVolume === 0
-          ? null
-          : ((minuteVolume - dailyVolume) / dailyVolume).toFixed(10);
-      await upsertDailyValidation({
-        instrumentId,
-        tradingDate: date,
-        sourceProviderId: oracle.providerId,
-        dailyOpen: daily?.open ?? null,
-        dailyHigh: daily?.high ?? null,
-        dailyLow: daily?.low ?? null,
-        dailyClose: daily?.close ?? null,
-        dailyVolume: daily?.volume ?? null,
-        minuteOpen: minute.open,
-        minuteHigh: minute.high,
-        minuteLow: minute.low,
-        minuteClose: minute.close,
-        minuteVolume: minute.volume,
-        volumeDeltaPct,
-        ohlcMatch:
-          verdict.validationStatus === 'matched' ||
-          status === 'volume_reconciled',
-        volumeMatch:
-          verdict.validationStatus === 'matched' ||
-          status === 'volume_reconciled',
-        status,
-        ingestionRunId,
-        rawPayloadId: oracle.rawPayloadId,
-      });
-      if (status === 'matched') matched += 1;
-      else if (status === 'volume_reconciled') reconciled += 1;
-      else if (status === 'daily_missing' || status === 'minute_missing')
-        missing += 1;
-      else mismatch += 1;
-    }
-    return { skipped: false, matched, reconciled, mismatch, missing };
   }
 
   async qualityScan(options: { days?: number; full?: boolean } = {}) {
@@ -747,8 +475,6 @@ export class QualityService {
   async detectCoverageAge(instrumentId: string, date: string) {
     const provider = await findProviderByCode('upstox');
     if (!provider) return false;
-    const coverage = await getDailyValidation(instrumentId, date);
-    void coverage;
     const candleUpdatedAt = await getCandleUpdatedAt(instrumentId, date);
     if (!candleUpdatedAt) return false;
     const statusRow = await getInstrumentStatusRow(instrumentId);

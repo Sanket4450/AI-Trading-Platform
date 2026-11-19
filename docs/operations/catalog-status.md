@@ -22,8 +22,7 @@ The instrument catalog is a read model over persisted evidence. It is not a seco
 | Value                | Meaning                                                              |
 | -------------------- | -------------------------------------------------------------------- |
 | `complete`           | Every expected minute present and no critical issue.                 |
-| `partial_reconciled` | Minutes missing, but the daily oracle proves no trades were lost.    |
-| `partial_mismatch`   | Minutes missing and the oracle disagrees or has not confirmed.       |
+| `partial_mismatch`   | Minutes missing.                                                     |
 | `missing`            | Zero bars on at least one scheduled trading day.                     |
 | `pending`            | The rollup was written before verification finished.                 |
 | `not_applicable`     | Every day in the window is a holiday, suspension or pre-listing.     |
@@ -42,13 +41,12 @@ The catalog shows one badge, in this order:
 7. Missing
 8. Gaps · mismatch
 9. Stale
-10. Gaps · reconciled
-11. Not applicable
-12. Complete
-13. Not fetched
+10. Not applicable
+11. Complete
+12. Not fetched
 
-`succeeded` is not `Complete`. A chunk can return HTTP 200 with an empty or short body. Only coverage
-plus the daily oracle can produce `complete`.
+`succeeded` is not `Complete`. A chunk can return HTTP 200 with an empty or short body. Only strict
+coverage can produce `complete`.
 
 ## Target window
 

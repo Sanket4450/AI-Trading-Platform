@@ -132,8 +132,7 @@ export default async function InstrumentDetailPage({
                       {month.complete} complete · {month.partial} partial
                     </p>
                     <p className="opacity-70">
-                      {month.missing} missing · {month.reconciled} reconciled · {month.mismatch}{' '}
-                      mismatch
+                      {month.missing} missing
                     </p>
                   </div>
                 );

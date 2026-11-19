@@ -98,20 +98,6 @@ describe('Upstox read-only client', () => {
     expect(candles.data.candles).toHaveLength(3);
   });
 
-  it('uses the days endpoint for the daily oracle', async () => {
-    let path = '';
-    handler = (request, response) => {
-      path = request.url ?? '';
-      json(response, 200, historicalNormalFixture);
-    };
-    await client().fetchDailyCandles({
-      instrumentKey: 'NSE_EQ|INE002A01018',
-      from: '2022-01-01',
-      to: '2026-10-23',
-    });
-    expect(path).toContain('/days/1/2026-10-23/2022-01-01');
-  });
-
   it('uses the intraday endpoint and keeps the partial final bar', async () => {
     let path = '';
     handler = (request, response) => {

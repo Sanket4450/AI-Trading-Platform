@@ -109,15 +109,6 @@ export class MarketScheduler {
     });
   }
 
-  @Cron('0 17 * * 1-5', { timeZone: 'Asia/Kolkata' })
-  async dailyValidation(): Promise<void> {
-    if (!this.enabled || !(await this.isTradingDay())) return;
-    await this.enqueue(this.historicalQueue, 'daily-validation', 'ingestion', {
-      source: 'schedule',
-      days: 1,
-    });
-  }
-
   @Cron('0 18 * * 1-5', { timeZone: 'Asia/Kolkata' })
   async postMarketRefresh(): Promise<void> {
     if (!this.enabled) return;

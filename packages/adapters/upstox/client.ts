@@ -250,12 +250,6 @@ export class UpstoxClient {
     return this.requestCandles(url, values.timeoutMs);
   }
 
-  async fetchDailyCandles(
-    values: Omit<CandleRequest, 'unit' | 'interval'>,
-  ): Promise<UpstoxCandleResponse> {
-    return this.fetchHistoricalCandles({ ...values, unit: 'days', interval: 1 });
-  }
-
   async fetchIntradayCandles(values: {
     instrumentKey: string;
     unit?: 'minutes' | 'hours';

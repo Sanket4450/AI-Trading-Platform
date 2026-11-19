@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { apiFetch } from '@/lib/api';
-import type { CoverageRow, DailyValidation, QualityIssue } from '@/lib/types';
-import { formatDateTime, formatNumber } from '@/lib/format';
+import type { CoverageRow, QualityIssue } from '@/lib/types';
+import { formatNumber } from '@/lib/format';
 import { label } from '@/lib/labels';
 import { backLinkFor, detailHref, type DetailSearchParams } from '@/lib/navigation';
 import { PageMeta } from '@/components/shell/page-meta';
@@ -10,12 +10,10 @@ import { SectionCard } from '@/components/dashboard/section-card';
 import { DetailHeader } from '@/components/dashboard/detail-header';
 import { StatusBadge } from '@/components/dashboard/status-badge';
 import { JsonBlock } from '@/components/dashboard/json-block';
-import { KeyValueGrid } from '@/components/dashboard/key-value-grid';
 
 interface DayDetail {
   instrument: { id: string; symbol: string; name: string; segment?: string; tickSize: string } | null;
   coverage: CoverageRow | null;
-  validation: (DailyValidation & Record<string, unknown>) | null;
   issues: QualityIssue[];
 }
 
@@ -40,10 +38,7 @@ export default async function InstrumentCoverageDayPage({
         back={back}
         badges={
           coverage ? (
-            <>
-              <StatusBadge status={coverage.status} />
-              <StatusBadge status={coverage.validationStatus} />
-            </>
+            <StatusBadge status={coverage.status} />
           ) : null
         }
         meta={`${label(detail.instrument?.segment, 'NSE')} · tick ${detail.instrument?.tickSize ? formatNumber(detail.instrument.tickSize) : '—'}`}
@@ -55,7 +50,7 @@ export default async function InstrumentCoverageDayPage({
         ]}
       />
 
-      <StatGrid columns={5}>
+      <StatGrid columns={4}>
         <StatCard
           label="Expected"
           value={formatNumber(coverage?.expectedBars ?? 0)}
@@ -80,86 +75,12 @@ export default async function InstrumentCoverageDayPage({
           hint={`Longest ${coverage?.maxGapMinutes ?? 0}m`}
           tone="highlight"
         />
-        <StatCard
-          label="Validation"
-          value={label(coverage?.validationStatus, 'Not checked')}
-          hint="Daily oracle verdict"
-          tone="info"
-        />
       </StatGrid>
-
-      <div className="mt-4 grid gap-4 xl:grid-cols-2">
-        <SectionCard
-          title="Minute versus daily"
-          description="A shortfall proves lost bars; an excess implies duplicates or overlap. No bar is synthesized."
-        >
-          {coverage ? (
-            <KeyValueGrid
-              columns={2}
-              items={[
-                { label: 'Daily volume', value: coverage.dailyVolume ?? '—' },
-                { label: 'Minute volume', value: coverage.minuteVolume ?? '—' },
-                { label: 'Volume delta', value: coverage.volumeDeltaPct ?? '—' },
-                {
-                  label: 'OHLC match',
-                  value:
-                    coverage.ohlcMatch === null ? 'Not checked' : coverage.ohlcMatch ? 'Yes' : 'No',
-                },
-                { label: 'Checked', value: formatDateTime(coverage.checkedAt) },
-                {
-                  label: 'First bar',
-                  value: coverage.firstBarAt ? formatDateTime(coverage.firstBarAt) : '—',
-                },
-                {
-                  label: 'Last bar',
-                  value: coverage.lastBarAt ? formatDateTime(coverage.lastBarAt) : '—',
-                },
-                { label: 'Validation', value: label(coverage.validationStatus) },
-              ]}
-            />
-          ) : (
-            <p className="text-muted-foreground text-sm">No coverage row for this day.</p>
-          )}
-        </SectionCard>
-
-        <SectionCard
-          title="Daily oracle"
-          description="Stored independently as evidence, never as a timeframe."
-        >
-          {detail.validation ? (
-            <div className="space-y-3 text-sm">
-              <p>
-                <span className="text-muted-foreground">Status:</span>{' '}
-                <StatusBadge status={String(detail.validation.status)} />
-              </p>
-              <KeyValueGrid
-                columns={2}
-                items={[
-                  {
-                    label: 'Daily open / high / low / close',
-                    value: `${String(detail.validation.dailyOpen ?? '—')} / ${String(detail.validation.dailyHigh ?? '—')} / ${String(detail.validation.dailyLow ?? '—')} / ${String(detail.validation.dailyClose ?? '—')}`,
-                  },
-                  {
-                    label: 'Minute open / high / low / close',
-                    value: `${String(detail.validation.minuteOpen ?? '—')} / ${String(detail.validation.minuteHigh ?? '—')} / ${String(detail.validation.minuteLow ?? '—')} / ${String(detail.validation.minuteClose ?? '—')}`,
-                  },
-                  {
-                    label: 'Checked',
-                    value: formatDateTime(String(detail.validation.checkedAt)),
-                  },
-                ]}
-              />
-            </div>
-          ) : (
-            <p className="text-muted-foreground text-sm">No daily validation row for this day.</p>
-          )}
-        </SectionCard>
-      </div>
 
       <SectionCard
         className="mt-4"
         title="Evidence"
-        description="Gap starts, comparison values and raw payload lineage."
+        description="Gap starts and raw payload lineage."
         contentClassName="space-y-4"
       >
         {coverage ? <JsonBlock value={coverage.details} /> : null}

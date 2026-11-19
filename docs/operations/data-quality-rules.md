@@ -28,11 +28,7 @@ dedupe key. The rule catalog is the `QUALITY_RULES` constant in `@ai-trading/mar
 | DQ-009 | `duplicate_bar`             | warning            | The same timestamp appears more than once with conflicting values.                    |
 | DQ-010 | `outlier`                   | warning            | A minute extreme is outside the daily range or an unexplained jump occurred.          |
 | DQ-011 | `tick_size_mismatch`        | warning            | A price is not aligned to the instrument tick size.                                   |
-| DQ-012 | `volume_mismatch`           | critical / warning | Minute volume differs from the daily volume beyond tolerance.                         |
-| DQ-013 | `volume_reconciled`         | info               | Missing minutes had no trades; the daily volume proves it.                            |
-| DQ-014 | `outlier`                   | warning            | The minute aggregate differs from the daily candle by more than one tick.             |
 | DQ-015 | `provider_revision`         | warning            | A refetch changed an existing final bar.                                              |
-| DQ-016 | `coverage_shortfall`        | critical           | The daily oracle or the minute side is missing for a scheduled day.                   |
 | DQ-017 | `mapping_missing`           | critical           | No primary provider mapping exists.                                                   |
 | DQ-018 | `instrument_missing`        | critical           | The provider omits an expected instrument.                                            |
 | DQ-019 | `unsupported_instrument`    | info               | The instrument type or segment is outside the R2 whitelist.                           |
@@ -53,24 +49,14 @@ dedupe key. The rule catalog is the `QUALITY_RULES` constant in `@ai-trading/mar
 5. **Auto-resolve** — a later full recheck that passes closes a non-critical open issue after 24
    hours without a repeat. It never auto-resolves an ignored or manually acknowledged critical issue.
 
-## Coverage and the daily oracle
+## Coverage
 
-Strict coverage and validation are independent verdicts.
+Strict coverage is the only completeness verdict: `complete`, `partial`, `missing`, `not_applicable`.
 
-- Strict status: `complete`, `partial`, `missing`, `not_applicable`.
-- Validation status: `not_checked`, `pending`, `matched`, `volume_reconciled`, `volume_mismatch`,
-  `ohlc_mismatch`, `daily_missing`, `minute_missing`, `error`.
-
-A missing minute is never filled with a flat bar. `volume_reconciled` means the daily volume proves
-the missing minutes had no trades; the strict status remains `partial`.
-
-The default daily-versus-minute volume tolerance is provisionally 2% (`0.02`). A live RELIANCE
-January 2022 check found the minute sum 1.0583% below the daily volume, likely because the daily
-candle includes non-minute or closing-auction volume. Open check #4 must resolve the exact treatment
-before a full backfill.
+A missing minute is never filled with a flat bar. A day with missing minutes stays `partial` until
+the gap is repaired from the provider.
 
 ## Preflight policy (R4)
 
-R4 may accept `complete` unconditionally. It may accept `partial + volume_reconciled` only when the
-longest gap is within the configured bound and no open critical issue exists. `volume_mismatch` and
-`ohlc_mismatch` always block until explained.
+R4 accepts `complete` unconditionally. Anything else blocks the preflight until the gap is repaired
+and coverage is recomputed as `complete`.

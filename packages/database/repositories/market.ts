@@ -238,11 +238,6 @@ export async function upsertCoverage(values: {
   firstBarAt: Date | null;
   lastBarAt: Date | null;
   status: string;
-  dailyVolume?: string | null;
-  minuteVolume?: string | null;
-  volumeDeltaPct?: string | null;
-  ohlcMatch?: boolean | null;
-  validationStatus?: string;
   details?: Record<string, unknown>;
 }) {
   const [row] = await db
@@ -259,11 +254,6 @@ export async function upsertCoverage(values: {
       firstBarAt: values.firstBarAt,
       lastBarAt: values.lastBarAt,
       status: values.status,
-      dailyVolume: values.dailyVolume ?? null,
-      minuteVolume: values.minuteVolume ?? null,
-      volumeDeltaPct: values.volumeDeltaPct ?? null,
-      ohlcMatch: values.ohlcMatch ?? null,
-      validationStatus: values.validationStatus ?? 'not_checked',
       details: values.details ?? {},
       checkedAt: new Date(),
     })
@@ -278,11 +268,6 @@ export async function upsertCoverage(values: {
         firstBarAt: values.firstBarAt,
         lastBarAt: values.lastBarAt,
         status: values.status,
-        dailyVolume: values.dailyVolume ?? null,
-        minuteVolume: values.minuteVolume ?? null,
-        volumeDeltaPct: values.volumeDeltaPct ?? null,
-        ohlcMatch: values.ohlcMatch ?? null,
-        validationStatus: values.validationStatus ?? 'not_checked',
         details: values.details ?? {},
         checkedAt: new Date(),
         updatedAt: new Date(),

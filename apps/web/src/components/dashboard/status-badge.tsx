@@ -8,7 +8,6 @@ const styles: Record<string, string> = {
   complete: 'border-success/30 bg-success/10 text-success',
   succeeded: 'border-success/30 bg-success/10 text-success',
   fetched: 'border-success/30 bg-success/10 text-success',
-  partial_reconciled: 'border-warning/30 bg-warning/10 text-warning-strong',
   active: 'border-success/30 bg-success/10 text-success',
   open: 'border-warning/30 bg-warning/10 text-warning-strong',
   partial: 'border-warning/30 bg-warning/10 text-warning-strong',

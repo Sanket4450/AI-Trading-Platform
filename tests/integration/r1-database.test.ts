@@ -44,7 +44,7 @@ afterAll(async () => {
 });
 
 describe('R2 database lifecycle', () => {
-  it('creates 60 logical tables, the materialized view and the partitions', async () => {
+  it('creates 56 logical tables, the materialized view and the partitions', async () => {
     const [schema] = await sql<{ tables: number; matviews: number }[]>`
       select
         count(*) filter (
@@ -56,7 +56,7 @@ describe('R2 database lifecycle', () => {
       from pg_class c
       where relnamespace = 'public'::regnamespace
     `;
-    expect(schema.tables).toBe(60);
+    expect(schema.tables).toBe(56);
     expect(schema.matviews).toBe(1);
 
     const [partitions] = await sql<{ count: number }[]>`
@@ -308,7 +308,7 @@ describe('R2 database lifecycle', () => {
     ).rejects.toThrow(/uq_ingestion_active_instrument|duplicate key/i);
   });
 
-  it('deduplicates quality issues and daily validation rows', async () => {
+  it('deduplicates quality issues', async () => {
     const [instrument] = await sql<{ id: string }[]>`
       select id from instruments where trading_symbol = 'RELIANCE' limit 1
     `;
@@ -329,20 +329,6 @@ describe('R2 database lifecycle', () => {
                 'missing_bar', 'warning', 'open', 'validation', 'DQ-001', ${dedupe})
       `,
     ).rejects.toThrow(/uq_quality_open_dedupe|duplicate key/i);
-
-    const [provider] = await sql<{ id: string }[]>`select id from providers where code = 'upstox'`;
-    await sql`
-      insert into market_data_daily_validation
-        (instrument_id, trading_date, source_provider_id, status)
-      values (${instrument.id}, '2026-09-01', ${provider.id}, 'matched')
-    `;
-    await expect(
-      sql`
-        insert into market_data_daily_validation
-          (instrument_id, trading_date, source_provider_id, status)
-        values (${instrument.id}, '2026-09-01', ${provider.id}, 'matched')
-      `,
-    ).rejects.toThrow(/uq_daily_validation_instrument_date_provider|duplicate key/i);
   });
 
   it('upserts coverage idempotently in a batch', async () => {
@@ -361,7 +347,6 @@ describe('R2 database lifecycle', () => {
       firstBarAt: null,
       lastBarAt: null,
       status: 'complete',
-      validationStatus: 'matched',
       details: {},
     };
     await upsertCoverageBatch([base]);
@@ -373,7 +358,6 @@ describe('R2 database lifecycle', () => {
         gapRunCount: 2,
         maxGapMinutes: 2,
         status: 'partial',
-        validationStatus: 'volume_reconciled',
       },
     ]);
     const rows = await sql<{ count: number; status: string; stored_bars: number }[]>`

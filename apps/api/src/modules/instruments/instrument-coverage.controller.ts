@@ -74,7 +74,7 @@ export class InstrumentCoverageController {
   }
 
   @Get(':instrumentId/coverage/:date')
-  @ApiOperation({ summary: 'Return coverage, validation and issues for one instrument/day' })
+  @ApiOperation({ summary: 'Return coverage and issues for one instrument/day' })
   @ApiParam({ name: 'instrumentId', format: 'uuid' })
   @ApiParam({ name: 'date', format: 'date' })
   @ApiOkResponse({ type: CoverageDayDetailDto })

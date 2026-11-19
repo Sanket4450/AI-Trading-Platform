@@ -1,7 +1,7 @@
 /**
  * @ai-trading/market-data
- * Provider-neutral normalization, session math, validation, coverage and
- * quality rules. Keep framework-specific code out of this package.
+ * Provider-neutral normalization, session math, coverage and quality rules.
+ * Keep framework-specific code out of this package.
  */
 
 export type {
@@ -23,7 +23,6 @@ export type {
   QualityRule,
   RawCandle,
   SessionWindow,
-  ValidationStatus,
 } from './types.js';
 
 export {
@@ -60,12 +59,8 @@ export {
 } from './candles.js';
 
 export {
-  compareDailyToMinute,
   computeCoverageVerdict,
   coverageStatus,
-  type DailyCandleValues,
-  type MinuteAggregate,
-  type ValidationComparison,
 } from './coverage.js';
 
 export {
@@ -81,10 +76,8 @@ export {
 export {
   coverageCounts,
   deriveDataStatus,
-  deriveDataStatusWithValidation,
   deriveFetchStatus,
   displayStatus,
-  validationCounts,
   type DisplayStatus,
   type InstrumentStatusCounters,
 } from './catalog.js';

@@ -40,12 +40,6 @@ export class ProviderService {
         'UPSTOX_BASE_URL',
         'https://api.upstox.com',
       ),
-      dailyOracleEnabled:
-        this.config.get<boolean | string>(
-          'DATA_VALIDATION_DAILY_ORACLE',
-          true,
-        ) === true ||
-        this.config.get<string>('DATA_VALIDATION_DAILY_ORACLE') === 'true',
       budget,
       ...status,
     };

@@ -22,7 +22,6 @@ export function displayStatus(input: {
   if (dataStatus === 'missing') return 'Missing';
   if (dataStatus === 'partial_mismatch') return 'Gaps · mismatch';
   if (fetchStatus === 'stale') return 'Stale';
-  if (dataStatus === 'partial_reconciled') return 'Gaps · reconciled';
   if (dataStatus === 'not_applicable') return 'Not applicable';
   if (dataStatus === 'complete') return 'Complete';
   return 'Not fetched';
@@ -32,8 +31,6 @@ export function statusTone(status: string): string {
   switch (status) {
     case 'Complete':
       return 'border-success/30 bg-success/10 text-success';
-    case 'Gaps · reconciled':
-      return 'border-warning/30 bg-warning/10 text-warning-strong';
     case 'Verifying':
     case 'Fetching':
     case 'Queued':

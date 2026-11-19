@@ -204,11 +204,6 @@ export interface CoverageRow {
   maxGapMinutes: number;
   firstBarAt: string | null;
   lastBarAt: string | null;
-  dailyVolume: string | null;
-  minuteVolume: string | null;
-  volumeDeltaPct: string | null;
-  ohlcMatch: boolean | null;
-  validationStatus: string;
   details: Record<string, unknown>;
   status: string;
   checkedAt: string;
@@ -486,8 +481,6 @@ export interface InstrumentCoverageMonth {
   partial: number;
   missing: number;
   notApplicable: number;
-  reconciled: number;
-  mismatch: number;
 }
 
 export interface InstrumentCoverageDetail extends InstrumentCoverageRow {
@@ -496,27 +489,12 @@ export interface InstrumentCoverageDetail extends InstrumentCoverageRow {
   issues: QualityIssue[];
 }
 
-export interface DailyValidation {
-  id: string;
-  instrumentId: string;
-  symbol: string;
-  tradingDate: string;
-  status: string;
-  ohlcMatch: boolean | null;
-  volumeMatch: boolean | null;
-  dailyVolume: string | null;
-  minuteVolume: string | null;
-  volumeDeltaPct: string | null;
-  checkedAt: string;
-}
-
 export interface ProviderStatus {
   provider: string;
   networkEnabled: boolean;
   apiKeyConfigured: boolean;
   tokenConfigured: boolean;
   baseUrl: string;
-  dailyOracleEnabled: boolean;
   budget: {
     availableSecond: number;
     availableMinute: number;
@@ -526,7 +504,6 @@ export interface ProviderStatus {
   lastSuccessfulSyncAt: string | null;
   lastSuccessfulBackfillAt: string | null;
   lastSuccessfulIntradayAt: string | null;
-  lastSuccessfulValidationAt: string | null;
   failedRuns24h: number;
   runningChunks: number;
   queuedChunks: number;

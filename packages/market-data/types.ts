@@ -82,17 +82,6 @@ export interface GapRun {
 
 export type CoverageStatus = 'complete' | 'partial' | 'missing' | 'not_applicable';
 
-export type ValidationStatus =
-  | 'not_checked'
-  | 'pending'
-  | 'matched'
-  | 'volume_reconciled'
-  | 'volume_mismatch'
-  | 'ohlc_mismatch'
-  | 'daily_missing'
-  | 'minute_missing'
-  | 'error';
-
 export interface CoverageVerdict {
   expectedBars: number;
   storedBars: number;
@@ -102,7 +91,6 @@ export interface CoverageVerdict {
   firstBarAt: Date | null;
   lastBarAt: Date | null;
   status: CoverageStatus;
-  validationStatus: ValidationStatus;
   details: Record<string, unknown>;
 }
 
@@ -118,7 +106,6 @@ export type FetchStatus =
 
 export type DataStatus =
   | 'complete'
-  | 'partial_reconciled'
   | 'partial_mismatch'
   | 'missing'
   | 'pending'

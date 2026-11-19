@@ -1,7 +1,7 @@
 # R2 operations runbook
 
 R2 turns the R1 cockpit into a research data platform. It ingests Upstox V3 1-minute history,
-proves completeness with strict coverage and a daily OHLCV oracle, and still cannot place an order.
+proves completeness with strict coverage, and still cannot place an order.
 
 ## Prerequisites
 
@@ -40,7 +40,6 @@ provisional where marked; reconcile it with NSE circulars before relying on it f
 | 16:00    | Mon–Fri      | `intraday-sync`             | Capture the current session; the last bar stays non-final.     |
 | 16:15    | Mon–Fri      | `coverage-recompute`        | Recompute strict coverage and project instrument status.       |
 | 16:30    | Mon–Fri      | `quality-scan`              | Scan the last 10 trading days.                                 |
-| 17:00    | Mon–Fri      | `daily-validation`          | Fetch daily candles and compare with the minute aggregate.     |
 | 18:00    | Mon–Fri      | `refresh-materialized-view` | Rebuild the daily projection once.                             |
 | 09:00    | Saturday     | `quality-scan` (full)       | Full integrity scan.                                           |
 | 08:00    | 1st of month | `ensure-partitions`         | Create future candle and quote partitions.                     |
@@ -104,12 +103,11 @@ pnpm build
 pnpm db:verify
 ```
 
-`pnpm db:verify` expects 57 logical tables, the R2 tables and indexes, 51 sync targets with status
+`pnpm db:verify` expects 56 logical tables, the R2 tables and indexes, 51 sync targets with status
 rows and primary mappings, a 2022–2027 calendar, valid tick sizes and zero orders.
 
-The daily-versus-minute volume tolerance defaults to 2% (`0.02`) provisionally. A live RELIANCE
-January 2022 check measured a 1.0583% difference, likely from closing-auction or non-minute volume in
-the daily candle. Resolve the exact treatment before the full backfill.
+Strict coverage is the only completeness verdict. Coverage that is missing minutes stays `partial`
+until the gap is repaired.
 
 The integration suite uses testcontainers PostgreSQL and a fixture provider. It never needs a live
 Upstox token.

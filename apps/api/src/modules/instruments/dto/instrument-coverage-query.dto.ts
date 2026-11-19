@@ -31,7 +31,6 @@ export const FETCH_STATUSES = [
 
 export const DATA_STATUSES = [
   'complete',
-  'partial_reconciled',
   'partial_mismatch',
   'missing',
   'pending',

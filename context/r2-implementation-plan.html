@@ -3876,9 +3876,25 @@ Authorization: Bearer &lt;access_token&gt;</code></pre>
   </div>
 </section>
 
+<div class="callout warn" id="r21-daily-validation-removal">
+  <span class="ico">!</span>
+  <div>
+    <b>R2.1 addendum: daily-oracle validation removed.</b>
+    <p style="margin:8px 0 0">
+      The plan above records how R2 was built. A later change removes the daily-validation feature:
+      the <code>market_data_daily_validation</code> table, the coverage comparison columns
+      (<code>daily_volume</code>, <code>minute_volume</code>, <code>volume_delta_pct</code>,
+      <code>ohlc_match</code>, <code>validation_status</code>), the <code>partial_reconciled</code>
+      data status, the 17:00 <code>daily-validation</code> schedule and DQ-012/013/014/016.
+      Strict coverage remains the only completeness verdict; the current schema ends at 56 logical
+      tables. Historical <code>daily_validation</code> ingestion rows and issue rows are retained.
+    </p>
+  </div>
+</div>
+
 <footer class="footer">
   <p><b>R2 Implementation Plan</b> · AI Trading System · Release 2, research mode.</p>
-  <p>51 instruments · sync-target catalog · ~22M 1-minute bars · strict coverage · daily OHLCV oracle · 0 orders.</p>
+  <p>51 instruments · sync-target catalog · ~22M 1-minute bars · strict coverage · 0 orders.</p>
   <p>Companion documents: <code>context/r1-implementation-plan.html</code>, <code>context/backtesting.md</code>, <code>context/deployment-order.md</code>.</p>
 </footer>
 </div>

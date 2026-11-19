@@ -11,7 +11,6 @@ import {
   jobRuns,
   marketCandles1m,
   marketDataCoverage,
-  marketDataDailyValidation,
   marketDataIngestionRuns,
   providers,
   rawProviderPayloads,
@@ -309,101 +308,6 @@ export async function writeCandles(
   return { inserted, updated, skipped, revisions };
 }
 
-export async function getStoredCandleStarts(instrumentId: string, tradingDate: string) {
-  return db
-    .select({
-      candleStart: marketCandles1m.candleStart,
-      volume: marketCandles1m.volume,
-      isFinal: marketCandles1m.isFinal,
-    })
-    .from(marketCandles1m)
-    .where(
-      and(
-        eq(marketCandles1m.instrumentId, instrumentId),
-        eq(marketCandles1m.tradingDate, tradingDate),
-      ),
-    )
-    .orderBy(asc(marketCandles1m.candleStart));
-}
-
-export async function getMinuteAggregate(instrumentId: string, tradingDate: string) {
-  const rows = await db.execute<{
-    open: string | null;
-    high: string | null;
-    low: string | null;
-    close: string | null;
-    volume: string | null;
-    bars: number;
-  }>(sql`
-    select
-      (array_agg(${marketCandles1m.open} order by ${marketCandles1m.candleStart}))[1]::text as open,
-      max(${marketCandles1m.high})::text as high,
-      min(${marketCandles1m.low})::text as low,
-      (array_agg(${marketCandles1m.close} order by ${marketCandles1m.candleStart} desc))[1]::text as close,
-      coalesce(sum(${marketCandles1m.volume}), 0)::text as volume,
-      count(*)::int as bars
-    from ${marketCandles1m}
-    where ${marketCandles1m.instrumentId} = ${instrumentId}
-      and ${marketCandles1m.tradingDate} = ${tradingDate}
-  `);
-  return rows[0] ?? { open: null, high: null, low: null, close: null, volume: '0', bars: 0 };
-}
-
-export async function upsertDailyValidation(values: {
-  instrumentId: string;
-  tradingDate: string;
-  sourceProviderId: string;
-  dailyOpen: string | null;
-  dailyHigh: string | null;
-  dailyLow: string | null;
-  dailyClose: string | null;
-  dailyVolume: string | null;
-  minuteOpen: string | null;
-  minuteHigh: string | null;
-  minuteLow: string | null;
-  minuteClose: string | null;
-  minuteVolume: string | null;
-  volumeDeltaPct: string | null;
-  ohlcMatch: boolean | null;
-  volumeMatch: boolean | null;
-  status: string;
-  ingestionRunId: string | null;
-  rawPayloadId: string | null;
-}) {
-  const [row] = await db
-    .insert(marketDataDailyValidation)
-    .values({ id: uuidv7(), ...values, checkedAt: new Date() })
-    .onConflictDoUpdate({
-      target: [
-        marketDataDailyValidation.instrumentId,
-        marketDataDailyValidation.tradingDate,
-        marketDataDailyValidation.sourceProviderId,
-      ],
-      set: {
-        dailyOpen: values.dailyOpen,
-        dailyHigh: values.dailyHigh,
-        dailyLow: values.dailyLow,
-        dailyClose: values.dailyClose,
-        dailyVolume: values.dailyVolume,
-        minuteOpen: values.minuteOpen,
-        minuteHigh: values.minuteHigh,
-        minuteLow: values.minuteLow,
-        minuteClose: values.minuteClose,
-        minuteVolume: values.minuteVolume,
-        volumeDeltaPct: values.volumeDeltaPct,
-        ohlcMatch: values.ohlcMatch,
-        volumeMatch: values.volumeMatch,
-        status: values.status,
-        ingestionRunId: values.ingestionRunId,
-        rawPayloadId: values.rawPayloadId,
-        checkedAt: new Date(),
-        updatedAt: new Date(),
-      },
-    })
-    .returning();
-  return row;
-}
-
 export async function getCoverageDayDetail(instrumentId: string, date: string) {
   const coverage = await db
     .select()
@@ -425,17 +329,6 @@ export async function getCoverageDayDetail(instrumentId: string, date: string) {
     .from(instruments)
     .where(eq(instruments.id, instrumentId))
     .limit(1);
-  const validation = await db
-    .select()
-    .from(marketDataDailyValidation)
-    .where(
-      and(
-        eq(marketDataDailyValidation.instrumentId, instrumentId),
-        eq(marketDataDailyValidation.tradingDate, date),
-      ),
-    )
-    .orderBy(desc(marketDataDailyValidation.checkedAt))
-    .limit(1);
   const issues = await db
     .select()
     .from(dataQualityIssues)
@@ -450,7 +343,6 @@ export async function getCoverageDayDetail(instrumentId: string, date: string) {
   return {
     instrument: instrument[0] ?? null,
     coverage: coverage[0] ?? null,
-    validation: validation[0] ?? null,
     issues,
   };
 }
@@ -661,9 +553,6 @@ export async function getProviderStatus() {
       lastSuccessfulIntradayAt: sql<
         string | null
       >`max(${marketDataIngestionRuns.finishedAt}) filter (where ${marketDataIngestionRuns.runType} = 'intraday_sync' and ${marketDataIngestionRuns.status} = 'succeeded')::text`,
-      lastSuccessfulValidationAt: sql<
-        string | null
-      >`max(${marketDataIngestionRuns.finishedAt}) filter (where ${marketDataIngestionRuns.runType} = 'daily_validation' and ${marketDataIngestionRuns.status} = 'succeeded')::text`,
       failedRuns24h: sql<number>`count(*) filter (where ${marketDataIngestionRuns.status} = 'failed' and ${marketDataIngestionRuns.createdAt} >= now() - interval '24 hours')::int`,
       runningChunks: sql<number>`count(*) filter (where ${marketDataIngestionRuns.status} = 'running')::int`,
       queuedChunks: sql<number>`count(*) filter (where ${marketDataIngestionRuns.status} = 'queued')::int`,
@@ -690,7 +579,6 @@ export async function getCatalogSummary() {
       partialFetch: sql<number>`count(*) filter (where ${instrumentDataStatus.fetchStatus} = 'partial')::int`,
       failed: sql<number>`count(*) filter (where ${instrumentDataStatus.fetchStatus} = 'failed')::int`,
       complete: sql<number>`count(*) filter (where ${instrumentDataStatus.dataStatus} = 'complete')::int`,
-      partialReconciled: sql<number>`count(*) filter (where ${instrumentDataStatus.dataStatus} = 'partial_reconciled')::int`,
       partialMismatch: sql<number>`count(*) filter (where ${instrumentDataStatus.dataStatus} = 'partial_mismatch')::int`,
       missing: sql<number>`count(*) filter (where ${instrumentDataStatus.dataStatus} = 'missing')::int`,
       needsReview: sql<number>`count(*) filter (where ${instrumentDataStatus.dataStatus} = 'needs_review')::int`,
@@ -901,21 +789,6 @@ export async function getPlanJob(id: string) {
   return rows[0] ?? null;
 }
 
-export async function getDailyValidation(instrumentId: string, tradingDate: string) {
-  const rows = await db
-    .select()
-    .from(marketDataDailyValidation)
-    .where(
-      and(
-        eq(marketDataDailyValidation.instrumentId, instrumentId),
-        eq(marketDataDailyValidation.tradingDate, tradingDate),
-      ),
-    )
-    .orderBy(desc(marketDataDailyValidation.checkedAt))
-    .limit(1);
-  return rows[0] ?? null;
-}
-
 export async function getCandleUpdatedAt(instrumentId: string, tradingDate: string) {
   const rows = await db.execute<{ updated_at: string | null }>(sql`
     select max(${marketCandles1m.updatedAt})::text as updated_at
@@ -1063,48 +936,19 @@ export async function getInstrumentListing(instrumentId: string) {
 export async function getCoverageInputs(instrumentId: string, from: string, to: string) {
   return db.execute<{
     trading_date: string;
-    stored_bars: number;
-    first_bar_at: string | null;
-    last_bar_at: string | null;
     has_partial: boolean;
     starts: (string | Date)[];
-    minute_open: string | null;
-    minute_high: string | null;
-    minute_low: string | null;
-    minute_close: string | null;
-    minute_volume: string | null;
   }>(sql`
     select
       ${marketCandles1m.tradingDate}::text as trading_date,
-      count(*)::int as stored_bars,
-      min(${marketCandles1m.candleStart})::text as first_bar_at,
-      max(${marketCandles1m.candleStart})::text as last_bar_at,
       bool_or(not ${marketCandles1m.isFinal}) as has_partial,
-      json_agg(${marketCandles1m.candleStart} order by ${marketCandles1m.candleStart}) as starts,
-      (array_agg(${marketCandles1m.open} order by ${marketCandles1m.candleStart}))[1]::text as minute_open,
-      max(${marketCandles1m.high})::text as minute_high,
-      min(${marketCandles1m.low})::text as minute_low,
-      (array_agg(${marketCandles1m.close} order by ${marketCandles1m.candleStart} desc))[1]::text as minute_close,
-      coalesce(sum(${marketCandles1m.volume}), 0)::text as minute_volume
+      json_agg(${marketCandles1m.candleStart} order by ${marketCandles1m.candleStart}) as starts
     from ${marketCandles1m}
     where ${marketCandles1m.instrumentId} = ${instrumentId}
       and ${marketCandles1m.tradingDate} between ${from} and ${to}
     group by ${marketCandles1m.tradingDate}
     order by ${marketCandles1m.tradingDate}
   `);
-}
-
-export async function getDailyValidationsForRange(instrumentId: string, from: string, to: string) {
-  return db
-    .select()
-    .from(marketDataDailyValidation)
-    .where(
-      and(
-        eq(marketDataDailyValidation.instrumentId, instrumentId),
-        gte(marketDataDailyValidation.tradingDate, from),
-        lte(marketDataDailyValidation.tradingDate, to),
-      ),
-    );
 }
 
 export async function upsertCoverageBatch(rows: (typeof marketDataCoverage.$inferInsert)[]) {
@@ -1126,11 +970,6 @@ export async function upsertCoverageBatch(rows: (typeof marketDataCoverage.$infe
           firstBarAt: sql`excluded.first_bar_at`,
           lastBarAt: sql`excluded.last_bar_at`,
           status: sql`excluded.status`,
-          dailyVolume: sql`excluded.daily_volume`,
-          minuteVolume: sql`excluded.minute_volume`,
-          volumeDeltaPct: sql`excluded.volume_delta_pct`,
-          ohlcMatch: sql`excluded.ohlc_match`,
-          validationStatus: sql`excluded.validation_status`,
           details: sql`excluded.details`,
           checkedAt: new Date(),
           updatedAt: new Date(),

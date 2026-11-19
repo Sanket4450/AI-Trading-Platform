@@ -1,4 +1,4 @@
-import type { CoverageStatus, DataStatus, FetchStatus, ValidationStatus } from './types.js';
+import type { CoverageStatus, DataStatus, FetchStatus } from './types.js';
 
 export interface InstrumentStatusCounters {
   expectedDays: number;
@@ -23,18 +23,6 @@ export function deriveDataStatus(counters: InstrumentStatusCounters): DataStatus
   if (counters.completeDays === counters.expectedDays) return 'complete';
   if (counters.partialDays > 0) return 'partial_mismatch';
   return 'pending';
-}
-
-export function deriveDataStatusWithValidation(input: {
-  counters: InstrumentStatusCounters;
-  reconciledDays: number;
-  mismatchDays: number;
-}): DataStatus {
-  const base = deriveDataStatus(input.counters);
-  if (base === 'partial_mismatch' && input.mismatchDays === 0 && input.reconciledDays > 0) {
-    return 'partial_reconciled';
-  }
-  return base;
 }
 
 export function deriveFetchStatus(input: {
@@ -76,7 +64,6 @@ export type DisplayStatus =
   | 'Missing'
   | 'Gaps · mismatch'
   | 'Stale'
-  | 'Gaps · reconciled'
   | 'Not applicable'
   | 'Complete'
   | 'Not fetched';
@@ -104,7 +91,6 @@ export function displayStatus(input: {
   if (dataStatus === 'missing') return 'Missing';
   if (dataStatus === 'partial_mismatch') return 'Gaps · mismatch';
   if (fetchStatus === 'stale') return 'Stale';
-  if (dataStatus === 'partial_reconciled') return 'Gaps · reconciled';
   if (dataStatus === 'not_applicable') return 'Not applicable';
   if (dataStatus === 'complete') return 'Complete';
   return 'Not fetched';
@@ -126,22 +112,4 @@ export function coverageCounts(rows: readonly { status: CoverageStatus }[]): {
     },
     { complete: 0, partial: 0, missing: 0, notApplicable: 0 },
   );
-}
-
-export function validationCounts(
-  rows: readonly { validationStatus: ValidationStatus }[],
-): Record<ValidationStatus, number> {
-  const counts: Record<ValidationStatus, number> = {
-    not_checked: 0,
-    pending: 0,
-    matched: 0,
-    volume_reconciled: 0,
-    volume_mismatch: 0,
-    ohlc_mismatch: 0,
-    daily_missing: 0,
-    minute_missing: 0,
-    error: 0,
-  };
-  for (const row of rows) counts[row.validationStatus] += 1;
-  return counts;
 }

@@ -64,8 +64,8 @@ rendered by `/jobs/[id]`. Sign in with the operator created by `pnpm db:seed`.
 The API and worker accept `offline` or `research` and refuse `backtesting`, `paper` and `live`.
 
 R2 adds Upstox V3 historical ingestion, a persisted per-instrument fetch/data status, strict coverage,
-a daily OHLCV validation oracle, 25 quality rules, resumable monthly chunks and a Redis-backed provider
-budget. It still has no order route and no broker write method.
+21 quality rules, resumable monthly chunks and a Redis-backed provider budget. It still has no order
+route and no broker write method.
 
 ## Guardrails
 
@@ -75,7 +75,7 @@ budget. It still has no order route and no broker write method.
 - Strategies may not import broker adapters or send orders directly.
 - Every backtest and live trade records its strategy version and configuration snapshot.
 - The Upstox adapter is read-only. R2 adds no order, modify or cancel method.
-- A successful HTTP fetch is never displayed as complete; only coverage plus the daily oracle can.
+- A successful HTTP fetch is never displayed as complete; only strict coverage can.
 
 See `docs/operations/r2-runbook.md`, `docs/operations/data-quality-rules.md` and
 `docs/operations/catalog-status.md` for the R2 operating model.
