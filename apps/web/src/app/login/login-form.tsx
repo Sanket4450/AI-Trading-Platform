@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CircleAlert, Eye, EyeOff, LoaderCircle } from 'lucide-react';
+import { authLogin } from '@/lib/api-browser';
+import { ApiError, apiMessage } from '@/lib/api-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -45,25 +47,18 @@ export function LoginForm({ next, initialError }: { next?: string; initialError?
 
     setPending(true);
     try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), password }),
-      });
-
-      if (!response.ok) {
-        const payload = (await response.json().catch(() => ({}))) as { message?: string };
+      await authLogin(email.trim(), password);
+      router.push(safeNextPath(next));
+      router.refresh();
+    } catch (error) {
+      if (error instanceof ApiError) {
         setError(
-          response.status >= 500
+          error.status >= 500
             ? 'Sign-in is temporarily unavailable. Please try again in a moment.'
-            : (payload.message ?? 'Sign-in failed. Check your email and password.'),
+            : (apiMessage(error.body) ?? 'Sign-in failed. Check your email and password.'),
         );
         return;
       }
-
-      router.push(safeNextPath(next));
-      router.refresh();
-    } catch {
       setError('Unable to reach the sign-in service. Check your connection and try again.');
     } finally {
       setPending(false);

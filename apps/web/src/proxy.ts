@@ -25,6 +25,7 @@ export function proxy(request: NextRequest) {
   return NextResponse.next();
 }
 
+// API route handlers authenticate themselves; this guard only protects rendered routes.
 export const config = {
-  matcher: ['/((?!api/auth|_next/static|_next/image|favicon.ico).*)'],
+  matcher: ['/((?!api/|_next/static|_next/image|favicon.ico).*)'],
 };

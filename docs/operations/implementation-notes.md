@@ -102,7 +102,7 @@ seed, repositories, configuration management, API, dashboard, worker jobs and au
 
 - **Authentication.** Argon2id password hashes, opaque 32-byte session tokens hashed with SHA-256 in
   `user_sessions`, HttpOnly session cookies, revocation and expiry. The web app stores the token in its own
-  HttpOnly cookie and forwards it as a Bearer token from server components and server actions.
+  HttpOnly cookie and forwards it as a Bearer token from server components and the `/api/proxy` route handler.
 - **Offline enforcement.** `assertOfflineMode()` refuses to start the API or worker when `TRADING_MODE` is not
   `offline`. `SystemControlService.onModuleInit()` also refuses to start when an active account is not offline.
 - **No order routes.** `OrdersModule`, `TradingModule`, `PositionsModule`, `RiskModule`, `BacktestsModule`,
@@ -133,8 +133,9 @@ seed, repositories, configuration management, API, dashboard, worker jobs and au
 
 - Seven operator routes: `/`, `/accounts`, `/instruments`, `/strategies`, `/jobs`, `/audit`
   and `/settings`.
-- Server components read the API through `apps/web/src/lib/api.ts`; server actions perform configuration,
-  strategy, credential, ingestion and settings writes.
+- Server components read the API through `apps/web/src/lib/api.ts`; browser mutations call the API through
+  `apps/web/src/lib/api-browser.ts` and the `/api/proxy/[...path]` route handler, so the token stays HttpOnly
+  and each write appears in the browser network tab.
 - `apps/web/src/proxy.ts` protects every route except login and auth callbacks. Next.js 16 replaced the
   `middleware` convention with `proxy`.
 - The dashboard is dark-first, responsive at 390px, and shows the offline mode on every screen.

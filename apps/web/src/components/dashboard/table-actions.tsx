@@ -106,7 +106,7 @@ export function TableActionLink({
   );
 }
 
-/** Icon submit button for a row-level server action such as fetch, retry or cancel. */
+/** Icon submit button for a row-level mutation such as fetch, retry or cancel. */
 export function TableActionSubmit({
   icon = 'refresh',
   label,

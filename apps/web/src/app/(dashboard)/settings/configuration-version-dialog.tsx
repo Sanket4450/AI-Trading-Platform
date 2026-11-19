@@ -31,7 +31,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { bindConfigurationAction } from './actions';
+import { useBindConfiguration } from './mutations';
 
 const bindingRoles = ['parameters', 'risk', 'execution'] as const;
 
@@ -49,6 +49,7 @@ export function ConfigurationVersionDialog({
   const router = useRouter();
   const pathname = usePathname();
   const [open, setOpen] = useState(defaultOpen);
+  const bindConfiguration = useBindConfiguration(version.id);
 
   function handleOpenChange(next: boolean) {
     setOpen(next);
@@ -133,9 +134,8 @@ export function ConfigurationVersionDialog({
                 title="Bind to a strategy version"
                 description="Binding is the only path from a snapshot to a strategy."
                 submitLabel="Bind"
-                action={bindConfigurationAction}
+                action={bindConfiguration}
               >
-                <input type="hidden" name="configurationId" value={version.id} />
                 <FormField
                   label="Strategy version ID"
                   htmlFor={`strategyVersionId-${version.id}`}

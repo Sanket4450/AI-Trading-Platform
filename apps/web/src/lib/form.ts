@@ -1,5 +1,5 @@
 /**
- * FormData values are `string | File`. Server actions only accept text fields,
+ * FormData values are `string | File`. Form mutations only accept text fields,
  * so this helper keeps the narrowing explicit and avoids stringifying a File.
  */
 export function formString(formData: FormData, key: string, fallback = ''): string {

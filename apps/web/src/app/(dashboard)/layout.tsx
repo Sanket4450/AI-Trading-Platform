@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { AppShell } from '@/components/shell/app-shell';
-import { apiFetch, getSession, UnauthorizedError } from '@/lib/api';
+import { apiFetch, getSession } from '@/lib/api';
+import { UnauthorizedError } from '@/lib/api-error';
 import type { SystemStatus } from '@/lib/types';
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {

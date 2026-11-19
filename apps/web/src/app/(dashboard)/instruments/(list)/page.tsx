@@ -8,13 +8,8 @@ import { TableSummary } from '@/components/dashboard/table-summary';
 import { StatusBadge } from '@/components/dashboard/status-badge';
 import { EmptyState } from '@/components/dashboard/empty-state';
 import { AutoRefresh } from '@/components/dashboard/auto-refresh';
-import {
-  TableActionButton,
-  TableActionLink,
-  TableActions,
-  TableRefreshButton,
-} from '@/components/dashboard/table-actions';
-import { ConfirmDialog } from '@/components/dashboard/confirm-dialog';
+import { TableRefreshButton } from '@/components/dashboard/table-actions';
+import { InstrumentRowActions } from '../instrument-actions';
 import { FilterSelect, SearchFilter, TableFilters } from '@/components/dashboard/table-filters';
 import { detailHref, originHref } from '@/lib/navigation';
 import { Badge } from '@/components/ui/badge';
@@ -26,8 +21,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { cancelInstrumentAction, fetchInstrumentsAction } from '../actions';
-import { coverageCancelCopy, coverageFetchCopy } from '@/lib/coverage-actions';
 
 type SearchParams = Promise<{
   dataStatus?: string;
@@ -143,9 +136,6 @@ export default async function InstrumentsPage({ searchParams }: { searchParams: 
             <TableBody>
               {rows.map((row) => {
                 const status = displayStatus(row);
-                const fetchCopy = coverageFetchCopy(row);
-                const cancelCopy = coverageCancelCopy(row.symbol);
-                const fetching = row.fetchStatus === 'queued' || row.fetchStatus === 'fetching';
                 return (
                   <TableRow key={row.instrumentId}>
                     <TableCell>
@@ -183,54 +173,11 @@ export default async function InstrumentsPage({ searchParams }: { searchParams: 
                     <TableCell className="text-muted-foreground text-xs">
                       {row.lastSuccessAt ? formatDateTime(row.lastSuccessAt) : 'Never'}
                     </TableCell>
-                    <TableActions>
-                      <TableActionLink
-                        href={detailHref(`/instruments/${row.instrumentId}`, from)}
-                        label="View instrument"
-                      />
-                      {fetching ? (
-                        <ConfirmDialog
-                          trigger={
-                            <TableActionButton
-                              icon="cancel"
-                              tone="destructive"
-                              label={cancelCopy.label}
-                              tooltip={cancelCopy.tooltip}
-                            />
-                          }
-                          title={cancelCopy.title}
-                          description={cancelCopy.description}
-                          confirmLabel={cancelCopy.label}
-                          tone="destructive"
-                          action={cancelInstrumentAction}
-                          hiddenFields={{
-                            instrumentId: row.instrumentId,
-                            returnTo: '/instruments',
-                          }}
-                        />
-                      ) : null}
-                      {fetchCopy && !fetching ? (
-                        <ConfirmDialog
-                          trigger={
-                            <TableActionButton
-                              icon="refresh"
-                              tone="refresh"
-                              label={fetchCopy.label}
-                              tooltip={fetchCopy.tooltip}
-                            />
-                          }
-                          title={fetchCopy.title}
-                          description={fetchCopy.description}
-                          confirmLabel={fetchCopy.label}
-                          action={fetchInstrumentsAction}
-                          hiddenFields={{
-                            instrumentIds: row.instrumentId,
-                            mode: 'missing_only',
-                            returnTo: '/instruments',
-                          }}
-                        />
-                      ) : null}
-                    </TableActions>
+                    <InstrumentRowActions
+                      row={row}
+                      returnTo="/instruments"
+                      viewHref={detailHref(`/instruments/${row.instrumentId}`, from)}
+                    />
                   </TableRow>
                 );
               })}

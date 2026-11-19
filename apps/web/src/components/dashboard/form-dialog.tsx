@@ -14,7 +14,7 @@ import {
 import { cn } from '@/lib/utils';
 
 /**
- * One dialog shape for every write form. The dialog closes on submit so the server action's
+ * One dialog shape for every write form. The dialog closes on submit so the mutation's
  * redirect and toast are the only visible result.
  */
 export function FormDialog({

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { Loader2, LogOut } from 'lucide-react';
+import { authLogout } from '@/lib/api-browser';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -29,8 +30,7 @@ export function SignOutButton() {
     setSigningOut(true);
 
     try {
-      const response = await fetch('/api/auth/logout', { method: 'POST' });
-      if (!response.ok) throw new Error(`Sign out failed with status ${response.status}`);
+      await authLogout();
     } catch {
       setSigningOut(false);
       toast.error('We could not sign you out. Please check your connection and try again.');

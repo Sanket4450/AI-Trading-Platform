@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { PencilLine, Plus, SlidersHorizontal } from 'lucide-react';
+import { SlidersHorizontal } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import type {
   ConfigurationVersion,
@@ -7,6 +7,7 @@ import type {
   QualityIssue,
   SystemSetting,
 } from '@/lib/types';
+import { configurationTypes } from '@/lib/configuration';
 import { formatDate, formatDateTime, formatNumber } from '@/lib/format';
 import { formatSettingKey, label } from '@/lib/labels';
 import { detailHref } from '@/lib/navigation';
@@ -14,14 +15,10 @@ import { SectionCard } from '@/components/dashboard/section-card';
 import { StatusBadge } from '@/components/dashboard/status-badge';
 import { EmptyState } from '@/components/dashboard/empty-state';
 import { KeyValueGrid } from '@/components/dashboard/key-value-grid';
-import { FormDialog } from '@/components/dashboard/form-dialog';
-import { FormField, FormSelect } from '@/components/dashboard/form-field';
 import { FilterSelect, SearchFilter, TableFilters } from '@/components/dashboard/table-filters';
 import { TableActions, TableRefreshButton } from '@/components/dashboard/table-actions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import {
   Table,
   TableBody,
@@ -30,23 +27,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { createConfigurationAction, updateSettingAction } from './actions';
 import { ConfigurationVersionDialog } from './configuration-version-dialog';
-
-const configTypes = ['strategy', 'risk', 'system'] as const;
-
-const defaultPayload = JSON.stringify(
-  {
-    riskPerTradePct: 0.005,
-    dailyLossLimitPct: 0.01,
-    maxOpenPositions: 1,
-    maxEntriesPerDay: 2,
-    maxDrawdownPct: 0.08,
-    killSwitchEnabled: true,
-  },
-  null,
-  2,
-);
+import { CreateConfigurationDialog } from './create-configuration-dialog';
+import { SettingEditor } from './setting-editor';
 
 export default async function SettingsPage({
   searchParams,
@@ -92,66 +75,11 @@ export default async function SettingsPage({
     .slice(0, 16);
 
   const createForm = (
-    <FormDialog
-      trigger={
-        <Button type="button" size="sm">
-          <Plus className="size-4" />
-          New version
-        </Button>
-      }
-      title="Create an immutable version"
-      description="The API validates against the strategy parameter schema or the built-in risk/system schema, then hashes the payload."
-      submitLabel="Validate and create"
-      action={createConfigurationAction}
-      className="sm:max-w-2xl"
-    >
-      <div className="grid gap-3 sm:grid-cols-2">
-        <FormField label="Type" htmlFor="configType">
-          <FormSelect
-            id="configType"
-            name="configType"
-            defaultValue={params.configType ?? 'strategy'}
-            options={configTypes.map((type) => ({ value: type, label: label(type) }))}
-          />
-        </FormField>
-        <FormField label="Scope key" htmlFor="scopeKey">
-          <Input
-            id="scopeKey"
-            name="scopeKey"
-            defaultValue={params.scopeKey ?? 'orb-15m'}
-            required
-          />
-        </FormField>
-        <FormField label="Schema version" htmlFor="schemaVersion">
-          <Input id="schemaVersion" name="schemaVersion" defaultValue="1.0.0" required />
-        </FormField>
-        <FormField label="Effective from" htmlFor="effectiveFrom">
-          <Input
-            id="effectiveFrom"
-            name="effectiveFrom"
-            type="datetime-local"
-            defaultValue={nowLocal}
-            required
-          />
-        </FormField>
-        <FormField label="Effective to" htmlFor="effectiveTo">
-          <Input id="effectiveTo" name="effectiveTo" type="datetime-local" />
-        </FormField>
-        <FormField label="Supersedes" htmlFor="supersedesId" hint="Optional configuration UUID.">
-          <Input id="supersedesId" name="supersedesId" placeholder="Optional UUID" />
-        </FormField>
-      </div>
-      <FormField label="Payload (JSON)" htmlFor="payload">
-        <Textarea
-          id="payload"
-          name="payload"
-          rows={12}
-          defaultValue={defaultPayload}
-          className="font-mono text-xs leading-5"
-          required
-        />
-      </FormField>
-    </FormDialog>
+    <CreateConfigurationDialog
+      defaultConfigType={params.configType ?? 'strategy'}
+      defaultScopeKey={params.scopeKey ?? 'orb-15m'}
+      nowLocal={nowLocal}
+    />
   );
 
   return (
@@ -278,7 +206,7 @@ export default async function SettingsPage({
               submitOnChange
               options={[
                 { value: '', label: 'All types' },
-                ...configTypes.map((type) => ({ value: type, label: label(type) })),
+                ...configurationTypes.map((type) => ({ value: type, label: label(type) })),
               ]}
             />
           </TableFilters>
@@ -369,38 +297,7 @@ export default async function SettingsPage({
                   </span>
                 </>
               }
-              actions={
-                <FormDialog
-                  trigger={
-                    <Button type="button" size="sm" variant="outline">
-                      <PencilLine className="size-4" />
-                      Edit
-                    </Button>
-                  }
-                  title={formatSettingKey(setting.key)}
-                  description="Changes are validated as JSON, written once and audited."
-                  submitLabel="Save"
-                  action={updateSettingAction}
-                >
-                  <input type="hidden" name="key" value={setting.key} />
-                  <FormField label="Value (JSON)" htmlFor={`value-${setting.key}`}>
-                    <Input
-                      id={`value-${setting.key}`}
-                      name="value"
-                      defaultValue={JSON.stringify(setting.value)}
-                      className="font-mono text-xs"
-                      required
-                    />
-                  </FormField>
-                  <FormField label="Description" htmlFor={`description-${setting.key}`}>
-                    <Input
-                      id={`description-${setting.key}`}
-                      name="description"
-                      defaultValue={setting.description ?? ''}
-                    />
-                  </FormField>
-                </FormDialog>
-              }
+              actions={<SettingEditor setting={setting} />}
             >
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <code className="bg-muted/40 rounded-md px-2 py-1 font-mono text-xs">

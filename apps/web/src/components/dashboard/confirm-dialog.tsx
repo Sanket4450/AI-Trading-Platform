@@ -16,7 +16,7 @@ import { SubmitButton } from '@/components/dashboard/submit-button';
 import { cn } from '@/lib/utils';
 
 /**
- * Confirmation step for a direct server action. The dialog owns the form so a row action can
+ * Confirmation step for a direct mutation. The dialog owns the form so a row action can
  * never fire on a single click; on submit it closes and the redirect plus toast report the result.
  */
 export function ConfirmDialog({

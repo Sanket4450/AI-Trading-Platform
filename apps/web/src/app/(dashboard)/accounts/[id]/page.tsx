@@ -1,6 +1,5 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { KeyRound } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import type { Account, AccountAccess, AccountPermission, EquitySnapshot } from '@/lib/types';
 import { formatDateTime, formatMoney, formatNumber } from '@/lib/format';
@@ -11,8 +10,6 @@ import { StatCard, StatGrid } from '@/components/dashboard/stat-card';
 import { SectionCard } from '@/components/dashboard/section-card';
 import { DetailHeader } from '@/components/dashboard/detail-header';
 import { DetailDialog } from '@/components/dashboard/detail-dialog';
-import { FormDialog } from '@/components/dashboard/form-dialog';
-import { FormField, FormSelect } from '@/components/dashboard/form-field';
 import { KeyValueGrid } from '@/components/dashboard/key-value-grid';
 import { StatusBadge } from '@/components/dashboard/status-badge';
 import { EmptyState } from '@/components/dashboard/empty-state';
@@ -23,7 +20,6 @@ import {
 } from '@/components/dashboard/table-actions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import {
   Table,
   TableBody,
@@ -32,7 +28,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { rotateCredentialAction } from '../actions';
+import { RotateCredentialDialog } from './rotate-credential-dialog';
 
 interface TradingSession {
   id: string;
@@ -45,14 +41,6 @@ interface TradingSession {
   closingEquity: string | null;
   killSwitchEngaged: boolean;
 }
-
-const credentialTypes = [
-  'api_key',
-  'api_secret',
-  'access_token',
-  'refresh_token',
-  'totp_secret',
-] as const;
 
 export default async function AccountDetailPage({
   params,
@@ -93,35 +81,10 @@ export default async function AccountDetailPage({
         }
         meta={`${account.baseCurrency} · UCC ${account.brokerUserRef ?? 'not set'} · opened ${formatDateTime(account.openedAt)}`}
         actions={
-          <FormDialog
-            trigger={
-              <Button type="button" size="sm" variant="outline">
-                <KeyRound className="size-4" />
-                Rotate credential
-              </Button>
-            }
-            title="Rotate a credential"
-            description="The API encrypts with AES-256-GCM and never returns the ciphertext or plaintext."
-            submitLabel="Encrypt and store"
-            action={rotateCredentialAction}
-          >
-            <input type="hidden" name="accountId" value={account.id} />
-            <input type="hidden" name="providerId" value={account.brokerProviderId} />
-            <FormField label="Credential type" htmlFor="credentialType">
-              <FormSelect
-                id="credentialType"
-                name="credentialType"
-                defaultValue="access_token"
-                options={credentialTypes.map((type) => ({ value: type, label: label(type) }))}
-              />
-            </FormField>
-            <FormField label="Expires at" htmlFor="expiresAt">
-              <Input id="expiresAt" name="expiresAt" type="datetime-local" />
-            </FormField>
-            <FormField label="Secret value" htmlFor="value">
-              <Input id="value" name="value" type="password" placeholder="Write-only" required />
-            </FormField>
-          </FormDialog>
+          <RotateCredentialDialog
+            accountId={account.id}
+            providerId={account.brokerProviderId}
+          />
         }
       />
 

@@ -12,13 +12,11 @@ import { KeyValueGrid } from '@/components/dashboard/key-value-grid';
 import { JsonBlock } from '@/components/dashboard/json-block';
 import { EmptyState } from '@/components/dashboard/empty-state';
 import { AutoRefresh } from '@/components/dashboard/auto-refresh';
-import { ConfirmDialog } from '@/components/dashboard/confirm-dialog';
 import {
   TableActionLink,
   TableActions,
   TableRefreshButton,
 } from '@/components/dashboard/table-actions';
-import { Button } from '@/components/ui/button';
 import {
   Table,
   TableBody,
@@ -29,7 +27,7 @@ import {
 } from '@/components/ui/table';
 import { StageRail } from '@/features/jobs/components/stage-rail';
 import { EventTimeline } from '@/features/jobs/components/event-timeline';
-import { cancelPlanAction } from '../actions';
+import { CancelPlanDialog } from './cancel-plan-dialog';
 
 const ACTIVE_STATUSES = new Set(['queued', 'running', 'retrying']);
 
@@ -82,19 +80,7 @@ export default async function JobDetailPage({
         }
         actions={
           isPlan && active ? (
-            <ConfirmDialog
-              trigger={
-                <Button type="button" size="sm" variant="outline">
-                  Cancel plan
-                </Button>
-              }
-              title="Cancel this backfill plan?"
-              description="The plan stops queuing new instrument chunks. Chunks already in flight finish cleanly, and candles already written are kept."
-              confirmLabel="Cancel plan"
-              tone="destructive"
-              action={cancelPlanAction}
-              hiddenFields={{ jobId: run.id, returnTo: `/jobs/${run.id}` }}
-            />
+            <CancelPlanDialog jobId={run.id} returnTo={`/jobs/${run.id}`} />
           ) : null
         }
       />

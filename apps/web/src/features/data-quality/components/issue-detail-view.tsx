@@ -1,3 +1,5 @@
+'use client';
+
 import { PencilLine } from 'lucide-react';
 import type { QualityIssue } from '@/lib/types';
 import { formatDateTime } from '@/lib/format';
@@ -13,23 +15,25 @@ import { FormDialog } from '@/components/dashboard/form-dialog';
 import { FormField, FormSelect } from '@/components/dashboard/form-field';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useAcknowledgeIssue, type IssueScope } from './issue-mutations';
 
 /**
  * Shared issue surface. Instrument issues are served under /instruments and provider-wide
- * issues under /settings; the owning list supplies the back link and the action.
+ * issues under /settings; the owning list supplies the back link and the API scope.
  */
 export function IssueDetailView({
   issue,
   back,
   returnTo,
-  action,
+  scope,
 }: {
   issue: QualityIssue;
   back: BackLink;
   returnTo: string;
-  action: (formData: FormData) => void | Promise<void>;
+  scope: IssueScope;
 }) {
   const providerWide = issue.instrumentId === null;
+  const action = useAcknowledgeIssue(scope);
 
   return (
     <div>

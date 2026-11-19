@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { Plus, SlidersHorizontal } from 'lucide-react';
+import { SlidersHorizontal } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import type { StrategyDetail } from '@/lib/types';
 import { formatDate, formatNumber } from '@/lib/format';
@@ -11,8 +11,6 @@ import { StatCard, StatGrid } from '@/components/dashboard/stat-card';
 import { SectionCard } from '@/components/dashboard/section-card';
 import { DetailHeader } from '@/components/dashboard/detail-header';
 import { DetailDialog } from '@/components/dashboard/detail-dialog';
-import { FormDialog } from '@/components/dashboard/form-dialog';
-import { FormField } from '@/components/dashboard/form-field';
 import { KeyValueGrid } from '@/components/dashboard/key-value-grid';
 import { StatusBadge } from '@/components/dashboard/status-badge';
 import { EmptyState } from '@/components/dashboard/empty-state';
@@ -24,8 +22,6 @@ import {
 } from '@/components/dashboard/table-actions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import {
   Table,
   TableBody,
@@ -34,22 +30,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { createStrategyVersionAction } from '../actions';
-
-const defaultSchema = JSON.stringify(
-  {
-    type: 'object',
-    additionalProperties: false,
-    required: ['openingRangeStart', 'openingRangeEnd', 'signalTimeframe'],
-    properties: {
-      openingRangeStart: { type: 'string', pattern: '^\\d{2}:\\d{2}$' },
-      openingRangeEnd: { type: 'string', pattern: '^\\d{2}:\\d{2}$' },
-      signalTimeframe: { type: 'string', enum: ['5m'] },
-    },
-  },
-  null,
-  2,
-);
+import { CreateVersionDialog } from './create-version-dialog';
 
 export default async function StrategyDetailPage({
   params,
@@ -81,46 +62,7 @@ export default async function StrategyDetailPage({
           </>
         }
         meta={`${detail.versions.length} versions`}
-        actions={
-          <FormDialog
-            trigger={
-              <Button type="button" size="sm" variant="outline">
-                <Plus className="size-4" />
-                New draft version
-              </Button>
-            }
-            title="Create a draft version"
-            description="Draft versions are insert-only. Bind a configuration snapshot after validation."
-            submitLabel="Create draft"
-            action={createStrategyVersionAction}
-            className="sm:max-w-2xl"
-          >
-            <input type="hidden" name="strategyId" value={detail.id} />
-            <div className="grid gap-3 sm:grid-cols-2">
-              <FormField label="Code reference" htmlFor="codeRef">
-                <Input
-                  id="codeRef"
-                  name="codeRef"
-                  placeholder="Git commit or package version"
-                  required
-                />
-              </FormField>
-              <FormField label="Changelog" htmlFor="changelog">
-                <Input id="changelog" name="changelog" placeholder="What changed?" />
-              </FormField>
-            </div>
-            <FormField label="Parameter schema (JSON Schema)" htmlFor="parameterSchema">
-              <Textarea
-                id="parameterSchema"
-                name="parameterSchema"
-                defaultValue={defaultSchema}
-                rows={12}
-                className="font-mono text-xs leading-5"
-                required
-              />
-            </FormField>
-          </FormDialog>
-        }
+        actions={<CreateVersionDialog strategyId={detail.id} />}
       />
 
       <StatGrid>

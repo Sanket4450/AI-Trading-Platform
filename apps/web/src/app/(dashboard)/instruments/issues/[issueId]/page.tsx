@@ -2,7 +2,6 @@ import { apiFetch } from '@/lib/api';
 import type { QualityIssue } from '@/lib/types';
 import { backLinkFor, type DetailSearchParams } from '@/lib/navigation';
 import { IssueDetailView } from '@/features/data-quality/components/issue-detail-view';
-import { acknowledgeIssueAction } from '../actions';
 
 export default async function InstrumentIssuePage({
   params,
@@ -21,7 +20,7 @@ export default async function InstrumentIssuePage({
       issue={issue}
       back={back}
       returnTo={`/instruments/issues/${issueId}`}
-      action={acknowledgeIssueAction}
+      scope="instruments"
     />
   );
 }

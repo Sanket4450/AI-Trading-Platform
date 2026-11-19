@@ -10,7 +10,7 @@ type SubmitButtonProps = ComponentProps<typeof Button> & {
 };
 
 /**
- * Submit button that disables itself and swaps to a spinner while its form's server action runs.
+ * Submit button that disables itself and swaps to a spinner while its form action runs.
  */
 export function SubmitButton({
   children,

@@ -33,7 +33,7 @@ type SelectFieldProps = {
 
 /**
  * Shared listbox used by forms and table filters. The hidden input keeps the selected value in the
- * surrounding HTML form so server actions and GET filters keep working.
+ * surrounding HTML form so mutations and GET filters keep working.
  */
 export function SelectField({
   id,
