@@ -1,8 +1,8 @@
-import Link from 'next/link';
 import { apiFetch } from '@/lib/api';
 import type { JobDetail } from '@/lib/types';
 import { formatDateTime, formatDuration, formatNumber } from '@/lib/format';
 import { label } from '@/lib/labels';
+import { backLinkFor, detailHref, type DetailSearchParams } from '@/lib/navigation';
 import { PageMeta } from '@/components/shell/page-meta';
 import { StatCard, StatGrid } from '@/components/dashboard/stat-card';
 import { SectionCard } from '@/components/dashboard/section-card';
@@ -12,9 +12,23 @@ import { KeyValueGrid } from '@/components/dashboard/key-value-grid';
 import { JsonBlock } from '@/components/dashboard/json-block';
 import { EmptyState } from '@/components/dashboard/empty-state';
 import { AutoRefresh } from '@/components/dashboard/auto-refresh';
-import { buttonVariants } from '@/components/ui/button';
+import { SubmitButton } from '@/components/dashboard/submit-button';
+import {
+  TableActionLink,
+  TableActions,
+  TableRefreshButton,
+} from '@/components/dashboard/table-actions';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { StageRail } from '@/features/jobs/components/stage-rail';
 import { EventTimeline } from '@/features/jobs/components/event-timeline';
+import { cancelPlanAction } from '../actions';
 
 const ACTIVE_STATUSES = new Set(['queued', 'running', 'retrying']);
 
@@ -24,13 +38,22 @@ function durationOf(run: JobDetail['run']): number | null {
   return Date.now() - new Date(run.startedAt).getTime();
 }
 
-export default async function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function JobDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: DetailSearchParams;
+}) {
   const { id } = await params;
+  const { from: fromParam } = await searchParams;
+  const back = backLinkFor(fromParam, '/jobs');
   const detail = await apiFetch<JobDetail>(`/jobs/${id}`);
   const run = detail.run;
   const active = ACTIVE_STATUSES.has(run.status);
   const parentJobRunId =
     typeof run.payload?.parentJobRunId === 'string' ? run.payload.parentJobRunId : null;
+  const isPlan = run.jobName === 'backfill-plan';
   const stageIndex = run.currentStage ? run.stageKeys.indexOf(run.currentStage) : -1;
   const stageTotal = run.stageTotal ?? run.stageKeys.length;
 
@@ -43,22 +66,29 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
       />
 
       <DetailHeader
+        back={back}
         badges={<StatusBadge status={run.status} />}
         meta={`${label(run.jobName)} · ${label(run.queueName)} · attempt ${run.attempt}/${run.maxAttempts}`}
+        links={
+          parentJobRunId
+            ? [
+                {
+                  href: detailHref(`/jobs/${parentJobRunId}`, back.href),
+                  label: 'Backfill plan',
+                },
+              ]
+            : []
+        }
         actions={
-          <>
-            <Link href="/jobs" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
-              All jobs
-            </Link>
-            {parentJobRunId ? (
-              <Link
-                href={`/data/backfills/${parentJobRunId}`}
-                className={buttonVariants({ variant: 'outline', size: 'sm' })}
-              >
-                Parent plan
-              </Link>
-            ) : null}
-          </>
+          isPlan && active ? (
+            <form action={cancelPlanAction}>
+              <input type="hidden" name="jobId" value={run.id} />
+              <input type="hidden" name="returnTo" value={`/jobs/${run.id}`} />
+              <SubmitButton size="sm" variant="outline" pendingLabel="Cancelling…">
+                Cancel plan
+              </SubmitButton>
+            </form>
+          ) : null
         }
       />
 
@@ -129,6 +159,118 @@ export default async function JobDetailPage({ params }: { params: Promise<{ id: 
           </StatGrid>
         )}
       </SectionCard>
+
+      {isPlan ? (
+        <SectionCard
+          className="mt-4"
+          title="Chunks"
+          description="One parent plan, one child job per instrument, one run per month. A succeeded chunk is not a complete day."
+          actions={<TableRefreshButton />}
+        >
+          {detail.planProgress ? (
+            <StatGrid columns={5}>
+              <StatCard
+                label="Succeeded"
+                value={formatNumber(detail.planProgress.succeeded)}
+                hint="Chunks"
+                tone="success"
+              />
+              <StatCard
+                label="Running"
+                value={formatNumber(detail.planProgress.running)}
+                hint="In-flight chunks"
+                tone="info"
+              />
+              <StatCard
+                label="Failed"
+                value={formatNumber(detail.planProgress.failed)}
+                hint="Chunks"
+                tone="danger"
+              />
+              <StatCard
+                label="Rows written"
+                value={formatNumber(detail.planProgress.rowsWritten)}
+                hint="Inserted + updated"
+                tone="highlight"
+              />
+              <StatCard
+                label="Rows rejected"
+                value={formatNumber(detail.planProgress.rowsRejected)}
+                hint="Evidence retained"
+                tone="warning"
+              />
+            </StatGrid>
+          ) : null}
+
+          {detail.chunks.length === 0 ? (
+            <EmptyState
+              className="mt-4"
+              title="No chunks"
+              description="The plan has not queued any instrument yet."
+            />
+          ) : (
+            <div className="mt-4 overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Rank</TableHead>
+                    <TableHead>Instrument</TableHead>
+                    <TableHead>Chunk</TableHead>
+                    <TableHead>Window</TableHead>
+                    <TableHead>Rows</TableHead>
+                    <TableHead>HTTP</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead />
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {detail.chunks.map((chunk) => (
+                    <TableRow key={chunk.id}>
+                      <TableCell className="text-muted-foreground font-mono text-xs">
+                        {chunk.rank ?? '—'}
+                      </TableCell>
+                      <TableCell>{chunk.symbol ?? chunk.instrumentId ?? '—'}</TableCell>
+                      <TableCell className="text-muted-foreground text-xs">
+                        {(chunk.chunkIndex ?? 0) + 1}/{chunk.chunkCount ?? '—'} · attempt{' '}
+                        {chunk.attempt}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-xs">
+                        {chunk.requestedFrom ?? '—'} → {chunk.requestedTo ?? '—'}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-xs">
+                        {chunk.rowsFetched}/{chunk.rowsWritten}/{chunk.rowsRejected}
+                        <span className="block text-[10px]">
+                          {chunk.rowsSkipped} skipped · {chunk.rowsUpdated} updated
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-xs">
+                        {chunk.httpStatus ?? '—'}
+                        {chunk.providerErrorCode ? (
+                          <span className="block text-[10px]">{chunk.providerErrorCode}</span>
+                        ) : null}
+                      </TableCell>
+                      <TableCell>
+                        <StatusBadge status={chunk.status} />
+                        {chunk.errorMessage ? (
+                          <p className="text-destructive mt-1 max-w-56 truncate text-[10px]">
+                            {chunk.errorMessage}
+                          </p>
+                        ) : null}
+                      </TableCell>
+                      <TableActions>
+                        <TableActionLink
+                          href={detailHref(`/instruments/runs/${chunk.id}`, back.href)}
+                          label="View run"
+                        />
+                      </TableActions>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </SectionCard>
+      ) : null}
 
       <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <SectionCard

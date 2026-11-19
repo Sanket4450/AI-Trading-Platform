@@ -110,10 +110,11 @@ seed, repositories, configuration management, API, dashboard, worker jobs and au
   releases.
 - **Credentials.** `CONFIG_ENCRYPTION_KEY` drives AES-256-GCM envelope encryption. The API returns credential
   metadata only; ciphertext is never exposed.
-- **API surface.** Health, auth, accounts, instruments, universes, strategies, configuration, data health, audit,
-  settings and system status. See Swagger at `/api/docs`.
-- **Data health writes.** Bounded backfill and materialized-view refresh create `job_runs` and enqueue BullMQ
-  jobs. Quality issues can be acknowledged, resolved or ignored with an audit row.
+- **API surface.** Health, auth, accounts, instruments (including coverage and ingestion runs), universes,
+  strategies, configuration, jobs, audit, settings (including provider state and provider-wide issues) and
+  system status. See Swagger at `/api/docs`.
+- **Ingestion writes.** A per-instrument fetch and a materialized-view refresh create `job_runs` and enqueue
+  BullMQ jobs. Quality issues can be acknowledged, resolved or ignored with an audit row.
 
 ### Worker
 
@@ -130,10 +131,10 @@ seed, repositories, configuration management, API, dashboard, worker jobs and au
 
 ### Dashboard
 
-- Nine R1 routes: `/`, `/accounts`, `/instruments`, `/universes`, `/strategies`, `/configuration`, `/data`,
-  `/audit` and `/settings`.
+- Eight operator routes: `/`, `/accounts`, `/instruments`, `/universes`, `/strategies`, `/jobs`, `/audit`
+  and `/settings`.
 - Server components read the API through `apps/web/src/lib/api.ts`; server actions perform configuration,
-  strategy, credential, data-health and settings writes.
+  strategy, credential, ingestion and settings writes.
 - `apps/web/src/proxy.ts` protects every route except login and auth callbacks. Next.js 16 replaced the
   `middleware` convention with `proxy`.
 - The dashboard is dark-first, responsive at 390px, and shows the offline mode on every screen.
@@ -229,14 +230,15 @@ modular monolith or the R1 lifecycle tables.
 
 ### API and dashboard
 
-- The catalog-first surface adds instrument status, fetch/cancel, plans, coverage heatmap,
-  day detail, validation, run detail, issue detail, provider status, quality rules and reference
-  commands. Every write records an audit row.
+- The catalog-first surface adds instrument coverage status, per-instrument fetch/cancel/recompute,
+  coverage day detail, ingestion run detail and issue lifecycle. Jobs expose plan chunks; settings expose
+  provider state and provider-wide issues. Every write records an audit row.
 - A broker-contract test asserts that the API does not import order, position or trading modules, that
   the Upstox adapter has no order method and that the placeholder order controller has no route.
 - Reference sync and corporate-action import require the global `admin` user role.
-- The dashboard adds `/instruments/[id]`, `/data/backfills/[id]`, `/data/runs/[id]`,
-  `/data/issues/[id]` and the coverage day detail. It polls only while a visible row is active.
+- The dashboard adds `/instruments/[id]`, its coverage day detail, `/instruments/runs/[id]`,
+  `/instruments/issues/[id]`, `/settings/issues/[id]` and plan chunks inside `/jobs/[id]`. It polls only
+  while a visible row is active.
 
 ### Open checks
 

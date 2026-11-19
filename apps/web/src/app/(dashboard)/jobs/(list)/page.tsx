@@ -17,6 +17,7 @@ import {
   TableActions,
   TableRefreshButton,
 } from '@/components/dashboard/table-actions';
+import { detailHref, originHref } from '@/lib/navigation';
 import {
   Table,
   TableBody,
@@ -57,6 +58,7 @@ export default async function JobsPage({
   searchParams: Promise<{ status?: string | string[]; search?: string }>;
 }) {
   const params = await searchParams;
+  const from = originHref('/jobs', params);
   const statuses = params.status
     ? Array.isArray(params.status)
       ? params.status
@@ -172,7 +174,7 @@ export default async function JobsPage({
                     <StatusBadge status={run.status} />
                   </TableCell>
                   <TableActions>
-                    <TableActionLink href={`/jobs/${run.id}`} label="View job" />
+                    <TableActionLink href={detailHref(`/jobs/${run.id}`, from)} label="View job" />
                   </TableActions>
                 </TableRow>
               ))}

@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { JobRunDto } from '../../../common/dto/job-run.dto.js';
-import { QualityIssueDto } from '../../data/dto/data-response.dto.js';
+import { QualityIssueDto } from '../../../common/dto/quality-issue.dto.js';
 
 export class HealthCheckDto {
   @ApiProperty({ enum: ['healthy', 'unhealthy'] })
@@ -158,6 +158,7 @@ export class OverviewDto {
       type: 'object',
       properties: {
         id: { type: 'string', format: 'uuid' },
+        instrumentId: { type: 'string', format: 'uuid', nullable: true },
         issueType: { type: 'string' },
         severity: { type: 'string' },
         status: { type: 'string' },
@@ -166,6 +167,7 @@ export class OverviewDto {
       },
       required: [
         'id',
+        'instrumentId',
         'issueType',
         'severity',
         'status',
@@ -177,7 +179,13 @@ export class OverviewDto {
   openIssues!: Array<
     Pick<
       QualityIssueDto,
-      'id' | 'issueType' | 'severity' | 'status' | 'tradingDate' | 'detectedAt'
+      | 'id'
+      | 'instrumentId'
+      | 'issueType'
+      | 'severity'
+      | 'status'
+      | 'tradingDate'
+      | 'detectedAt'
     >
   >;
 

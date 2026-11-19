@@ -61,7 +61,7 @@ names its window. A stock listed in 2024 cannot claim complete history from 2022
 - T+1 finalization.
 - The scheduled quality scan.
 - The 08:30 ingestion reconciliation.
-- An explicit `POST /data/instrument-status/recompute`.
+- An explicit `POST /instruments/:id/coverage/recompute`.
 
 The catalog never computes status on read.
 

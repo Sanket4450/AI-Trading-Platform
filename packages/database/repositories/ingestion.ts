@@ -175,65 +175,6 @@ export async function getParentPlanProgress(parentJobRunId: string) {
   );
 }
 
-export async function listBackfillPlans(limit = 50) {
-  const plans = await db
-    .select()
-    .from(jobRuns)
-    .where(and(eq(jobRuns.jobName, 'backfill-plan'), eq(jobRuns.jobType, 'ingestion')))
-    .orderBy(desc(jobRuns.createdAt))
-    .limit(limit);
-  return Promise.all(
-    plans.map(async (plan) => ({
-      ...plan,
-      progress: await getParentPlanProgress(plan.id),
-    })),
-  );
-}
-
-export async function getBackfillPlanDetail(id: string) {
-  const rows = await db.select().from(jobRuns).where(eq(jobRuns.id, id)).limit(1);
-  const plan = rows[0];
-  if (!plan) return null;
-  const progress = await getParentPlanProgress(id);
-  const chunks = await db
-    .select({
-      id: marketDataIngestionRuns.id,
-      instrumentId: marketDataIngestionRuns.instrumentId,
-      symbol: instruments.tradingSymbol,
-      rank: sql<number | null>`(
-        select m.rank from instrument_universe_members m
-        join instrument_universe_versions v on v.id = m.universe_version_id
-        join instrument_universes u on u.id = v.universe_id
-        where m.instrument_id = "market_data_ingestion_runs"."instrument_id"
-          and u.code = 'nifty-50'
-          and v.effective_to is null
-        limit 1
-      )`,
-      chunkIndex: marketDataIngestionRuns.chunkIndex,
-      chunkCount: marketDataIngestionRuns.chunkCount,
-      requestedFrom: marketDataIngestionRuns.requestedFrom,
-      requestedTo: marketDataIngestionRuns.requestedTo,
-      status: marketDataIngestionRuns.status,
-      attempt: marketDataIngestionRuns.attempt,
-      rowsFetched: marketDataIngestionRuns.rowsFetched,
-      rowsWritten: marketDataIngestionRuns.rowsWritten,
-      rowsRejected: marketDataIngestionRuns.rowsRejected,
-      rowsSkipped: marketDataIngestionRuns.rowsSkipped,
-      rowsUpdated: marketDataIngestionRuns.rowsUpdated,
-      httpStatus: marketDataIngestionRuns.httpStatus,
-      providerErrorCode: marketDataIngestionRuns.providerErrorCode,
-      durationMs: marketDataIngestionRuns.durationMs,
-      errorMessage: marketDataIngestionRuns.errorMessage,
-      startedAt: marketDataIngestionRuns.startedAt,
-      finishedAt: marketDataIngestionRuns.finishedAt,
-    })
-    .from(marketDataIngestionRuns)
-    .leftJoin(instruments, eq(instruments.id, marketDataIngestionRuns.instrumentId))
-    .where(eq(marketDataIngestionRuns.parentJobRunId, id))
-    .orderBy(asc(marketDataIngestionRuns.instrumentId), asc(marketDataIngestionRuns.chunkIndex));
-  return { ...plan, progress, chunks };
-}
-
 export async function getExistingCandles(instrumentId: string, from: Date, to: Date) {
   return db
     .select({
@@ -466,40 +407,6 @@ export async function upsertDailyValidation(values: {
   return row;
 }
 
-export async function listDailyValidation(filters: {
-  instrumentId?: string;
-  from?: string;
-  to?: string;
-  status?: string;
-  limit?: number;
-}) {
-  const conditions = [];
-  if (filters.instrumentId)
-    conditions.push(eq(marketDataDailyValidation.instrumentId, filters.instrumentId));
-  if (filters.from) conditions.push(gte(marketDataDailyValidation.tradingDate, filters.from));
-  if (filters.to) conditions.push(lte(marketDataDailyValidation.tradingDate, filters.to));
-  if (filters.status) conditions.push(eq(marketDataDailyValidation.status, filters.status));
-  return db
-    .select({
-      id: marketDataDailyValidation.id,
-      instrumentId: marketDataDailyValidation.instrumentId,
-      symbol: instruments.tradingSymbol,
-      tradingDate: marketDataDailyValidation.tradingDate,
-      status: marketDataDailyValidation.status,
-      ohlcMatch: marketDataDailyValidation.ohlcMatch,
-      volumeMatch: marketDataDailyValidation.volumeMatch,
-      dailyVolume: marketDataDailyValidation.dailyVolume,
-      minuteVolume: marketDataDailyValidation.minuteVolume,
-      volumeDeltaPct: marketDataDailyValidation.volumeDeltaPct,
-      checkedAt: marketDataDailyValidation.checkedAt,
-    })
-    .from(marketDataDailyValidation)
-    .innerJoin(instruments, eq(instruments.id, marketDataDailyValidation.instrumentId))
-    .where(conditions.length > 0 ? and(...conditions) : undefined)
-    .orderBy(desc(marketDataDailyValidation.tradingDate))
-    .limit(Math.min(filters.limit ?? 500, 2000));
-}
-
 export async function getCoverageDayDetail(instrumentId: string, date: string) {
   const coverage = await db
     .select()
@@ -549,51 +456,6 @@ export async function getCoverageDayDetail(instrumentId: string, date: string) {
     validation: validation[0] ?? null,
     issues,
   };
-}
-
-export async function getCoverageHeatmap(filters: {
-  from: string;
-  to: string;
-  universeCode?: string;
-  limit?: number;
-}) {
-  const universeCode = filters.universeCode ?? 'nifty-50';
-  return db
-    .select({
-      instrumentId: marketDataCoverage.instrumentId,
-      symbol: instruments.tradingSymbol,
-      rank: instrumentUniverseMembers.rank,
-      tradingDate: marketDataCoverage.tradingDate,
-      status: marketDataCoverage.status,
-      validationStatus: marketDataCoverage.validationStatus,
-      gapCount: marketDataCoverage.gapCount,
-      gapRunCount: marketDataCoverage.gapRunCount,
-      maxGapMinutes: marketDataCoverage.maxGapMinutes,
-    })
-    .from(marketDataCoverage)
-    .innerJoin(instruments, eq(instruments.id, marketDataCoverage.instrumentId))
-    .innerJoin(
-      instrumentUniverseMembers,
-      eq(instrumentUniverseMembers.instrumentId, marketDataCoverage.instrumentId),
-    )
-    .innerJoin(
-      instrumentUniverseVersions,
-      eq(instrumentUniverseVersions.id, instrumentUniverseMembers.universeVersionId),
-    )
-    .innerJoin(
-      instrumentUniverses,
-      eq(instrumentUniverses.id, instrumentUniverseVersions.universeId),
-    )
-    .where(
-      and(
-        eq(instrumentUniverses.code, universeCode),
-        sql`${instrumentUniverseVersions.effectiveTo} is null`,
-        gte(marketDataCoverage.tradingDate, filters.from),
-        lte(marketDataCoverage.tradingDate, filters.to),
-      ),
-    )
-    .orderBy(asc(instrumentUniverseMembers.rank), asc(marketDataCoverage.tradingDate))
-    .limit(Math.min(filters.limit ?? 2000, 5000));
 }
 
 export async function getIngestionRunDetail(id: string) {
@@ -1037,8 +899,39 @@ export async function getRawPayloadByFingerprint(values: {
 
 export async function listPlanChunks(parentJobRunId: string) {
   return db
-    .select()
+    .select({
+      id: marketDataIngestionRuns.id,
+      instrumentId: marketDataIngestionRuns.instrumentId,
+      symbol: instruments.tradingSymbol,
+      rank: sql<number | null>`(
+        select m.rank from instrument_universe_members m
+        join instrument_universe_versions v on v.id = m.universe_version_id
+        join instrument_universes u on u.id = v.universe_id
+        where m.instrument_id = "market_data_ingestion_runs"."instrument_id"
+          and u.code = 'nifty-50'
+          and v.effective_to is null
+        limit 1
+      )`,
+      chunkIndex: marketDataIngestionRuns.chunkIndex,
+      chunkCount: marketDataIngestionRuns.chunkCount,
+      requestedFrom: marketDataIngestionRuns.requestedFrom,
+      requestedTo: marketDataIngestionRuns.requestedTo,
+      status: marketDataIngestionRuns.status,
+      attempt: marketDataIngestionRuns.attempt,
+      rowsFetched: marketDataIngestionRuns.rowsFetched,
+      rowsWritten: marketDataIngestionRuns.rowsWritten,
+      rowsRejected: marketDataIngestionRuns.rowsRejected,
+      rowsSkipped: marketDataIngestionRuns.rowsSkipped,
+      rowsUpdated: marketDataIngestionRuns.rowsUpdated,
+      httpStatus: marketDataIngestionRuns.httpStatus,
+      providerErrorCode: marketDataIngestionRuns.providerErrorCode,
+      durationMs: marketDataIngestionRuns.durationMs,
+      errorMessage: marketDataIngestionRuns.errorMessage,
+      startedAt: marketDataIngestionRuns.startedAt,
+      finishedAt: marketDataIngestionRuns.finishedAt,
+    })
     .from(marketDataIngestionRuns)
+    .leftJoin(instruments, eq(instruments.id, marketDataIngestionRuns.instrumentId))
     .where(eq(marketDataIngestionRuns.parentJobRunId, parentJobRunId))
     .orderBy(asc(marketDataIngestionRuns.instrumentId), asc(marketDataIngestionRuns.chunkIndex));
 }

@@ -1,5 +1,5 @@
 import { apiFetch } from '@/lib/api';
-import type { InstrumentStatusRow } from '@/lib/types';
+import type { InstrumentCoverageRow } from '@/lib/types';
 import { formatDateTime, formatNumber } from '@/lib/format';
 import { label } from '@/lib/labels';
 import { displayStatus, statusTone } from '@/lib/status';
@@ -15,6 +15,7 @@ import {
   TableRefreshButton,
 } from '@/components/dashboard/table-actions';
 import { FilterSelect, SearchFilter, TableFilters } from '@/components/dashboard/table-filters';
+import { detailHref, originHref } from '@/lib/navigation';
 import { Badge } from '@/components/ui/badge';
 import {
   Table,
@@ -45,14 +46,15 @@ const dataStatuses = [
 export default async function InstrumentsPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams;
   const universeCode = params.universeCode ?? 'nifty-50';
+  const from = originHref('/instruments', params);
   const query = new URLSearchParams({ universeCode, limit: '200' });
   if (params.dataStatus) query.set('dataStatus', params.dataStatus);
   if (params.search) query.set('search', params.search);
 
   const [rows, summary] = await Promise.all([
-    apiFetch<InstrumentStatusRow[]>(`/data/instrument-status?${query.toString()}`),
+    apiFetch<InstrumentCoverageRow[]>(`/instruments/status?${query.toString()}`),
     apiFetch<Record<string, number>>(
-      `/data/instrument-status/summary?universeCode=${encodeURIComponent(universeCode)}`,
+      `/instruments/status/summary?universeCode=${encodeURIComponent(universeCode)}`,
     ),
   ]);
 
@@ -187,7 +189,7 @@ export default async function InstrumentsPage({ searchParams }: { searchParams: 
                     </TableCell>
                     <TableActions>
                       <TableActionLink
-                        href={`/instruments/${row.instrumentId}`}
+                        href={detailHref(`/instruments/${row.instrumentId}`, from)}
                         label="View instrument"
                       />
                       {row.fetchStatus === 'queued' || row.fetchStatus === 'fetching' ? (

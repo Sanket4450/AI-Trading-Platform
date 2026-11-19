@@ -7,6 +7,7 @@ import { TableSummary } from '@/components/dashboard/table-summary';
 import { StatusBadge } from '@/components/dashboard/status-badge';
 import { EmptyState } from '@/components/dashboard/empty-state';
 import { SearchFilter, TableFilters } from '@/components/dashboard/table-filters';
+import { detailHref, originHref } from '@/lib/navigation';
 import {
   TableActionLink,
   TableActions,
@@ -28,6 +29,7 @@ export default async function StrategiesPage({
   searchParams: Promise<{ search?: string }>;
 }) {
   const params = await searchParams;
+  const from = originHref('/strategies', params);
   const query = new URLSearchParams();
   if (params.search) query.set('search', params.search);
   const queryString = query.toString();
@@ -132,7 +134,10 @@ export default async function StrategiesPage({
                   <TableCell>{strategy.universeCount}</TableCell>
                   <TableCell>{strategy.activeActivations}</TableCell>
                   <TableActions>
-                    <TableActionLink href={`/strategies/${strategy.id}`} label="View strategy" />
+                    <TableActionLink
+                      href={detailHref(`/strategies/${strategy.id}`, from)}
+                      label="View strategy"
+                    />
                   </TableActions>
                 </TableRow>
               ))}

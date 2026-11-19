@@ -5,6 +5,7 @@ import { apiFetch } from '@/lib/api';
 import type { Account, AccountAccess, AccountPermission, EquitySnapshot } from '@/lib/types';
 import { formatDateTime, formatMoney, formatNumber } from '@/lib/format';
 import { label } from '@/lib/labels';
+import { backLinkFor, detailHref, type DetailSearchParams } from '@/lib/navigation';
 import { PageMeta } from '@/components/shell/page-meta';
 import { StatCard, StatGrid } from '@/components/dashboard/stat-card';
 import { SectionCard } from '@/components/dashboard/section-card';
@@ -21,7 +22,7 @@ import {
   TableRefreshButton,
 } from '@/components/dashboard/table-actions';
 import { Badge } from '@/components/ui/badge';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
   Table,
@@ -53,8 +54,16 @@ const credentialTypes = [
   'totp_secret',
 ] as const;
 
-export default async function AccountDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function AccountDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: DetailSearchParams;
+}) {
   const { id } = await params;
+  const { from: fromParam } = await searchParams;
+  const back = backLinkFor(fromParam, '/accounts');
   const accounts = await apiFetch<Account[]>('/accounts');
   const account = accounts.find((entry) => entry.id === id);
 
@@ -75,6 +84,7 @@ export default async function AccountDetailPage({ params }: { params: Promise<{ 
       />
 
       <DetailHeader
+        back={back}
         badges={
           <>
             <StatusBadge status={account.mode} />
@@ -83,40 +93,35 @@ export default async function AccountDetailPage({ params }: { params: Promise<{ 
         }
         meta={`${account.baseCurrency} · UCC ${account.brokerUserRef ?? 'not set'} · opened ${formatDateTime(account.openedAt)}`}
         actions={
-          <>
-            <Link href="/accounts" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
-              Back to accounts
-            </Link>
-            <FormDialog
-              trigger={
-                <Button type="button" size="sm" variant="outline">
-                  <KeyRound className="size-4" />
-                  Rotate credential
-                </Button>
-              }
-              title="Rotate a credential"
-              description="The API encrypts with AES-256-GCM and never returns the ciphertext or plaintext."
-              submitLabel="Encrypt and store"
-              action={rotateCredentialAction}
-            >
-              <input type="hidden" name="accountId" value={account.id} />
-              <input type="hidden" name="providerId" value={account.brokerProviderId} />
-              <FormField label="Credential type" htmlFor="credentialType">
-                <FormSelect
-                  id="credentialType"
-                  name="credentialType"
-                  defaultValue="access_token"
-                  options={credentialTypes.map((type) => ({ value: type, label: label(type) }))}
-                />
-              </FormField>
-              <FormField label="Expires at" htmlFor="expiresAt">
-                <Input id="expiresAt" name="expiresAt" type="datetime-local" />
-              </FormField>
-              <FormField label="Secret value" htmlFor="value">
-                <Input id="value" name="value" type="password" placeholder="Write-only" required />
-              </FormField>
-            </FormDialog>
-          </>
+          <FormDialog
+            trigger={
+              <Button type="button" size="sm" variant="outline">
+                <KeyRound className="size-4" />
+                Rotate credential
+              </Button>
+            }
+            title="Rotate a credential"
+            description="The API encrypts with AES-256-GCM and never returns the ciphertext or plaintext."
+            submitLabel="Encrypt and store"
+            action={rotateCredentialAction}
+          >
+            <input type="hidden" name="accountId" value={account.id} />
+            <input type="hidden" name="providerId" value={account.brokerProviderId} />
+            <FormField label="Credential type" htmlFor="credentialType">
+              <FormSelect
+                id="credentialType"
+                name="credentialType"
+                defaultValue="access_token"
+                options={credentialTypes.map((type) => ({ value: type, label: label(type) }))}
+              />
+            </FormField>
+            <FormField label="Expires at" htmlFor="expiresAt">
+              <Input id="expiresAt" name="expiresAt" type="datetime-local" />
+            </FormField>
+            <FormField label="Secret value" htmlFor="value">
+              <Input id="value" name="value" type="password" placeholder="Write-only" required />
+            </FormField>
+          </FormDialog>
         }
       />
 
@@ -223,7 +228,9 @@ export default async function AccountDetailPage({ params }: { params: Promise<{ 
                           ]}
                         />
                         <Button asChild variant="outline" size="sm">
-                          <Link href={`/instruments/${permission.instrumentId}`}>
+                          <Link
+                            href={detailHref(`/instruments/${permission.instrumentId}`, back.href)}
+                          >
                             Open instrument
                           </Link>
                         </Button>

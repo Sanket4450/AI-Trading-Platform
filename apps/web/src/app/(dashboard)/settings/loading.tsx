@@ -1,6 +1,7 @@
 import {
   ButtonSkeleton,
   IconButtonSkeleton,
+  IssueListSkeleton,
   KeyValueGridSkeleton,
   SectionSkeleton,
   TableSkeleton,
@@ -11,7 +12,11 @@ export default function Loading() {
   return (
     <div aria-busy="true" aria-live="polite">
       <SectionSkeleton titleWidth="w-48" descriptionWidth="w-80">
-        <KeyValueGridSkeleton columns={4} items={8} />
+        <KeyValueGridSkeleton columns={4} items={14} />
+      </SectionSkeleton>
+
+      <SectionSkeleton className="mt-4" titleWidth="w-32" descriptionWidth="w-96">
+        <IssueListSkeleton rows={3} />
       </SectionSkeleton>
 
       <SectionSkeleton

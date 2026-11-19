@@ -241,25 +241,8 @@ export function JsonBlockSkeleton({ lines = 5 }: { lines?: number }) {
   );
 }
 
-/** List of bordered issue cards, used by overview, data health and instrument detail. */
+/** List of bordered issue cards, used by overview and instrument detail. */
 export function IssueListSkeleton({ rows = 3 }: { rows?: number }) {
-  return (
-    <div className="space-y-3">
-      {Array.from({ length: rows }).map((_, index) => (
-        <div key={index} className="border-border/70 bg-background/40 rounded-lg border p-3">
-          <div className="flex items-center justify-between gap-2">
-            <Skeleton className="h-3.5 w-32" />
-            <Skeleton className="h-5 w-16 rounded-full" />
-          </div>
-          <Skeleton className="mt-2 h-2.5 w-56" />
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/** Backfill-plan cards with a mono ID, status badge and two metadata lines. */
-export function PlanListSkeleton({ rows = 4 }: { rows?: number }) {
   return (
     <div className="space-y-2">
       {Array.from({ length: rows }).map((_, index) => (
@@ -350,30 +333,6 @@ export function MonthGridSkeleton({ months = 12 }: { months?: number }) {
           <Skeleton className="mt-1.5 h-2 w-3/4" />
         </div>
       ))}
-    </div>
-  );
-}
-
-/** Coverage heatmap placeholder: instrument labels plus a dense grid of day cells. */
-export function HeatmapSkeleton({ rows = 16, columns = 28 }: { rows?: number; columns?: number }) {
-  return (
-    <div className="overflow-x-auto">
-      <div className="space-y-1">
-        <div className="flex items-center gap-1">
-          <Skeleton className="mr-1 h-2.5 w-20 shrink-0" />
-          {Array.from({ length: columns }).map((_, index) => (
-            <Skeleton key={index} className="h-2.5 w-4 shrink-0" />
-          ))}
-        </div>
-        {Array.from({ length: rows }).map((_, row) => (
-          <div key={row} className="flex items-center gap-1">
-            <Skeleton className="mr-1 h-3 w-20 shrink-0" />
-            {Array.from({ length: columns }).map((_, column) => (
-              <Skeleton key={column} className="size-4 shrink-0 rounded-sm" />
-            ))}
-          </div>
-        ))}
-      </div>
     </div>
   );
 }

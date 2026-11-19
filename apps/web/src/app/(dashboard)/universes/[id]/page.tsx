@@ -4,6 +4,7 @@ import { apiFetch } from '@/lib/api';
 import type { UniverseDetail } from '@/lib/types';
 import { formatDate, formatNumber } from '@/lib/format';
 import { label } from '@/lib/labels';
+import { backLinkFor, detailHref, type DetailSearchParams } from '@/lib/navigation';
 import { PageMeta } from '@/components/shell/page-meta';
 import { StatCard, StatGrid } from '@/components/dashboard/stat-card';
 import { SectionCard } from '@/components/dashboard/section-card';
@@ -18,7 +19,7 @@ import {
   TableRefreshButton,
 } from '@/components/dashboard/table-actions';
 import { Badge } from '@/components/ui/badge';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
 import {
   Table,
   TableBody,
@@ -28,8 +29,16 @@ import {
   TableRow,
 } from '@/components/ui/table';
 
-export default async function UniverseDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function UniverseDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: DetailSearchParams;
+}) {
   const { id } = await params;
+  const { from: fromParam } = await searchParams;
+  const back = backLinkFor(fromParam, '/universes');
   const detail = await apiFetch<UniverseDetail>(`/universes/${id}`);
 
   if (!detail) notFound();
@@ -42,6 +51,7 @@ export default async function UniverseDetailPage({ params }: { params: Promise<{
       />
 
       <DetailHeader
+        back={back}
         badges={
           <>
             <Badge variant="outline">{detail.code}</Badge>
@@ -49,11 +59,6 @@ export default async function UniverseDetailPage({ params }: { params: Promise<{
           </>
         }
         meta={`${detail.versions.length} versions · latest v${detail.latestVersion ?? '—'}`}
-        actions={
-          <Link href="/universes" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
-            Back to universes
-          </Link>
-        }
       />
 
       <StatGrid>
@@ -180,7 +185,9 @@ export default async function UniverseDetailPage({ params }: { params: Promise<{
                             ]}
                           />
                           <Button asChild variant="outline" size="sm">
-                            <Link href={`/instruments/${member.instrumentId}`}>
+                            <Link
+                              href={detailHref(`/instruments/${member.instrumentId}`, back.href)}
+                            >
                               Open instrument
                             </Link>
                           </Button>

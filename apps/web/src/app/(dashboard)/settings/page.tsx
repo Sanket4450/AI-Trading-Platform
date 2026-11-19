@@ -1,10 +1,17 @@
 import Link from 'next/link';
 import { PencilLine, Plus, SlidersHorizontal } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
-import type { ConfigurationVersion, ProviderStatus, SystemSetting } from '@/lib/types';
+import type {
+  ConfigurationVersion,
+  ProviderStatus,
+  QualityIssue,
+  SystemSetting,
+} from '@/lib/types';
 import { formatDate, formatDateTime, formatNumber } from '@/lib/format';
 import { formatSettingKey, label } from '@/lib/labels';
+import { detailHref } from '@/lib/navigation';
 import { SectionCard } from '@/components/dashboard/section-card';
+import { StatusBadge } from '@/components/dashboard/status-badge';
 import { EmptyState } from '@/components/dashboard/empty-state';
 import { KeyValueGrid } from '@/components/dashboard/key-value-grid';
 import { FormDialog } from '@/components/dashboard/form-dialog';
@@ -61,9 +68,10 @@ export default async function SettingsPage({
     ? apiFetch<ConfigurationVersion>(`/configuration/${params.version}`).catch(() => null)
     : Promise.resolve(null);
 
-  const [settings, provider, versions, versionDetail] = await Promise.all([
+  const [settings, provider, providerIssues, versions, versionDetail] = await Promise.all([
     apiFetch<SystemSetting[]>('/settings'),
-    apiFetch<ProviderStatus>('/data/provider-status'),
+    apiFetch<ProviderStatus>('/settings/provider'),
+    apiFetch<QualityIssue[]>('/settings/issues?limit=20'),
     apiFetch<ConfigurationVersion[]>(`/configuration?${configQuery.toString()}`),
     selectedVersion,
   ]);
@@ -150,24 +158,43 @@ export default async function SettingsPage({
     <div>
       <SectionCard
         title="Provider and schedule state"
-        description="Read-only operational state. Tokens are never returned."
+        description="Read-only operational state. Credentials are reported as present or missing, never returned."
       >
         <KeyValueGrid
           columns={4}
           items={[
             { label: 'Network', value: provider.networkEnabled ? 'Enabled' : 'Disabled' },
+            { label: 'API key', value: provider.apiKeyConfigured ? 'Set' : 'Missing' },
             { label: 'Token', value: provider.tokenConfigured ? 'Configured' : 'Missing' },
             { label: 'Daily oracle', value: provider.dailyOracleEnabled ? 'Enabled' : 'Disabled' },
             {
               label: 'Budget',
               value: provider.budget
-                ? `${provider.budget.availableSecond}/s · ${provider.budget.availableMinute}/m`
+                ? `${provider.budget.availableSecond}/s · ${provider.budget.availableMinute}/m · ${provider.budget.available30Minutes}/30m`
                 : 'Unavailable',
+            },
+            {
+              label: 'Chunks',
+              value: `${formatNumber(provider.runningChunks)} running · ${formatNumber(provider.queuedChunks)} queued`,
+            },
+            {
+              label: 'Failed 24h',
+              value: formatNumber(provider.failedRuns24h),
+            },
+            {
+              label: 'Raw payloads',
+              value: `${formatNumber(Number(provider.payloadCount))} rows · ${formatNumber(Number(provider.payloadBytes))} bytes`,
             },
             {
               label: 'Last instrument sync',
               value: provider.lastSuccessfulSyncAt
                 ? formatDateTime(provider.lastSuccessfulSyncAt)
+                : 'Never',
+            },
+            {
+              label: 'Last backfill',
+              value: provider.lastSuccessfulBackfillAt
+                ? formatDateTime(provider.lastSuccessfulBackfillAt)
                 : 'Never',
             },
             {
@@ -183,11 +210,54 @@ export default async function SettingsPage({
                 : 'Never',
             },
             {
-              label: 'Raw payloads',
-              value: `${formatNumber(Number(provider.payloadCount))} rows`,
+              label: 'Oldest payload',
+              value: provider.oldestPayloadAt
+                ? formatDateTime(provider.oldestPayloadAt)
+                : 'None retained',
+            },
+            {
+              label: 'Paused until',
+              value: provider.budget?.pausedUntil
+                ? formatDateTime(provider.budget.pausedUntil)
+                : 'Not paused',
             },
           ]}
         />
+      </SectionCard>
+
+      <SectionCard
+        className="mt-4"
+        title="Provider issues"
+        description="Findings with no single instrument: provider, trading calendar and market-wide checks."
+      >
+        {providerIssues.length === 0 ? (
+          <EmptyState
+            title="No provider issues"
+            description="Provider-wide validation has not raised anything."
+          />
+        ) : (
+          <div className="space-y-2">
+            {providerIssues.map((issue) => (
+              <Link
+                key={issue.id}
+                href={detailHref(`/settings/issues/${issue.id}`, '/settings')}
+                className="border-border/70 bg-background/40 block rounded-lg border p-3 text-sm"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-medium">{label(issue.issueType)}</span>
+                  <div className="flex gap-1">
+                    <StatusBadge status={issue.severity} />
+                    <StatusBadge status={issue.status} />
+                  </div>
+                </div>
+                <p className="text-muted-foreground mt-1 text-xs">
+                  {issue.ruleId ?? 'No rule'} · {issue.tradingDate ?? 'No date'} · seen{' '}
+                  {issue.occurrenceCount}× · last {formatDateTime(issue.lastSeenAt)}
+                </p>
+              </Link>
+            ))}
+          </div>
+        )}
       </SectionCard>
 
       <SectionCard

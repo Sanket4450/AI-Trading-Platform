@@ -57,9 +57,10 @@ pnpm dev:stop   # stop stale listeners on 3000/8000
 
 ## R2 research dashboard
 
-The R2 research cockpit keeps the nine R1 routes and adds the instrument catalog and data-console
-detail pages: `/instruments`, `/instruments/[id]`, `/data`, `/data/backfills/[id]`, `/data/runs/[id]`,
-`/data/issues/[id]` and the coverage day detail. Sign in with the operator created by `pnpm db:seed`.
+The R2 research cockpit keeps the R1 routes and adds the instrument catalog and its drill-downs:
+`/instruments`, `/instruments/[id]`, the coverage day detail, `/instruments/runs/[id]`,
+`/instruments/issues/[id]` and `/settings/issues/[id]` for provider-wide findings. Backfill plans are
+rendered by `/jobs/[id]`. Sign in with the operator created by `pnpm db:seed`.
 The API and worker accept `offline` or `research` and refuse `backtesting`, `paper` and `live`.
 
 R2 adds Upstox V3 historical ingestion, a persisted per-instrument fetch/data status, strict coverage,

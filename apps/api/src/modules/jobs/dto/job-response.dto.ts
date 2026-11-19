@@ -90,6 +90,112 @@ export class JobEventDto {
   metricUnit!: string | null;
 }
 
+export class JobPlanProgressDto {
+  @ApiProperty()
+  chunks!: number;
+
+  @ApiProperty()
+  instruments!: number;
+
+  @ApiProperty()
+  queued!: number;
+
+  @ApiProperty()
+  running!: number;
+
+  @ApiProperty()
+  succeeded!: number;
+
+  @ApiProperty()
+  partiallyFailed!: number;
+
+  @ApiProperty()
+  failed!: number;
+
+  @ApiProperty()
+  cancelled!: number;
+
+  @ApiProperty()
+  rowsFetched!: number;
+
+  @ApiProperty()
+  rowsWritten!: number;
+
+  @ApiProperty()
+  rowsRejected!: number;
+
+  @ApiProperty()
+  rowsSkipped!: number;
+
+  @ApiProperty()
+  rowsUpdated!: number;
+}
+
+export class JobPlanChunkDto {
+  @ApiProperty({ format: 'uuid' })
+  id!: string;
+
+  @ApiProperty({ type: String, format: 'uuid', nullable: true })
+  instrumentId!: string | null;
+
+  @ApiProperty({ type: String, nullable: true })
+  symbol!: string | null;
+
+  @ApiProperty({ type: Number, nullable: true })
+  rank!: number | null;
+
+  @ApiProperty({ type: Number, nullable: true })
+  chunkIndex!: number | null;
+
+  @ApiProperty({ type: Number, nullable: true })
+  chunkCount!: number | null;
+
+  @ApiProperty({ type: String, format: 'date', nullable: true })
+  requestedFrom!: string | null;
+
+  @ApiProperty({ type: String, format: 'date', nullable: true })
+  requestedTo!: string | null;
+
+  @ApiProperty()
+  status!: string;
+
+  @ApiProperty()
+  attempt!: number;
+
+  @ApiProperty()
+  rowsFetched!: number;
+
+  @ApiProperty()
+  rowsWritten!: number;
+
+  @ApiProperty()
+  rowsRejected!: number;
+
+  @ApiProperty()
+  rowsSkipped!: number;
+
+  @ApiProperty()
+  rowsUpdated!: number;
+
+  @ApiProperty({ type: Number, nullable: true })
+  httpStatus!: number | null;
+
+  @ApiProperty({ type: String, nullable: true })
+  providerErrorCode!: string | null;
+
+  @ApiProperty({ type: Number, nullable: true })
+  durationMs!: number | null;
+
+  @ApiProperty({ type: String, nullable: true })
+  errorMessage!: string | null;
+
+  @ApiProperty({ type: String, format: 'date-time', nullable: true })
+  startedAt!: string | null;
+
+  @ApiProperty({ type: String, format: 'date-time', nullable: true })
+  finishedAt!: string | null;
+}
+
 export class JobDetailResponseDto {
   @ApiProperty({ type: JobRunDto })
   run!: JobRunDto;
@@ -102,4 +208,18 @@ export class JobDetailResponseDto {
 
   @ApiProperty({ type: [JobEventDto] })
   events!: JobEventDto[];
+
+  @ApiProperty({
+    type: JobPlanProgressDto,
+    nullable: true,
+    description: 'Only present when the run is a multi-instrument backfill plan.',
+  })
+  planProgress!: JobPlanProgressDto | null;
+
+  @ApiProperty({
+    type: [JobPlanChunkDto],
+    description: 'Only populated for a multi-instrument backfill plan.',
+  })
+  chunks!: JobPlanChunkDto[];
 }
+

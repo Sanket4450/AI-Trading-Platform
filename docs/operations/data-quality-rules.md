@@ -1,7 +1,7 @@
 # R2 data-quality rules
 
 One real problem becomes one issue. A finding carries a stable rule ID, a severity, evidence and a
-dedupe key. The rule catalog is exposed at `GET /api/v1/data/quality-rules`.
+dedupe key. The rule catalog is the `QUALITY_RULES` constant in `@ai-trading/market-data`.
 
 ## Dimensions
 

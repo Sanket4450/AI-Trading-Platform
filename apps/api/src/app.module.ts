@@ -8,7 +8,6 @@ import { AccountsModule } from './modules/accounts/accounts.module.js';
 import { AuditModule } from './modules/audit/audit.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { ConfigurationModule } from './modules/configuration/configuration.module.js';
-import { DataModule } from './modules/data/data.module.js';
 import { InstrumentsModule } from './modules/instruments/instruments.module.js';
 import { JobsModule } from './modules/jobs/jobs.module.js';
 import { SettingsModule } from './modules/settings/settings.module.js';
@@ -45,7 +44,6 @@ import { UniversesModule } from './modules/universes/universes.module.js';
     UniversesModule,
     StrategiesModule,
     ConfigurationModule,
-    DataModule,
     JobsModule,
     AuditModule,
     SettingsModule,

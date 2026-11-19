@@ -1,15 +1,17 @@
 ## Implementation Plan
 
-Task 1: within webapp, make sure to do following consistent UI fixes
+Task: Do the following task for webapp
 
 ### Description
 
-- At all places to use shadcn components for input (text field, select, checkbox, radio, switch, textarea, etc.) and make sure to use consistent design across the webapp.
-  - In case of any custom input component, make sure to use consistent design across the webapp.
-  - In case of a common repeated design is there for input, make sure to create a common component and reuse it across the webapp.
-    - Which may have common label styling
-- While loading skeletons for pages, make sure to use consistent number of box skeleton (make sure to use single row of skeletons for upper cards, I have seen for some there are 2 rows of skeletons for upper cards, which is not consistent with other pages)
-- The filters in table should be aligned center vertically and have a consistent gap between them
+- In case of Refresh missing months button, it should show a confirmation dialog for that action
+
+- Go through for each such action button or trigger within webapp that does an important operation directly, the dialog should be come for every one of them
+
+- Make sure to levarage existing common dialog if present otherwise build a such dialog and levarage that consistently
+
+- Make sure it shouldn't show "Refresh missing months" tooltip or button for every instrument strait, in case some instrument aren't fetched anytime, so that action would fetch the instrument data from scratch so the action button and dialog should show something else, like this in case of different cases then show messages, tooltip, labels conditionally
+  - Not too conditionally, you can group related things together
 
 ### Context
 
@@ -17,4 +19,4 @@ Task 1: within webapp, make sure to do following consistent UI fixes
 
 ### Constraints
 
-- Do not waste much time on doing extra things apart from what is requested
+- 

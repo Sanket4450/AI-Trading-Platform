@@ -5,6 +5,7 @@ import { apiFetch } from '@/lib/api';
 import type { StrategyDetail } from '@/lib/types';
 import { formatDate, formatNumber } from '@/lib/format';
 import { label } from '@/lib/labels';
+import { backLinkFor, type DetailSearchParams } from '@/lib/navigation';
 import { PageMeta } from '@/components/shell/page-meta';
 import { StatCard, StatGrid } from '@/components/dashboard/stat-card';
 import { SectionCard } from '@/components/dashboard/section-card';
@@ -22,7 +23,7 @@ import {
   TableRefreshButton,
 } from '@/components/dashboard/table-actions';
 import { Badge } from '@/components/ui/badge';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -50,8 +51,16 @@ const defaultSchema = JSON.stringify(
   2,
 );
 
-export default async function StrategyDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function StrategyDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: DetailSearchParams;
+}) {
   const { id } = await params;
+  const { from: fromParam } = await searchParams;
+  const back = backLinkFor(fromParam, '/strategies');
   const detail = await apiFetch<StrategyDetail>(`/strategies/${id}`);
 
   if (!detail) notFound();
@@ -64,6 +73,7 @@ export default async function StrategyDetailPage({ params }: { params: Promise<{
       />
 
       <DetailHeader
+        back={back}
         badges={
           <>
             <Badge variant="outline">{detail.code}</Badge>
@@ -72,49 +82,44 @@ export default async function StrategyDetailPage({ params }: { params: Promise<{
         }
         meta={`${detail.versions.length} versions · ${detail.universeCount} universes`}
         actions={
-          <>
-            <Link href="/strategies" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
-              Back to strategies
-            </Link>
-            <FormDialog
-              trigger={
-                <Button type="button" size="sm" variant="outline">
-                  <Plus className="size-4" />
-                  New draft version
-                </Button>
-              }
-              title="Create a draft version"
-              description="Draft versions are insert-only. Bind a configuration snapshot after validation."
-              submitLabel="Create draft"
-              action={createStrategyVersionAction}
-              className="sm:max-w-2xl"
-            >
-              <input type="hidden" name="strategyId" value={detail.id} />
-              <div className="grid gap-3 sm:grid-cols-2">
-                <FormField label="Code reference" htmlFor="codeRef">
-                  <Input
-                    id="codeRef"
-                    name="codeRef"
-                    placeholder="Git commit or package version"
-                    required
-                  />
-                </FormField>
-                <FormField label="Changelog" htmlFor="changelog">
-                  <Input id="changelog" name="changelog" placeholder="What changed?" />
-                </FormField>
-              </div>
-              <FormField label="Parameter schema (JSON Schema)" htmlFor="parameterSchema">
-                <Textarea
-                  id="parameterSchema"
-                  name="parameterSchema"
-                  defaultValue={defaultSchema}
-                  rows={12}
-                  className="font-mono text-xs leading-5"
+          <FormDialog
+            trigger={
+              <Button type="button" size="sm" variant="outline">
+                <Plus className="size-4" />
+                New draft version
+              </Button>
+            }
+            title="Create a draft version"
+            description="Draft versions are insert-only. Bind a configuration snapshot after validation."
+            submitLabel="Create draft"
+            action={createStrategyVersionAction}
+            className="sm:max-w-2xl"
+          >
+            <input type="hidden" name="strategyId" value={detail.id} />
+            <div className="grid gap-3 sm:grid-cols-2">
+              <FormField label="Code reference" htmlFor="codeRef">
+                <Input
+                  id="codeRef"
+                  name="codeRef"
+                  placeholder="Git commit or package version"
                   required
                 />
               </FormField>
-            </FormDialog>
-          </>
+              <FormField label="Changelog" htmlFor="changelog">
+                <Input id="changelog" name="changelog" placeholder="What changed?" />
+              </FormField>
+            </div>
+            <FormField label="Parameter schema (JSON Schema)" htmlFor="parameterSchema">
+              <Textarea
+                id="parameterSchema"
+                name="parameterSchema"
+                defaultValue={defaultSchema}
+                rows={12}
+                className="font-mono text-xs leading-5"
+                required
+              />
+            </FormField>
+          </FormDialog>
         }
       />
 

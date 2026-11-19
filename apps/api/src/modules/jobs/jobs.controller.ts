@@ -1,12 +1,28 @@
-import { Controller, Get, Param, ParseUUIDPipe, Query } from '@nestjs/common';
 import {
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Query,
+  Req,
+} from '@nestjs/common';
+import {
+  ApiCreatedResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiParam,
   ApiTags,
 } from '@nestjs/swagger';
+import type { Request } from 'express';
+import {
+  CurrentUser,
+  type AuthenticatedUser,
+} from '../../common/auth/current-user.decorator.js';
 import { ErrorResponseDto } from '../../common/dto/error-response.dto.js';
+import { JobRunDto } from '../../common/dto/job-run.dto.js';
+import { requestMeta } from '../../common/http/request-meta.js';
 import { ApiSessionAuth } from '../../common/swagger/api-session-auth.decorator.js';
 import { JobDetailResponseDto, JobListResponseDto } from './dto/job-response.dto.js';
 import { JobQueryDto } from './dto/job-query.dto.js';
@@ -25,8 +41,23 @@ export class JobsController {
     return this.jobs.list(query);
   }
 
+  @Post(':id/cancel')
+  @ApiOperation({ summary: 'Cancel a multi-instrument backfill plan' })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiCreatedResponse({ type: JobRunDto })
+  @ApiNotFoundResponse({ type: ErrorResponseDto, description: 'Backfill plan not found' })
+  cancel(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() request: Request,
+  ) {
+    return this.jobs.cancel(id, user.id, requestMeta(request));
+  }
+
   @Get(':id')
-  @ApiOperation({ summary: 'Return a job run with stages, metrics and events' })
+  @ApiOperation({
+    summary: 'Return a job run with stages, metrics, events and plan chunks',
+  })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiOkResponse({ type: JobDetailResponseDto })
   @ApiNotFoundResponse({ type: ErrorResponseDto, description: 'Job not found' })

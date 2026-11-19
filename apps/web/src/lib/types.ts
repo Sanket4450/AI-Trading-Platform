@@ -272,15 +272,6 @@ export interface CoverageRow {
   checkedAt: string;
 }
 
-export interface CoverageSummary {
-  complete: number;
-  partial: number;
-  missing: number;
-  notApplicable: number;
-  total: number;
-  validation: Record<string, number>;
-}
-
 export interface IngestionRun {
   id: string;
   providerCode: string;
@@ -433,11 +424,53 @@ export interface JobEvent {
   metricUnit: string | null;
 }
 
+export interface JobPlanProgress {
+  chunks: number;
+  instruments: number;
+  queued: number;
+  running: number;
+  succeeded: number;
+  partiallyFailed: number;
+  failed: number;
+  cancelled: number;
+  rowsFetched: number;
+  rowsWritten: number;
+  rowsRejected: number;
+  rowsSkipped: number;
+  rowsUpdated: number;
+}
+
+export interface JobPlanChunk {
+  id: string;
+  instrumentId: string | null;
+  symbol: string | null;
+  rank: number | null;
+  chunkIndex: number | null;
+  chunkCount: number | null;
+  requestedFrom: string | null;
+  requestedTo: string | null;
+  status: string;
+  attempt: number;
+  rowsFetched: number;
+  rowsWritten: number;
+  rowsRejected: number;
+  rowsSkipped: number;
+  rowsUpdated: number;
+  httpStatus: number | null;
+  providerErrorCode: string | null;
+  durationMs: number | null;
+  errorMessage: string | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+}
+
 export interface JobDetail {
   run: JobRun;
   stages: JobStage[];
   metrics: JobMetric[];
   events: JobEvent[];
+  planProgress: JobPlanProgress | null;
+  chunks: JobPlanChunk[];
 }
 
 export interface HealthCheck {
@@ -478,7 +511,7 @@ export interface Overview {
   coverageByStatus: { status: string; count: number }[];
 }
 
-export interface InstrumentStatusRow {
+export interface InstrumentCoverageRow {
   rank: number;
   instrumentId: string;
   symbol: string;
@@ -510,7 +543,7 @@ export interface InstrumentStatusRow {
   mappingCount: number;
 }
 
-export interface InstrumentStatusMonth {
+export interface InstrumentCoverageMonth {
   month: string;
   complete: number;
   partial: number;
@@ -520,11 +553,11 @@ export interface InstrumentStatusMonth {
   mismatch: number;
 }
 
-export interface InstrumentStatusDetail extends Omit<
-  InstrumentStatusRow,
+export interface InstrumentCoverageDetail extends Omit<
+  InstrumentCoverageRow,
   'rank' | 'universeCode' | 'universeVersionId' | 'universeVersion'
 > {
-  months: InstrumentStatusMonth[];
+  months: InstrumentCoverageMonth[];
   runs: IngestionRun[];
   issues: QualityIssue[];
 }
@@ -541,81 +574,6 @@ export interface DailyValidation {
   minuteVolume: string | null;
   volumeDeltaPct: string | null;
   checkedAt: string;
-}
-
-export interface CoverageHeatmapCell {
-  instrumentId: string;
-  symbol: string;
-  rank: number;
-  tradingDate: string;
-  status: string;
-  validationStatus: string;
-  gapCount: number;
-  gapRunCount: number;
-  maxGapMinutes: number;
-}
-
-export interface BackfillPreview {
-  instrumentCount: number;
-  resolved: number;
-  blocked: { instrumentId: string; symbol: string; reason: string }[];
-  sessionCount: number;
-  monthCount: number;
-  skippedMonths: number;
-  requestCount: number;
-  estimatedBars: number;
-  estimatedBytes: number;
-  from: string;
-  to: string;
-  months: { index: number; from: string; to: string }[];
-}
-
-export interface BackfillPlanProgress {
-  chunks: number;
-  instruments: number;
-  queued: number;
-  running: number;
-  succeeded: number;
-  partiallyFailed: number;
-  failed: number;
-  cancelled: number;
-  rowsFetched: number;
-  rowsWritten: number;
-  rowsRejected: number;
-  rowsSkipped: number;
-  rowsUpdated: number;
-}
-
-export interface BackfillPlan extends JobRun {
-  progress: BackfillPlanProgress;
-}
-
-export interface BackfillPlanChunk {
-  id: string;
-  instrumentId: string | null;
-  symbol: string | null;
-  rank: number | null;
-  chunkIndex: number | null;
-  chunkCount: number | null;
-  requestedFrom: string | null;
-  requestedTo: string | null;
-  status: string;
-  attempt: number;
-  rowsFetched: number;
-  rowsWritten: number;
-  rowsRejected: number;
-  rowsSkipped: number;
-  rowsUpdated: number;
-  httpStatus: number | null;
-  providerErrorCode: string | null;
-  durationMs: number | null;
-  errorMessage: string | null;
-  startedAt: string | null;
-  finishedAt: string | null;
-}
-
-export interface BackfillPlanDetail extends BackfillPlan {
-  chunks: BackfillPlanChunk[];
 }
 
 export interface ProviderStatus {
@@ -643,11 +601,3 @@ export interface ProviderStatus {
   oldestPayloadAt: string | null;
 }
 
-export interface QualityRule {
-  ruleId: string;
-  issueType: string;
-  dimension: string;
-  defaultSeverity: string;
-  description: string;
-  blocksPreflightWhenCritical: boolean;
-}

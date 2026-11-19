@@ -4,8 +4,14 @@ import {
   getJobRunEvents,
   getJobRunMetrics,
   getJobRunSummary,
+  getParentPlanProgress,
+  getPlanJob,
+  listPlanChunks,
   listTrackedJobRuns,
+  recordAudit,
+  updateJobRun,
 } from '@ai-trading/database';
+import type { RequestMeta } from '../../common/http/request-meta.js';
 import type { JobQueryDto } from './dto/job-query.dto.js';
 
 type RunRow = NonNullable<Awaited<ReturnType<typeof getJobRun>>>;
@@ -162,11 +168,43 @@ export class JobsService {
       getJobRunMetrics(id),
     ]);
 
+    const isPlan = run.jobName === 'backfill-plan';
+    const [planProgress, chunks] = isPlan
+      ? await Promise.all([getParentPlanProgress(id), listPlanChunks(id)])
+      : [null, []];
+
     return {
       run: mapRun(run),
       stages: deriveStages(run, events),
       metrics: deriveMetrics(metrics),
       events: events.map(mapEvent),
+      planProgress,
+      chunks,
     };
+  }
+
+  async cancel(id: string, actorUserId: string, meta: RequestMeta) {
+    const plan = await getPlanJob(id);
+    if (!plan || plan.jobName !== 'backfill-plan') {
+      throw new NotFoundException('Backfill plan not found');
+    }
+    const updated = await updateJobRun(id, {
+      status: 'cancelled',
+      finishedAt: new Date(),
+      errorMessage: null,
+    });
+    await recordAudit({
+      actorUserId,
+      accountId: null,
+      action: 'data.backfill_plan_cancelled',
+      entityType: 'job_run',
+      entityId: id,
+      beforeState: { status: plan.status },
+      afterState: { status: 'cancelled' },
+      requestId: meta.requestId,
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+    });
+    return updated;
   }
 }

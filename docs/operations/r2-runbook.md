@@ -68,15 +68,18 @@ The catalog is the entry point.
 3. Confirm the resolved instrument count, blocked mappings, sessions, requests and skipped months.
 4. Press **Confirm and launch**. A second request for an active instrument returns the existing run.
 5. Watch rows move through Queued, Fetching, Verifying and then their data status.
-6. Open `/data` for the heatmap, plans, runs and issues.
-7. Export or record the acceptance evidence from the backfill detail page.
+6. Open `/instruments` for per-instrument coverage and its month grid; open a row for runs, issues
+   and the coverage day detail.
+7. Open `/jobs` and select the plan row for chunk progress, then export or record the acceptance
+   evidence from its chunk table.
 
 The first full run is roughly 2,958 monthly requests for 51 instruments. The provider budget, not
 network latency, dominates: at 1,600 requests per 30 minutes the floor is about 45 minutes.
 
 ## Resume and recovery
 
-- **Worker killed mid-backfill**: run `ingestion-reconcile` from the scheduler or the data console.
+- **Worker killed mid-backfill**: run `ingestion-reconcile` from the scheduler or trigger a
+  `coverage-recompute` from the instrument page.
   Runs older than 15 minutes are marked failed; launch a new missing-month fetch from the catalog.
   Completed chunks are skipped.
 - **Redis unavailable**: queue and limiter fail. Start Redis, restart the worker and retry queued or

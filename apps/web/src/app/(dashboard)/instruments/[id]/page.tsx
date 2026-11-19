@@ -1,9 +1,14 @@
 import Link from 'next/link';
 import { apiFetch } from '@/lib/api';
-import type { CorporateAction, InstrumentMapping, InstrumentStatusDetail } from '@/lib/types';
+import type {
+  CorporateAction,
+  InstrumentCoverageDetail,
+  InstrumentMapping,
+} from '@/lib/types';
 import { formatDate, formatNumber } from '@/lib/format';
 import { label } from '@/lib/labels';
 import { displayStatus, statusTone } from '@/lib/status';
+import { backLinkFor, detailHref, type DetailSearchParams } from '@/lib/navigation';
 import { PageMeta } from '@/components/shell/page-meta';
 import { StatCard, StatGrid } from '@/components/dashboard/stat-card';
 import { SectionCard } from '@/components/dashboard/section-card';
@@ -21,7 +26,6 @@ import {
   TableRefreshButton,
 } from '@/components/dashboard/table-actions';
 import { Badge } from '@/components/ui/badge';
-import { buttonVariants } from '@/components/ui/button';
 import {
   Table,
   TableBody,
@@ -30,20 +34,20 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  cancelInstrumentAction,
-  fetchInstrumentsAction,
-  recomputeStatusAction,
-} from '../actions';
+import { cancelInstrumentAction, fetchInstrumentsAction, recomputeStatusAction } from '../actions';
 
 export default async function InstrumentDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: DetailSearchParams;
 }) {
   const { id } = await params;
+  const { from: fromParam } = await searchParams;
+  const back = backLinkFor(fromParam, '/instruments');
   const [detail, mappings, actions] = await Promise.all([
-    apiFetch<InstrumentStatusDetail>(`/data/instrument-status/${id}`),
+    apiFetch<InstrumentCoverageDetail>(`/instruments/${id}/coverage`),
     apiFetch<InstrumentMapping[]>(`/instruments/${id}/mappings`),
     apiFetch<CorporateAction[]>(`/instruments/${id}/corporate-actions`),
   ]);
@@ -57,6 +61,7 @@ export default async function InstrumentDetailPage({
       />
 
       <DetailHeader
+        back={back}
         badges={
           <>
             <Badge variant="outline" className={statusTone(status)}>
@@ -73,12 +78,6 @@ export default async function InstrumentDetailPage({
         meta={`Target ${detail.targetFrom ?? '—'} → ${detail.targetTo ?? '—'}`}
         actions={
           <>
-            <Link
-              href="/instruments"
-              className={buttonVariants({ variant: 'outline', size: 'sm' })}
-            >
-              Back to catalog
-            </Link>
             <form action={recomputeStatusAction}>
               <input type="hidden" name="instrumentId" value={detail.instrumentId} />
               <input type="hidden" name="returnTo" value={`/instruments/${detail.instrumentId}`} />
@@ -280,7 +279,10 @@ export default async function InstrumentDetailPage({
                         <StatusBadge status={run.status} />
                       </TableCell>
                       <TableActions>
-                        <TableActionLink href={`/data/runs/${run.id}`} label="View run" />
+                        <TableActionLink
+                          href={detailHref(`/instruments/runs/${run.id}`, back.href)}
+                          label="View run"
+                        />
                       </TableActions>
                     </TableRow>
                   ))}
@@ -301,7 +303,7 @@ export default async function InstrumentDetailPage({
               {detail.issues.slice(0, 10).map((issue) => (
                 <Link
                   key={issue.id}
-                  href={`/data/issues/${issue.id}`}
+                  href={detailHref(`/instruments/issues/${issue.id}`, back.href)}
                   className="border-border/70 bg-background/40 block rounded-lg border p-3 text-sm"
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
@@ -328,7 +330,7 @@ export default async function InstrumentDetailPage({
         {actions.length === 0 ? (
           <EmptyState
             title="No corporate actions"
-            description="Import a reviewed CSV from the data console."
+            description="Corporate actions are imported through the reference-data API and audited."
           />
         ) : (
           <div className="overflow-x-auto">

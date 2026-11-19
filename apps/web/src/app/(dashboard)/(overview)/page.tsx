@@ -4,6 +4,7 @@ import { apiFetch } from '@/lib/api';
 import type { HealthResponse, Overview } from '@/lib/types';
 import { formatDateTime, formatNumber } from '@/lib/format';
 import { label } from '@/lib/labels';
+import { detailHref } from '@/lib/navigation';
 import { PageMeta } from '@/components/shell/page-meta';
 import { StatCard, StatGrid } from '@/components/dashboard/stat-card';
 import { SectionCard } from '@/components/dashboard/section-card';
@@ -39,19 +40,13 @@ export default async function OverviewPage() {
     <div>
       <PageMeta
         actions={
-          <>
-            <Link
-              href="/instruments"
-              className={buttonVariants({ variant: 'outline', size: 'sm' })}
-            >
-              Open catalog
-              <ArrowUpRight className="size-4" />
-            </Link>
-            <Link href="/data" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
-              Open data health
-              <ArrowUpRight className="size-4" />
-            </Link>
-          </>
+          <Link
+            href="/instruments"
+            className={buttonVariants({ variant: 'outline', size: 'sm' })}
+          >
+            Open catalog
+            <ArrowUpRight className="size-4" />
+          </Link>
         }
       />
 
@@ -153,7 +148,7 @@ export default async function OverviewPage() {
                       {formatDateTime(job.finishedAt)}
                     </TableCell>
                     <TableActions>
-                      <TableActionLink href={`/jobs/${job.id}`} label="View job" />
+                      <TableActionLink href={detailHref(`/jobs/${job.id}`, '/')} label="View job" />
                     </TableActions>
                   </TableRow>
                 ))}
@@ -176,7 +171,12 @@ export default async function OverviewPage() {
               {overview.openIssues.map((issue) => (
                 <Link
                   key={issue.id}
-                  href={`/data/issues/${issue.id}`}
+                  href={detailHref(
+                    issue.instrumentId
+                      ? `/instruments/issues/${issue.id}`
+                      : `/settings/issues/${issue.id}`,
+                    '/',
+                  )}
                   className="border-border/70 bg-background/40 block rounded-lg border p-3"
                 >
                   <div className="flex items-center justify-between gap-2">

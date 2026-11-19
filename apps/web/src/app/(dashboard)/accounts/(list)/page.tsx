@@ -6,6 +6,7 @@ import { TableSummary } from '@/components/dashboard/table-summary';
 import { StatusBadge } from '@/components/dashboard/status-badge';
 import { EmptyState } from '@/components/dashboard/empty-state';
 import { SearchFilter, TableFilters } from '@/components/dashboard/table-filters';
+import { detailHref, originHref } from '@/lib/navigation';
 import {
   TableActionLink,
   TableActions,
@@ -26,6 +27,7 @@ export default async function AccountsPage({
   searchParams: Promise<{ search?: string }>;
 }) {
   const params = await searchParams;
+  const from = originHref('/accounts', params);
   const query = new URLSearchParams();
   if (params.search) query.set('search', params.search);
   const queryString = query.toString();
@@ -120,7 +122,10 @@ export default async function AccountsPage({
                     {formatDateTime(account.credentialExpiry)}
                   </TableCell>
                   <TableActions>
-                    <TableActionLink href={`/accounts/${account.id}`} label="View account" />
+                    <TableActionLink
+                      href={detailHref(`/accounts/${account.id}`, from)}
+                      label="View account"
+                    />
                   </TableActions>
                 </TableRow>
               ))}

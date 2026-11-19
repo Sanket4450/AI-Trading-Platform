@@ -1,10 +1,12 @@
 import {
   DetailHeaderSkeleton,
+  IconButtonSkeleton,
   JsonBlockSkeleton,
   KeyValueGridSkeleton,
   SectionSkeleton,
   StageRailSkeleton,
   StatGridSkeleton,
+  TableSkeleton,
   TimelineSkeleton,
 } from '@/components/dashboard/skeletons';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -21,6 +23,30 @@ export default function Loading() {
 
       <SectionSkeleton className="mt-4" titleWidth="w-36" descriptionWidth="w-56">
         <StatGridSkeleton count={4} />
+      </SectionSkeleton>
+
+      <SectionSkeleton
+        className="mt-4"
+        titleWidth="w-20"
+        descriptionWidth="w-96"
+        actions={<IconButtonSkeleton />}
+      >
+        <StatGridSkeleton count={5} columns={5} />
+        <div className="mt-4">
+          <TableSkeleton
+            columns={[
+              { header: 'w-10', width: 'w-12' },
+              { header: 'w-20', width: 'w-24' },
+              { header: 'w-14', width: 'w-16' },
+              { header: 'w-16', width: 'w-28' },
+              { header: 'w-12', width: 'w-20' },
+              { header: 'w-10', width: 'w-10' },
+              { header: 'w-14', badge: true, width: 'w-16' },
+              { actions: true },
+            ]}
+            rows={5}
+          />
+        </div>
       </SectionSkeleton>
 
       <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">

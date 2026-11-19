@@ -184,6 +184,7 @@ export async function getDashboardOverview() {
   const openIssues = await db
     .select({
       id: dataQualityIssues.id,
+      instrumentId: dataQualityIssues.instrumentId,
       issueType: dataQualityIssues.issueType,
       severity: dataQualityIssues.severity,
       status: dataQualityIssues.status,

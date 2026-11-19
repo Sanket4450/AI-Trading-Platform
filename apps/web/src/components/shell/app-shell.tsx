@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   Activity,
-  Database,
   FlaskConical,
   LayoutDashboard,
   Layers,
@@ -21,7 +20,7 @@ import { SignOutButton } from '@/components/shell/sign-out-button';
 import { ThemeToggle } from '@/components/shell/theme-toggle';
 import { InfoTooltip } from '@/components/ui/info-tooltip';
 import { label } from '@/lib/labels';
-import { routeMetaFor } from '@/lib/page-meta';
+import { routeMetaFor } from '@/lib/route-meta';
 import { cn } from '@/lib/utils';
 import type { SessionUser } from '@/lib/types';
 
@@ -31,7 +30,6 @@ const navigation = [
   { href: '/instruments', label: 'Instruments', icon: LineChart },
   { href: '/universes', label: 'Universes', icon: Layers },
   { href: '/strategies', label: 'Strategies', icon: FlaskConical },
-  { href: '/data', label: 'Data health', icon: Database },
   { href: '/jobs', label: 'Jobs', icon: Activity },
   { href: '/audit', label: 'Audit', icon: ScrollText },
   { href: '/settings', label: 'Settings', icon: Settings },

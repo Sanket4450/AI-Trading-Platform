@@ -26,6 +26,9 @@ coverage/
 .turbo/
 .cache/
 
+# The instrument coverage-day route is source, not test output.
+!apps/web/src/app/(dashboard)/instruments/*/coverage/
+
 # Next.js generated type declarations
 next-env.d.ts
 

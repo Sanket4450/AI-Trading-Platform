@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, lte, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, isNull, lte, sql } from 'drizzle-orm';
 import { uuidv7 } from 'uuidv7';
 import { db } from '../client.js';
 import {
@@ -11,124 +11,6 @@ import {
   marketQuoteSnapshots,
   providers,
 } from '../schema/index.js';
-
-export async function listCoverage(filters: {
-  date?: string;
-  instrumentId?: string;
-  status?: string;
-  validationStatus?: string;
-  limit?: number;
-}) {
-  const conditions = [];
-  if (filters.date) conditions.push(eq(marketDataCoverage.tradingDate, filters.date));
-  if (filters.instrumentId)
-    conditions.push(eq(marketDataCoverage.instrumentId, filters.instrumentId));
-  if (filters.status) conditions.push(eq(marketDataCoverage.status, filters.status));
-  if (filters.validationStatus)
-    conditions.push(eq(marketDataCoverage.validationStatus, filters.validationStatus));
-
-  return db
-    .select({
-      id: marketDataCoverage.id,
-      instrumentId: marketDataCoverage.instrumentId,
-      symbol: instruments.tradingSymbol,
-      name: instruments.name,
-      tradingDate: marketDataCoverage.tradingDate,
-      expectedBars: marketDataCoverage.expectedBars,
-      storedBars: marketDataCoverage.storedBars,
-      gapCount: marketDataCoverage.gapCount,
-      gapRunCount: marketDataCoverage.gapRunCount,
-      maxGapMinutes: marketDataCoverage.maxGapMinutes,
-      firstBarAt: marketDataCoverage.firstBarAt,
-      lastBarAt: marketDataCoverage.lastBarAt,
-      dailyVolume: marketDataCoverage.dailyVolume,
-      minuteVolume: marketDataCoverage.minuteVolume,
-      volumeDeltaPct: marketDataCoverage.volumeDeltaPct,
-      ohlcMatch: marketDataCoverage.ohlcMatch,
-      validationStatus: marketDataCoverage.validationStatus,
-      details: marketDataCoverage.details,
-      status: marketDataCoverage.status,
-      checkedAt: marketDataCoverage.checkedAt,
-    })
-    .from(marketDataCoverage)
-    .innerJoin(instruments, eq(instruments.id, marketDataCoverage.instrumentId))
-    .where(conditions.length > 0 ? and(...conditions) : undefined)
-    .orderBy(desc(marketDataCoverage.tradingDate), asc(instruments.tradingSymbol))
-    .limit(filters.limit ?? 500);
-}
-
-export async function getCoverageSummary(date?: string) {
-  const rows = await db
-    .select({
-      status: marketDataCoverage.status,
-      validationStatus: marketDataCoverage.validationStatus,
-      count: sql<number>`count(*)::int`,
-      instruments: sql<number>`count(distinct ${marketDataCoverage.instrumentId})::int`,
-    })
-    .from(marketDataCoverage)
-    .where(date ? eq(marketDataCoverage.tradingDate, date) : undefined)
-    .groupBy(marketDataCoverage.status, marketDataCoverage.validationStatus);
-
-  const summary = {
-    complete: 0,
-    partial: 0,
-    missing: 0,
-    notApplicable: 0,
-    total: 0,
-    validation: {} as Record<string, number>,
-  };
-  for (const row of rows) {
-    if (row.status === 'complete') summary.complete += row.count;
-    if (row.status === 'partial') summary.partial += row.count;
-    if (row.status === 'missing') summary.missing += row.count;
-    if (row.status === 'not_applicable') summary.notApplicable += row.count;
-    summary.total += row.count;
-    summary.validation[row.validationStatus] =
-      (summary.validation[row.validationStatus] ?? 0) + row.count;
-  }
-  return summary;
-}
-
-export async function listIngestionRuns(filters: { limit?: number; status?: string }) {
-  return db
-    .select({
-      id: marketDataIngestionRuns.id,
-      providerId: marketDataIngestionRuns.providerId,
-      providerCode: providers.code,
-      runType: marketDataIngestionRuns.runType,
-      instrumentId: marketDataIngestionRuns.instrumentId,
-      symbol: instruments.tradingSymbol,
-      timeframeUnit: marketDataIngestionRuns.timeframeUnit,
-      timeframeInterval: marketDataIngestionRuns.timeframeInterval,
-      requestedFrom: marketDataIngestionRuns.requestedFrom,
-      requestedTo: marketDataIngestionRuns.requestedTo,
-      status: marketDataIngestionRuns.status,
-      rowsFetched: marketDataIngestionRuns.rowsFetched,
-      rowsWritten: marketDataIngestionRuns.rowsWritten,
-      rowsRejected: marketDataIngestionRuns.rowsRejected,
-      rowsSkipped: marketDataIngestionRuns.rowsSkipped,
-      rowsUpdated: marketDataIngestionRuns.rowsUpdated,
-      parentJobRunId: marketDataIngestionRuns.parentJobRunId,
-      chunkIndex: marketDataIngestionRuns.chunkIndex,
-      chunkCount: marketDataIngestionRuns.chunkCount,
-      attempt: marketDataIngestionRuns.attempt,
-      requestFingerprint: marketDataIngestionRuns.requestFingerprint,
-      httpStatus: marketDataIngestionRuns.httpStatus,
-      providerErrorCode: marketDataIngestionRuns.providerErrorCode,
-      durationMs: marketDataIngestionRuns.durationMs,
-      rateLimitedUntil: marketDataIngestionRuns.rateLimitedUntil,
-      errorMessage: marketDataIngestionRuns.errorMessage,
-      startedAt: marketDataIngestionRuns.startedAt,
-      finishedAt: marketDataIngestionRuns.finishedAt,
-      createdAt: marketDataIngestionRuns.createdAt,
-    })
-    .from(marketDataIngestionRuns)
-    .innerJoin(providers, eq(providers.id, marketDataIngestionRuns.providerId))
-    .leftJoin(instruments, eq(instruments.id, marketDataIngestionRuns.instrumentId))
-    .where(filters.status ? eq(marketDataIngestionRuns.status, filters.status) : undefined)
-    .orderBy(desc(marketDataIngestionRuns.createdAt))
-    .limit(filters.limit ?? 100);
-}
 
 export async function createIngestionRun(values: {
   providerId: string;
@@ -206,6 +88,7 @@ export async function listQualityIssues(filters: {
   status?: string;
   severity?: string;
   instrumentId?: string;
+  providerWideOnly?: boolean;
   limit?: number;
 }) {
   const conditions = [];
@@ -213,6 +96,8 @@ export async function listQualityIssues(filters: {
   if (filters.severity) conditions.push(eq(dataQualityIssues.severity, filters.severity));
   if (filters.instrumentId)
     conditions.push(eq(dataQualityIssues.instrumentId, filters.instrumentId));
+  if (filters.providerWideOnly)
+    conditions.push(isNull(dataQualityIssues.instrumentId));
 
   return db
     .select({
@@ -246,18 +131,6 @@ export async function listQualityIssues(filters: {
     .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(desc(dataQualityIssues.detectedAt))
     .limit(filters.limit ?? 200);
-}
-
-export async function updateQualityIssueStatus(id: string, status: string) {
-  const [updated] = await db
-    .update(dataQualityIssues)
-    .set({
-      status,
-      resolvedAt: status === 'resolved' ? new Date() : null,
-    })
-    .where(eq(dataQualityIssues.id, id))
-    .returning();
-  return updated;
 }
 
 export async function createQualityIssue(values: {
@@ -456,39 +329,6 @@ export async function refreshDailyStats() {
 
 export async function ensureMarketPartitions(monthsAhead = 5) {
   await db.execute(sql`select ensure_market_partitions(${monthsAhead})`);
-}
-
-export async function getDailyStats(filters: {
-  instrumentId?: string;
-  from?: string;
-  to?: string;
-}) {
-  const conditions = [];
-  if (filters.instrumentId) conditions.push(sql`instrument_id = ${filters.instrumentId}`);
-  if (filters.from) conditions.push(sql`trading_date >= ${filters.from}`);
-  if (filters.to) conditions.push(sql`trading_date <= ${filters.to}`);
-
-  const where = conditions.length > 0 ? sql`where ${sql.join(conditions, sql` and `)}` : sql``;
-  const rows = await db.execute<{
-    instrument_id: string;
-    trading_date: string;
-    open: string;
-    high: string;
-    low: string;
-    close: string;
-    volume: string;
-    traded_value: string;
-    vwap_approx: string | null;
-    bar_count: number;
-  }>(sql`
-    select instrument_id, trading_date::text, open::text, high::text, low::text,
-           close::text, volume::text, traded_value::text, vwap_approx::text, bar_count
-    from mv_instrument_daily_stats
-    ${where}
-    order by trading_date desc
-    limit 500
-  `);
-  return rows;
 }
 
 export async function computeCoverageForInstrument(instrumentId: string, from: string, to: string) {

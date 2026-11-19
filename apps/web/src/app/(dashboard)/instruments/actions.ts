@@ -5,25 +5,27 @@ import { redirect } from 'next/navigation';
 import { apiErrorMessage, apiFetch } from '@/lib/api';
 import { formString } from '@/lib/form';
 
-function selectedIds(formData: FormData): string[] {
-  return formData.getAll('instrumentIds').map(String).filter(Boolean);
+/** Forms submit one instrument; the API surface is per-instrument by design. */
+function selectedInstrument(formData: FormData): string {
+  return formData.getAll('instrumentIds').map(String).find(Boolean) ?? '';
 }
 
 export async function fetchInstrumentsAction(formData: FormData): Promise<void> {
-  const instrumentIds = selectedIds(formData);
-  const universeCode = formString(formData, 'universeCode', 'nifty-50');
+  const instrumentId = selectedInstrument(formData);
   const mode = formString(formData, 'mode', 'missing_only');
   const from = formString(formData, 'from', '');
   const to = formString(formData, 'to', '');
   const reason = formString(formData, 'reason', '');
   const returnTo = formString(formData, 'returnTo', '/instruments');
 
+  if (!instrumentId) {
+    redirect(`${returnTo}?error=${encodeURIComponent('Select an instrument first')}`);
+  }
+
   try {
-    await apiFetch('/data/instruments/fetch', {
+    await apiFetch(`/instruments/${instrumentId}/fetch`, {
       method: 'POST',
       body: JSON.stringify({
-        instrumentIds: instrumentIds.length > 0 ? instrumentIds : undefined,
-        universeCode: instrumentIds.length > 0 ? undefined : universeCode,
         mode,
         from: from || undefined,
         to: to || undefined,
@@ -36,7 +38,6 @@ export async function fetchInstrumentsAction(formData: FormData): Promise<void> 
   }
 
   revalidatePath('/instruments');
-  revalidatePath('/data');
   redirect(`${returnTo}?queued=1`);
 }
 
@@ -44,7 +45,7 @@ export async function cancelInstrumentAction(formData: FormData): Promise<void> 
   const instrumentId = formString(formData, 'instrumentId', '');
   const returnTo = formString(formData, 'returnTo', `/instruments/${instrumentId}`);
   try {
-    await apiFetch(`/data/instruments/${instrumentId}/cancel`, { method: 'POST' });
+    await apiFetch(`/instruments/${instrumentId}/fetch/cancel`, { method: 'POST' });
   } catch (error) {
     redirect(`${returnTo}?error=${encodeURIComponent(apiErrorMessage(error))}`);
   }
@@ -57,9 +58,9 @@ export async function recomputeStatusAction(formData: FormData): Promise<void> {
   const instrumentId = formString(formData, 'instrumentId', '');
   const returnTo = formString(formData, 'returnTo', '/instruments');
   try {
-    await apiFetch('/data/instrument-status/recompute', {
+    await apiFetch(`/instruments/${instrumentId}/coverage/recompute`, {
       method: 'POST',
-      body: JSON.stringify(instrumentId ? { instrumentIds: [instrumentId] } : {}),
+      body: JSON.stringify({}),
     });
   } catch (error) {
     redirect(`${returnTo}?error=${encodeURIComponent(apiErrorMessage(error))}`);
