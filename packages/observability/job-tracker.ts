@@ -1,10 +1,11 @@
-import type {
-  JobBeginInput,
-  JobEventInput,
-  JobFinishInput,
-  JobStageStatus,
-  JobStore,
-  JobTrackerOptions,
+import {
+  toJobError,
+  type JobBeginInput,
+  type JobEventInput,
+  type JobFinishInput,
+  type JobStageOutcome,
+  type JobStore,
+  type JobTrackerOptions,
 } from './types.js';
 
 interface RunState {
@@ -12,22 +13,16 @@ interface RunState {
   stages: string[];
   startedAt: number;
   currentStage: string | null;
+  entered: Set<string>;
+  closed: Set<string>;
+  stageStartedAt: Map<string, number>;
   buffer: JobEventInput[];
   timer: ReturnType<typeof setTimeout> | null;
   flushing: boolean;
   pendingFlush: boolean;
-  stageStartedAt: Map<string, number>;
-  /** Serializes stage writes so the database never ends on an older stage. */
-  stageUpdate: Promise<void>;
 }
 
 const secretKeyPattern = /token|secret|password|authorization|api[-_]?key/i;
-
-function errorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  if (typeof error === 'string' && error.length > 0) return error;
-  return 'Job failed';
-}
 
 function redact(value: unknown, depth = 0): unknown {
   if (depth > 6) return '[depth-limit]';
@@ -45,8 +40,8 @@ function redact(value: unknown, depth = 0): unknown {
 }
 
 /**
- * Framework-agnostic run journal. Writes are buffered and best-effort: a
- * tracking failure is reported once and never interrupts the job.
+ * Framework-agnostic run journal. Stages are fixed by the caller; every event is a fact
+ * (`stage` + `type` + `data`). Writes are buffered and best-effort.
  */
 export class JobTracker {
   private readonly runs = new Map<string, RunState>();
@@ -66,154 +61,132 @@ export class JobTracker {
   }
 
   async begin(input: JobBeginInput): Promise<void> {
+    const stages = input.stages.length > 0 ? input.stages : ['work'];
     const startedAt = input.startedAt ?? new Date();
-    const stages = input.stages.length > 0 ? input.stages : ['start'];
     const state: RunState = {
       jobRunId: input.jobRunId,
       stages,
       startedAt: startedAt.getTime(),
       currentStage: stages[0] ?? null,
+      entered: new Set(),
+      closed: new Set(),
+      stageStartedAt: new Map(),
       buffer: [],
       timer: null,
       flushing: false,
       pendingFlush: false,
-      stageStartedAt: new Map(),
-      stageUpdate: Promise.resolve(),
     };
     this.runs.set(input.jobRunId, state);
 
-    this.append(state, {
-      kind: 'lifecycle',
-      message: 'Job started',
-      data: { stages },
-    });
-
     try {
-      await this.store.beginRun({ jobRunId: input.jobRunId, stages, startedAt });
+      await this.store.beginRun({
+        jobRunId: input.jobRunId,
+        startedAt,
+        attempt: input.attempt ?? 0,
+      });
     } catch (error) {
       this.report(error);
     }
+
+    this.enterStage(input.jobRunId, stages[0]!);
   }
 
-  enterStage(jobRunId: string, key: string, message?: string): void {
+  enterStage(jobRunId: string, stage: string): void {
+    const state = this.runs.get(jobRunId);
+    if (!state || state.entered.has(stage)) return;
+
+    state.entered.add(stage);
+    state.currentStage = stage;
+    if (!state.stageStartedAt.has(stage)) state.stageStartedAt.set(stage, Date.now());
+
+    this.append(state, { jobRunId, stage, type: 'entered' });
+  }
+
+  /** Records one unit of work inside a quantified stage. */
+  progress(jobRunId: string, stage: string, data: Record<string, unknown>): void {
     const state = this.runs.get(jobRunId);
     if (!state) return;
-
-    state.currentStage = key;
-    if (!state.stageStartedAt.has(key)) state.stageStartedAt.set(key, Date.now());
-
-    this.append(state, {
-      kind: 'stage',
-      stageKey: key,
-      message: message ?? `Entered ${key}`,
-      data: { phase: 'entered' },
-    });
-
-    state.stageUpdate = state.stageUpdate
-      .then(() => this.store.setStage({ jobRunId, stageKey: key }))
-      .catch((error) => this.report(error));
+    if (!state.entered.has(stage)) this.enterStage(jobRunId, stage);
+    this.append(state, { jobRunId, stage, type: 'progress', data });
   }
 
   completeStage(
     jobRunId: string,
-    key: string,
-    status: JobStageStatus = 'succeeded',
-    message?: string,
+    stage: string,
+    outcome: JobStageOutcome = 'completed',
+    data?: Record<string, unknown>,
   ): void {
     const state = this.runs.get(jobRunId);
-    if (!state) return;
+    if (!state || state.closed.has(stage)) return;
+    if (!state.entered.has(stage)) this.enterStage(jobRunId, stage);
 
-    const startedAt = state.stageStartedAt.get(key);
+    const startedAt = state.stageStartedAt.get(stage);
     const durationMs = startedAt === undefined ? null : Date.now() - startedAt;
-    state.stageStartedAt.delete(key);
+    state.closed.add(stage);
+    state.stageStartedAt.delete(stage);
+    if (state.currentStage === stage) state.currentStage = null;
 
     this.append(state, {
-      kind: 'stage',
-      level: status === 'failed' ? 'error' : 'info',
-      stageKey: key,
-      message: message ?? `${status === 'failed' ? 'Failed' : 'Completed'} ${key}`,
-      data: { phase: 'completed', status, durationMs },
+      jobRunId,
+      stage,
+      type: outcome,
+      data: { ...data, durationMs },
     });
   }
 
-  async stage<T>(jobRunId: string, key: string, fn: () => Promise<T>): Promise<T> {
-    this.enterStage(jobRunId, key);
+  async stage<T>(
+    jobRunId: string,
+    stage: string,
+    fn: () => Promise<T>,
+  ): Promise<T> {
+    this.enterStage(jobRunId, stage);
     try {
       const result = await fn();
-      this.completeStage(jobRunId, key, 'succeeded');
+      this.completeStage(jobRunId, stage, 'completed');
       return result;
     } catch (error) {
-      this.completeStage(jobRunId, key, 'failed');
+      this.completeStage(jobRunId, stage, 'failed', {
+        ...toJobError(error),
+      });
       throw error;
     }
   }
 
-  step(jobRunId: string, message: string, data?: Record<string, unknown>): void {
+  warning(jobRunId: string, stage: string, data: Record<string, unknown>): void {
     const state = this.runs.get(jobRunId);
     if (!state) return;
-    this.append(state, { kind: 'step', stageKey: state.currentStage, message, data });
-  }
-
-  metric(
-    jobRunId: string,
-    key: string,
-    value: number,
-    unit = 'count',
-    data?: Record<string, unknown>,
-  ): void {
-    const state = this.runs.get(jobRunId);
-    if (!state || !Number.isFinite(value)) return;
-    this.append(state, {
-      kind: 'metric',
-      stageKey: state.currentStage,
-      message: `${key} = ${value}`,
-      metricKey: key,
-      metricValue: value,
-      metricUnit: unit,
-      data,
-    });
-  }
-
-  warn(jobRunId: string, message: string, data?: Record<string, unknown>): void {
-    const state = this.runs.get(jobRunId);
-    if (!state) return;
-    this.append(state, {
-      kind: 'warning',
-      level: 'warn',
-      stageKey: state.currentStage,
-      message,
-      data,
-    });
+    if (!state.entered.has(stage)) this.enterStage(jobRunId, stage);
+    this.append(state, { jobRunId, stage, type: 'warning', data });
   }
 
   async finish(jobRunId: string, input: JobFinishInput): Promise<void> {
     const state = this.runs.get(jobRunId);
     const failed = input.status === 'failed';
-    const lastStage = state?.stages.at(-1) ?? null;
-    const currentStage = state?.currentStage ?? (failed ? null : lastStage);
 
     if (state) {
-      this.append(state, {
-        kind: 'lifecycle',
-        level: failed ? 'error' : 'info',
-        message: failed ? 'Job failed' : 'Job finished',
-        data: { status: input.status },
-      });
+      const open = state.currentStage;
+      if (open && !state.closed.has(open)) {
+        const startedAt = state.stageStartedAt.get(open);
+        this.append(state, {
+          jobRunId,
+          stage: open,
+          type: failed ? 'failed' : 'completed',
+          data: {
+            durationMs: startedAt === undefined ? null : Date.now() - startedAt,
+            ...(failed ? toJobError(input.error) : {}),
+          },
+        });
+        state.closed.add(open);
+      }
       this.clearTimer(state);
       await this.flushRun(jobRunId);
-      await state.stageUpdate;
     }
-
-    const durationMs = state ? Date.now() - state.startedAt : null;
 
     try {
       await this.store.finishRun({
         jobRunId,
         status: input.status,
-        currentStage,
-        durationMs,
-        summary: input.summary ?? null,
-        errorMessage: failed ? errorMessage(input.error) : null,
+        error: failed ? toJobError(input.error) : null,
       });
     } catch (error) {
       this.report(error);
@@ -231,10 +204,9 @@ export class JobTracker {
     return this.dropped;
   }
 
-  private append(state: RunState, event: Omit<JobEventInput, 'jobRunId' | 'occurredAt'>): void {
+  private append(state: RunState, event: JobEventInput): void {
     state.buffer.push({
       ...event,
-      jobRunId: state.jobRunId,
       occurredAt: new Date(),
       data: event.data ? (redact(event.data) as Record<string, unknown>) : undefined,
     });

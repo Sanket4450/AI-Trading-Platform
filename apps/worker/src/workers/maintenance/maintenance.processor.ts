@@ -20,10 +20,10 @@ export class MaintenanceProcessor extends WorkerHost {
 
   private async execute(job: Job): Promise<unknown> {
     const jobRunId = String((job.data as Record<string, unknown>).jobRunId);
+    const stage = job.name === 'ensure-partitions' ? 'ensure' : 'refresh';
     await updateJobRun(jobRunId, {
       status: 'running',
       startedAt: new Date(),
-      attempt: 1,
     });
 
     try {
@@ -43,13 +43,18 @@ export class MaintenanceProcessor extends WorkerHost {
         finishedAt: new Date(),
         result,
       });
+      this.tracking.completeStage(jobRunId, stage, 'completed', result);
       return result;
     } catch (error) {
       await updateJobRun(jobRunId, {
         status: 'failed',
         finishedAt: new Date(),
-        errorMessage:
-          error instanceof Error ? error.message : 'Maintenance job failed',
+        error: {
+          code: 'maintenance_failed',
+          message:
+            error instanceof Error ? error.message : 'Maintenance job failed',
+          retryable: false,
+        },
       });
       throw error;
     }

@@ -1,5 +1,6 @@
 import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import { uuidv7 } from 'uuidv7';
+import { isJobName, queueNameOf } from '@ai-trading/domain';
 import { db } from '../client.js';
 import {
   accounts,
@@ -12,10 +13,9 @@ import {
   systemHealthSnapshots,
 } from '../schema/index.js';
 
-export async function listJobRuns(filters: { limit?: number; status?: string; jobType?: string }) {
+export async function listJobRuns(filters: { limit?: number; status?: string }) {
   const conditions = [];
   if (filters.status) conditions.push(eq(jobRuns.status, filters.status));
-  if (filters.jobType) conditions.push(eq(jobRuns.jobType, filters.jobType));
 
   return db
     .select()
@@ -25,32 +25,35 @@ export async function listJobRuns(filters: { limit?: number; status?: string; jo
     .limit(filters.limit ?? 100);
 }
 
+/** Creates the row that mirrors a BullMQ job. The caller must enqueue with this id. */
 export async function createJobRun(values: {
   jobName: string;
-  queueName: string;
-  jobType: string;
   status?: string;
-  scheduledFor?: Date | null;
+  groupId?: string | null;
+  instrumentId?: string | null;
   payload?: Record<string, unknown>;
-  correlationId?: string | null;
+  maxAttempts?: number;
 }) {
+  if (!isJobName(values.jobName)) {
+    throw new Error(`Unknown job name: ${values.jobName}`);
+  }
+  const queueName = queueNameOf(values.jobName);
+  if (!queueName) throw new Error(`Job ${values.jobName} has no queue`);
+
   const [created] = await db
     .insert(jobRuns)
     .values({
       id: uuidv7(),
       jobName: values.jobName,
-      queueName: values.queueName,
-      jobType: values.jobType,
+      queueName,
       status: values.status ?? 'queued',
-      scheduledFor: values.scheduledFor ?? null,
-      startedAt: null,
-      finishedAt: null,
+      groupId: values.groupId ?? null,
+      instrumentId: values.instrumentId ?? null,
       attempt: 0,
-      maxAttempts: 3,
+      maxAttempts: values.maxAttempts ?? 1,
       payload: values.payload ?? {},
       result: null,
-      errorMessage: null,
-      correlationId: values.correlationId ?? null,
+      error: null,
     })
     .returning();
   return created;
@@ -59,16 +62,22 @@ export async function createJobRun(values: {
 export async function updateJobRun(
   id: string,
   values: {
-    status: string;
+    status?: string;
     startedAt?: Date | null;
     finishedAt?: Date | null;
     attempt?: number;
-    result?: Record<string, unknown> | null;
-    errorMessage?: string | null;
+    maxAttempts?: number;
+    result?: unknown;
+    error?: unknown;
   },
 ) {
   const [updated] = await db.update(jobRuns).set(values).where(eq(jobRuns.id, id)).returning();
   return updated;
+}
+
+/** Removes a row when the matching BullMQ job could not be created. */
+export async function deleteJobRun(id: string) {
+  await db.delete(jobRuns).where(eq(jobRuns.id, id));
 }
 
 export async function listHealthSnapshots(filters: { limit?: number; component?: string }) {
@@ -108,7 +117,7 @@ export async function getSystemStatus() {
       strategies: sql<number>`(select count(*)::int from strategies)`,
       openQualityIssues: sql<number>`(select count(*)::int from data_quality_issues where status = 'open')`,
       criticalQualityIssues: sql<number>`(select count(*)::int from data_quality_issues where status = 'open' and severity = 'critical')`,
-      queuedJobs: sql<number>`(select count(*)::int from job_runs where status in ('queued','retrying'))`,
+      queuedJobs: sql<number>`(select count(*)::int from job_runs where status = 'queued')`,
       runningJobs: sql<number>`(select count(*)::int from job_runs where status = 'running')`,
       failedJobs24h: sql<number>`(select count(*)::int from job_runs where status = 'failed' and created_at >= now() - interval '24 hours')`,
       latestJobAt: sql<string | null>`(select max(created_at)::text from job_runs)`,
@@ -163,7 +172,7 @@ export async function getDashboardOverview() {
       candles: sql<number>`(select count(*)::int from market_candles_1m)`,
       lastIngestionAt: sql<
         string | null
-      >`(select max(finished_at)::text from job_runs where job_type = 'ingestion' and status in ('succeeded', 'partially_failed'))`,
+      >`(select max(finished_at)::text from job_runs where status in ('succeeded', 'partially_failed'))`,
     })
     .from(sql`(select 1) as singleton`);
 
@@ -171,7 +180,6 @@ export async function getDashboardOverview() {
     .select({
       id: jobRuns.id,
       jobName: jobRuns.jobName,
-      jobType: jobRuns.jobType,
       status: jobRuns.status,
       startedAt: jobRuns.startedAt,
       finishedAt: jobRuns.finishedAt,

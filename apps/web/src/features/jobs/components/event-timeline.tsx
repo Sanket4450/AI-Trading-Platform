@@ -1,32 +1,60 @@
 import type { JobEvent } from '@/lib/types';
-import { formatClock, formatDateTime, formatNumber } from '@/lib/format';
+import { formatClock, formatDateTime } from '@/lib/format';
 import { label } from '@/lib/labels';
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/dashboard/empty-state';
 import { JsonBlock } from '@/components/dashboard/json-block';
 import { cn } from '@/lib/utils';
+import { eventFigures } from '../progress';
 
-const levelDot: Record<string, string> = {
-  error: 'bg-destructive',
-  warn: 'bg-warning',
-  info: 'bg-info',
-  debug: 'bg-muted-foreground',
+const typeDot: Record<string, string> = {
+  failed: 'bg-destructive',
+  warning: 'bg-warning',
+  completed: 'bg-success',
+  skipped: 'bg-muted-foreground',
+  entered: 'bg-info',
+  progress: 'bg-info',
 };
 
-const levelText: Record<string, string> = {
-  error: 'text-destructive',
-  warn: 'text-warning-strong',
-  info: 'text-info',
-  debug: 'text-muted-foreground',
+const typeText: Record<string, string> = {
+  failed: 'text-destructive',
+  warning: 'text-warning-strong',
 };
 
-/** Timestamped, append-only event list. Lifecycle and stage events stay visible but quiet. */
+/** Builds the operator-facing line from objective facts; the database stores no prose. */
+function eventTitle(event: JobEvent): string {
+  const stage = label(event.stage);
+  const code = typeof event.data.code === 'string' ? label(event.data.code) : null;
+  const reason = typeof event.data.reason === 'string' ? label(event.data.reason) : null;
+  const message = typeof event.data.message === 'string' ? event.data.message : null;
+
+  switch (event.type) {
+    case 'entered':
+      return `Started ${stage}`;
+    case 'progress': {
+      const figures = eventFigures(event);
+      return figures ? `${stage} · ${figures}` : `Progress in ${stage}`;
+    }
+    case 'completed':
+      return `Finished ${stage}`;
+    case 'failed':
+      return message ? `${stage} failed: ${message}` : `${stage} failed`;
+    case 'skipped':
+      return reason ? `Skipped ${stage} · ${reason}` : `Skipped ${stage}`;
+    case 'warning':
+      return code ? `Warning in ${stage} · ${code}` : `Warning in ${stage}`;
+    default:
+      return `${event.type} · ${stage}`;
+  }
+}
+
+/** Timestamped, append-only event list. */
 export function EventTimeline({ events }: { events: JobEvent[] }) {
   if (events.length === 0) {
     return (
       <EmptyState
         title="No events yet"
-        description="Steps appear here as soon as the job starts reporting."
+        description="Stage facts appear here as soon as the job starts reporting."
       />
     );
   }
@@ -41,7 +69,7 @@ export function EventTimeline({ events }: { events: JobEvent[] }) {
           <span
             className={cn(
               'ring-card absolute -left-[5px] top-4 size-2.5 rounded-full ring-4',
-              levelDot[event.level] ?? 'bg-muted-foreground',
+              typeDot[event.type] ?? 'bg-muted-foreground',
             )}
           />
           <div className="min-w-0 flex-1">
@@ -52,36 +80,17 @@ export function EventTimeline({ events }: { events: JobEvent[] }) {
               >
                 {formatClock(event.occurredAt)}
               </span>
-              {event.stageKey ? (
-                <Badge variant="outline" className="text-[10px]">
-                  {label(event.stageKey)}
-                </Badge>
-              ) : null}
-              {event.kind !== 'step' ? (
-                <Badge variant="outline" className="text-[10px]">
-                  {label(event.kind)}
-                </Badge>
-              ) : null}
-              {event.metricKey ? (
-                <span className={cn('font-mono text-[10px]', levelText[event.level])}>
-                  {label(event.metricKey)} · {formatNumber(event.metricValue)}
-                  {event.metricUnit ? ` ${event.metricUnit}` : ''}
-                </span>
-              ) : null}
+              <Badge variant="outline" className="text-[10px]">
+                {label(event.stage)}
+              </Badge>
+              <Badge variant="outline" className="text-[10px]">
+                {label(event.type)}
+              </Badge>
             </div>
-            <p
-              className={cn(
-                'mt-0.5 text-sm',
-                event.level === 'error'
-                  ? 'text-destructive'
-                  : event.level === 'warn'
-                    ? 'text-warning-strong'
-                    : '',
-              )}
-            >
-              {event.message ?? label(event.kind)}
+            <p className={cn('mt-0.5 text-sm', typeText[event.type] ?? '')}>
+              {eventTitle(event)}
             </p>
-            {event.kind !== 'stage' && Object.keys(event.data).length > 0 ? (
+            {event.type !== 'entered' && Object.keys(event.data).length > 0 ? (
               <details className="mt-1">
                 <summary className="text-muted-foreground cursor-pointer text-[11px]">
                   Details

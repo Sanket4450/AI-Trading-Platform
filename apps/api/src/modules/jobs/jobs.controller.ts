@@ -42,10 +42,10 @@ export class JobsController {
   }
 
   @Post(':id/cancel')
-  @ApiOperation({ summary: 'Cancel a multi-instrument backfill plan' })
+  @ApiOperation({ summary: 'Cancel one job run' })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiCreatedResponse({ type: JobRunDto })
-  @ApiNotFoundResponse({ type: ErrorResponseDto, description: 'Backfill plan not found' })
+  @ApiNotFoundResponse({ type: ErrorResponseDto, description: 'Job not found' })
   cancel(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: AuthenticatedUser,
@@ -55,9 +55,7 @@ export class JobsController {
   }
 
   @Get(':id')
-  @ApiOperation({
-    summary: 'Return a job run with stages, metrics, events and plan chunks',
-  })
+  @ApiOperation({ summary: 'Return a job run with its stage rail and events' })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiOkResponse({ type: JobDetailResponseDto })
   @ApiNotFoundResponse({ type: ErrorResponseDto, description: 'Job not found' })

@@ -12,6 +12,7 @@ import { Redis } from 'ioredis';
 import { sql } from 'drizzle-orm';
 import {
   createJobRun,
+  deleteJobRun,
   db,
   getDashboardOverview,
   getSystemStatus,
@@ -24,9 +25,8 @@ import {
   listTradingCalendar,
   listTradingSessions,
   recordAudit,
-  updateJobRun,
 } from '@ai-trading/database';
-import { QUEUES } from '@ai-trading/domain';
+import { QUEUES, jobTypeOf } from '@ai-trading/domain';
 import type { RequestMeta } from '../../common/http/request-meta.js';
 
 export interface CheckResult {
@@ -114,17 +114,26 @@ export class SystemControlService implements OnModuleInit, OnModuleDestroy {
   }
 
   jobs(limit = 100, status?: string) {
-    return listJobRuns({ limit, status });
+    return listJobRuns({ limit, status }).then((rows) =>
+      rows.map((row) => ({
+        ...row,
+        jobType: jobTypeOf(row.jobName) ?? 'ingestion',
+        durationMs:
+          row.startedAt && row.finishedAt
+            ? Math.max(0, row.finishedAt.getTime() - row.startedAt.getTime())
+            : null,
+        latestEvent: null,
+        progress: null,
+      })),
+    );
   }
 
   async rebuildCoverage(actorUserId: string, meta: RequestMeta) {
     const jobRun = await createJobRun({
       jobName: 'coverage-rebuild',
-      queueName: QUEUES.historicalData,
-      jobType: 'maintenance',
       status: 'queued',
       payload: {},
-      correlationId: meta.requestId,
+      maxAttempts: 1,
     });
     try {
       await this.historicalQueue.add(
@@ -138,13 +147,8 @@ export class SystemControlService implements OnModuleInit, OnModuleDestroy {
           removeOnFail: 500,
         },
       );
-    } catch (error) {
-      await updateJobRun(jobRun.id, {
-        status: 'failed',
-        finishedAt: new Date(),
-        errorMessage:
-          error instanceof Error ? error.message : 'Queue unavailable',
-      });
+    } catch {
+      await deleteJobRun(jobRun.id);
       throw new ServiceUnavailableException(
         'The background queue is unavailable',
       );

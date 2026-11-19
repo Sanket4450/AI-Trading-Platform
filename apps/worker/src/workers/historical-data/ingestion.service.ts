@@ -24,19 +24,18 @@ import {
   type SessionWindow,
 } from '@ai-trading/market-data';
 import {
+  closeJobRun,
   createRawProviderPayload,
   deleteAllCoverage,
   findProviderByCode,
   findProviderMapping,
   getInstrumentTickSize,
+  getJobRun,
   getLatestCompletedSession,
-  getParentPlanProgress,
-  getPlanJob,
   getTradingCalendarRow,
   getTradingSessionsForRange,
   getSyncTargetInstruments,
   isMonthComplete,
-  listChildJobRuns,
   refreshDailyStats,
   updateJobRun,
   upsertQualityIssue,
@@ -48,7 +47,6 @@ import { RedisRateLimiter } from './rate-limit.service.js';
 
 interface ChunkInput {
   providerId: string;
-  parentJobRunId: string;
   instrumentId: string;
   externalKey: string;
   from: string;
@@ -129,43 +127,32 @@ export class IngestionService {
     return map;
   }
 
-  private async isCancelled(
-    parentJobRunId: string,
-    childJobRunId?: string,
-  ): Promise<boolean> {
-    const parent = await getPlanJob(parentJobRunId);
-    if (parent?.status === 'cancelled') return true;
-    if (childJobRunId) {
-      const child = await getPlanJob(childJobRunId);
-      if (child?.status === 'cancelled') return true;
-    }
-    return false;
+  private async isCancelled(jobRunId: string): Promise<boolean> {
+    const run = await getJobRun(jobRunId);
+    return run?.status === 'cancelled';
   }
 
   async runInstrumentBackfill(payload: Record<string, unknown>) {
-    const childJobRunId = String(payload.jobRunId);
-    const parentJobRunId = String(payload.parentJobRunId);
+    const jobRunId = String(payload.jobRunId);
     const instrumentId = String(payload.instrumentId);
     const from = String(payload.from);
     const to = String(payload.to);
     const mode = payload.mode === 'force' ? 'force' : 'missing_only';
 
-    await updateJobRun(childJobRunId, {
+    await updateJobRun(jobRunId, {
       status: 'running',
       startedAt: new Date(),
-      attempt: 1,
     });
-    this.tracking.enterStage(childJobRunId, 'prepare');
     const client = this.client();
     const reason = client.configurationReason();
     if (reason) {
       const result = { skipped: true, reason };
-      await updateJobRun(childJobRunId, {
+      this.tracking.completeStage(jobRunId, 'prepare', 'skipped', { reason: 'not_configured' });
+      await updateJobRun(jobRunId, {
         status: 'succeeded',
         finishedAt: new Date(),
         result,
       });
-      await this.maybeCloseParent(parentJobRunId);
       return result;
     }
 
@@ -185,13 +172,13 @@ export class IngestionService {
         detectedBy: 'ingestion',
       });
       const result = { skipped: true, reason: 'mapping_missing' };
-      await updateJobRun(childJobRunId, {
+      this.tracking.completeStage(jobRunId, 'prepare', 'failed', { reason: 'mapping_missing' });
+      await updateJobRun(jobRunId, {
         status: 'failed',
         finishedAt: new Date(),
-        errorMessage: 'mapping_missing',
+        error: { code: 'mapping_missing', message: 'No primary Upstox mapping', retryable: false },
         result,
       });
-      await this.maybeCloseParent(parentJobRunId);
       return result;
     }
 
@@ -203,16 +190,11 @@ export class IngestionService {
     let failedChunks = 0;
     let cancelled = false;
 
-    this.tracking.completeStage(childJobRunId, 'prepare');
-    this.tracking.enterStage(childJobRunId, 'chunks');
+    this.tracking.completeStage(jobRunId, 'prepare');
+    this.tracking.enterStage(jobRunId, 'chunks');
 
     for (const chunk of chunks) {
-      this.tracking.step(childJobRunId, `Chunk ${chunk.index + 1}/${chunks.length}`, {
-        chunkIndex: chunk.index,
-        from: chunk.from,
-        to: chunk.to,
-      });
-      if (await this.isCancelled(parentJobRunId, childJobRunId)) {
+      if (await this.isCancelled(jobRunId)) {
         cancelled = true;
         break;
       }
@@ -221,13 +203,19 @@ export class IngestionService {
         (await isMonthComplete(instrumentId, chunk.from, chunk.to))
       ) {
         skippedChunks += 1;
+        this.tracking.progress(jobRunId, 'chunks', {
+          index: chunk.index + 1,
+          total: chunks.length,
+          from: chunk.from,
+          to: chunk.to,
+          status: 'skipped',
+        });
         continue;
       }
 
       try {
         const result = await this.runChunk({
           providerId: provider.id,
-          parentJobRunId,
           instrumentId,
           externalKey: mapping.externalKey,
           from: chunk.from,
@@ -239,6 +227,19 @@ export class IngestionService {
         fetched += result.fetched;
         written += result.written;
         rejected += result.rejected;
+        this.tracking.progress(jobRunId, 'chunks', {
+          index: chunk.index + 1,
+          total: chunks.length,
+          from: chunk.from,
+          to: chunk.to,
+          status: 'completed',
+          fetched: result.fetched,
+          written: result.written,
+          updated: result.updated,
+          rejected: result.rejected,
+          durationMs: result.durationMs,
+          httpStatus: result.httpStatus,
+        });
       } catch (error) {
         failedChunks += 1;
         const classification = classifyUpstoxError(error);
@@ -296,26 +297,28 @@ export class IngestionService {
         this.logger.warn(
           `Chunk failed for ${instrumentId} ${chunk.from}..${chunk.to}: ${classification.message}`,
         );
-        this.tracking.warn(childJobRunId, `Chunk failed: ${classification.message}`, {
-          chunkIndex: chunk.index,
+        this.tracking.warning(jobRunId, 'chunks', {
+          index: chunk.index + 1,
+          total: chunks.length,
           from: chunk.from,
           to: chunk.to,
-          httpStatus:
-            error instanceof Error && 'status' in error
-              ? Number((error as { status: number }).status)
-              : null,
+          code: classification.kind,
+          errorCode: classification.errorCode,
+          retryable: classification.retryable,
         });
       }
     }
 
-    this.tracking.metric(childJobRunId, 'chunks_total', chunks.length);
-    this.tracking.metric(childJobRunId, 'rows_fetched', fetched);
-    this.tracking.metric(childJobRunId, 'rows_written', written);
-    this.tracking.metric(childJobRunId, 'rows_rejected', rejected);
-    this.tracking.metric(childJobRunId, 'chunks_skipped', skippedChunks);
-    this.tracking.metric(childJobRunId, 'chunks_failed', failedChunks);
-    this.tracking.completeStage(childJobRunId, 'chunks');
-    this.tracking.enterStage(childJobRunId, 'close');
+    this.tracking.completeStage(jobRunId, 'chunks', 'completed', {
+      completed: chunks.length - skippedChunks,
+      total: chunks.length,
+      fetched,
+      written,
+      rejected,
+      skipped: skippedChunks,
+      failed: failedChunks,
+    });
+    this.tracking.enterStage(jobRunId, 'finalize');
 
     await this.quality.recomputeCoverage(instrumentId, from, to);
     await this.quality.recomputeInstrumentStatus(instrumentId);
@@ -335,14 +338,27 @@ export class IngestionService {
       failedChunks,
       chunks: chunks.length,
     };
-    await updateJobRun(childJobRunId, {
+    await closeJobRun({
+      jobRunId,
       status,
-      finishedAt: new Date(),
       result,
-      errorMessage: failedChunks > 0 ? `${failedChunks} chunk(s) failed` : null,
+      error:
+        failedChunks > 0
+          ? {
+              code: 'chunks_failed',
+              message: `${failedChunks} chunk(s) failed`,
+              retryable: false,
+              details: { failedChunks, chunks: chunks.length },
+            }
+          : null,
     });
-    await this.maybeCloseParent(parentJobRunId);
-    this.tracking.completeStage(childJobRunId, 'close');
+    this.tracking.completeStage(jobRunId, 'finalize', cancelled ? 'skipped' : 'completed', {
+      fetched,
+      written,
+      rejected,
+      skippedChunks,
+      failedChunks,
+    });
     return result;
   }
 
@@ -566,12 +582,12 @@ export class IngestionService {
     await updateJobRun(jobRunId, {
       status: 'running',
       startedAt: new Date(),
-      attempt: 1,
     });
     const client = this.client();
     const reason = client.configurationReason();
     if (reason) {
       const result = { skipped: true, reason };
+      this.tracking.completeStage(jobRunId, 'prepare', 'skipped', { reason: 'not_configured' });
       await updateJobRun(jobRunId, {
         status: 'succeeded',
         finishedAt: new Date(),
@@ -589,6 +605,7 @@ export class IngestionService {
         reason: 'not a trading day',
         date: today,
       };
+      this.tracking.completeStage(jobRunId, 'prepare', 'skipped', { reason: 'not_a_trading_day' });
       await updateJobRun(jobRunId, {
         status: 'succeeded',
         finishedAt: new Date(),
@@ -612,6 +629,8 @@ export class IngestionService {
     const targets = await getSyncTargetInstruments();
     let instruments = 0;
     let rowsWritten = 0;
+    this.tracking.completeStage(jobRunId, 'prepare');
+    this.tracking.enterStage(jobRunId, 'instruments');
     for (const target of targets) {
       const mapping = await findProviderMapping(
         target.instrumentId,
@@ -676,17 +695,39 @@ export class IngestionService {
         });
         await this.quality.recomputeCoverage(target.instrumentId, today, today);
         await this.quality.recomputeInstrumentStatus(target.instrumentId);
+        this.tracking.progress(jobRunId, 'instruments', {
+          index: instruments,
+          total: targets.length,
+          instrumentId: target.instrumentId,
+          symbol: target.symbol,
+          written: write.inserted + write.updated,
+        });
       } catch (error) {
         this.logger.warn(
           `Intraday sync failed for ${target.symbol}: ${String(error)}`,
         );
+        this.tracking.warning(jobRunId, 'instruments', {
+          instrumentId: target.instrumentId,
+          symbol: target.symbol,
+          code: 'intraday_fetch_failed',
+        });
       }
     }
+    this.tracking.completeStage(jobRunId, 'instruments', 'completed', {
+      completed: instruments,
+      total: targets.length,
+      rowsWritten,
+    });
+    this.tracking.enterStage(jobRunId, 'finalize');
     const result = { instruments, rowsWritten, date: today };
     await updateJobRun(jobRunId, {
       status: 'succeeded',
       finishedAt: new Date(),
       result,
+    });
+    this.tracking.completeStage(jobRunId, 'finalize', 'completed', {
+      instruments,
+      rowsWritten,
     });
     return result;
   }
@@ -695,12 +736,12 @@ export class IngestionService {
     await updateJobRun(jobRunId, {
       status: 'running',
       startedAt: new Date(),
-      attempt: 1,
     });
     const client = this.client();
     const reason = client.configurationReason();
     if (reason) {
       const result = { skipped: true, reason };
+      this.tracking.completeStage(jobRunId, 'prepare', 'skipped', { reason: 'not_configured' });
       await updateJobRun(jobRunId, {
         status: 'succeeded',
         finishedAt: new Date(),
@@ -713,6 +754,7 @@ export class IngestionService {
     const latest = await getLatestCompletedSession();
     if (!latest) {
       const result = { skipped: true, reason: 'no completed session' };
+      this.tracking.completeStage(jobRunId, 'prepare', 'skipped', { reason: 'no_completed_session' });
       await updateJobRun(jobRunId, {
         status: 'succeeded',
         finishedAt: new Date(),
@@ -724,6 +766,13 @@ export class IngestionService {
     const targets = await getSyncTargetInstruments();
     let instruments = 0;
     let rowsWritten = 0;
+    let repairs = 0;
+    const totalRepairs = targets.length * dates.length;
+    this.tracking.completeStage(jobRunId, 'prepare', 'completed', {
+      instruments: targets.length,
+      dates: dates.length,
+    });
+    this.tracking.enterStage(jobRunId, 'repair');
     for (const target of targets) {
       const mapping = await findProviderMapping(
         target.instrumentId,
@@ -731,15 +780,9 @@ export class IngestionService {
       );
       if (!mapping) continue;
       for (const date of dates) {
-        this.tracking.step(jobRunId, `Repair ${target.symbol} ${date}`, {
-          instrumentId: target.instrumentId,
-          from: date,
-          to: date,
-        });
         try {
           const result = await this.runChunk({
             providerId: provider.id,
-            parentJobRunId: jobRunId,
             instrumentId: target.instrumentId,
             externalKey: mapping.externalKey,
             from: date,
@@ -752,6 +795,15 @@ export class IngestionService {
           await this.quality.recomputeCoverage(target.instrumentId, date, date);
           await this.quality.recomputeInstrumentStatus(target.instrumentId);
           instruments += 1;
+          repairs += 1;
+          this.tracking.progress(jobRunId, 'repair', {
+            index: repairs,
+            total: totalRepairs,
+            instrumentId: target.instrumentId,
+            symbol: target.symbol,
+            tradingDate: date,
+            written: result.written,
+          });
         } catch (error) {
           const classification = classifyUpstoxError(error);
           await this.issue({
@@ -771,16 +823,30 @@ export class IngestionService {
             },
             detectedBy: 'ingestion',
           });
+          this.tracking.warning(jobRunId, 'repair', {
+            instrumentId: target.instrumentId,
+            symbol: target.symbol,
+            tradingDate: date,
+            code: classification.kind,
+            retryable: classification.retryable,
+          });
         }
       }
     }
+    this.tracking.completeStage(jobRunId, 'repair', 'completed', {
+      completed: repairs,
+      total: totalRepairs,
+      rowsWritten,
+    });
+    this.tracking.enterStage(jobRunId, 'refresh');
+    await refreshDailyStats();
     const result = { instruments, rowsWritten, dates };
     await updateJobRun(jobRunId, {
       status: 'succeeded',
       finishedAt: new Date(),
       result,
     });
-    await refreshDailyStats();
+    this.tracking.completeStage(jobRunId, 'refresh', 'completed', { rowsWritten });
     return result;
   }
 
@@ -806,7 +872,6 @@ export class IngestionService {
     await updateJobRun(jobRunId, {
       status: 'running',
       startedAt: new Date(),
-      attempt: 1,
     });
     const latest =
       (await getLatestCompletedSession()) ??
@@ -827,17 +892,34 @@ export class IngestionService {
           ? [{ instrumentId }]
           : await getSyncTargetInstruments();
     let recomputed = 0;
+    this.tracking.completeStage(jobRunId, 'prepare', 'completed', {
+      instruments: targets.length,
+      from,
+      to,
+    });
+    this.tracking.enterStage(jobRunId, 'instruments');
     for (const target of targets) {
       await this.quality.recomputeCoverage(target.instrumentId, from, to);
       await this.quality.recomputeInstrumentStatus(target.instrumentId);
       recomputed += 1;
+      this.tracking.progress(jobRunId, 'instruments', {
+        index: recomputed,
+        total: targets.length,
+        instrumentId: target.instrumentId,
+      });
     }
+    this.tracking.completeStage(jobRunId, 'instruments', 'completed', {
+      completed: recomputed,
+      total: targets.length,
+    });
+    this.tracking.enterStage(jobRunId, 'finalize');
     const result = { recomputed, from, to };
     await updateJobRun(jobRunId, {
       status: 'succeeded',
       finishedAt: new Date(),
       result,
     });
+    this.tracking.completeStage(jobRunId, 'finalize', 'completed', { recomputed });
     return result;
   }
 
@@ -845,7 +927,6 @@ export class IngestionService {
     await updateJobRun(jobRunId, {
       status: 'running',
       startedAt: new Date(),
-      attempt: 1,
     });
     const latest =
       (await getLatestCompletedSession()) ??
@@ -854,13 +935,25 @@ export class IngestionService {
       typeof payload.from === 'string' ? payload.from : HISTORY_START;
 
     await deleteAllCoverage();
+    this.tracking.completeStage(jobRunId, 'clear', 'completed');
+    this.tracking.enterStage(jobRunId, 'instruments');
     const targets = await getSyncTargetInstruments();
     let rebuilt = 0;
     for (const target of targets) {
       await this.quality.recomputeCoverage(target.instrumentId, from, latest);
       await this.quality.recomputeInstrumentStatus(target.instrumentId);
       rebuilt += 1;
+      this.tracking.progress(jobRunId, 'instruments', {
+        index: rebuilt,
+        total: targets.length,
+        instrumentId: target.instrumentId,
+      });
     }
+    this.tracking.completeStage(jobRunId, 'instruments', 'completed', {
+      completed: rebuilt,
+      total: targets.length,
+    });
+    this.tracking.enterStage(jobRunId, 'finalize');
 
     const result = { rebuilt, from, to: latest };
     await updateJobRun(jobRunId, {
@@ -868,6 +961,7 @@ export class IngestionService {
       finishedAt: new Date(),
       result,
     });
+    this.tracking.completeStage(jobRunId, 'finalize', 'completed', { rebuilt });
     return result;
   }
 
@@ -875,17 +969,35 @@ export class IngestionService {
     await updateJobRun(jobRunId, {
       status: 'running',
       startedAt: new Date(),
-      attempt: 1,
+    });
+    const days = payload.days ? Number(payload.days) : 10;
+    this.tracking.progress(jobRunId, 'scan', {
+      index: 0,
+      total: days,
+      mode: payload.full === true ? 'full' : 'window',
     });
     const result = await this.quality.qualityScan({
-      days: payload.days ? Number(payload.days) : 10,
+      days,
       full: payload.full === true,
     });
+    this.tracking.completeStage(jobRunId, 'scan', 'completed', {
+      completed: days,
+      total: days,
+      scanned: result.scanned,
+      autoResolved: result.autoResolved,
+    });
+    this.tracking.enterStage(jobRunId, 'stale');
     const stale = await this.quality.detectStaleIngestion();
+    this.tracking.completeStage(jobRunId, 'stale', 'completed', { stale });
+    this.tracking.enterStage(jobRunId, 'finalize');
     await updateJobRun(jobRunId, {
       status: 'succeeded',
       finishedAt: new Date(),
       result: { ...result, stale },
+    });
+    this.tracking.completeStage(jobRunId, 'finalize', 'completed', {
+      scanned: result.scanned,
+      stale,
     });
     return result;
   }
@@ -894,20 +1006,20 @@ export class IngestionService {
     await updateJobRun(jobRunId, {
       status: 'running',
       startedAt: new Date(),
-      attempt: 1,
     });
     const { markStaleJobsFailed } = await import('@ai-trading/database');
     const stale = await markStaleJobsFailed(15);
-    for (const job of stale) {
+    this.tracking.completeStage(jobRunId, 'sweep', 'completed', {
+      completed: stale.length,
+      total: stale.length,
+    });
+    this.tracking.enterStage(jobRunId, 'issues');
+    for (const [index, job] of stale.entries()) {
       await this.issue({
         ruleId: 'DQ-023',
         severity: 'warning',
         providerId: null,
-        instrumentId:
-          typeof (job.payload as Record<string, unknown> | null)?.instrumentId ===
-          'string'
-            ? String((job.payload as Record<string, unknown>).instrumentId)
-            : null,
+        instrumentId: job.instrumentId ?? null,
         tradingDate: null,
         windowStart: null,
         windowEnd: null,
@@ -918,62 +1030,27 @@ export class IngestionService {
         },
         detectedBy: 'reconciliation',
       });
+      this.tracking.progress(jobRunId, 'issues', {
+        index: index + 1,
+        total: stale.length,
+        jobRunId: job.id,
+        jobName: job.jobName,
+      });
     }
+    this.tracking.completeStage(jobRunId, 'issues', 'completed', {
+      completed: stale.length,
+      total: stale.length,
+    });
+    this.tracking.enterStage(jobRunId, 'finalize');
     const result = { recovered: stale.length };
     await updateJobRun(jobRunId, {
       status: 'succeeded',
       finishedAt: new Date(),
       result,
     });
-    return result;
-  }
-
-  async maybeCloseParent(parentJobRunId: string): Promise<void> {
-    const parent = await getPlanJob(parentJobRunId);
-    if (
-      !parent ||
-      parent.status === 'succeeded' ||
-      parent.status === 'failed' ||
-      parent.status === 'partially_failed' ||
-      parent.status === 'cancelled'
-    ) {
-      return;
-    }
-    const children = await listChildJobRuns(parentJobRunId);
-    if (children.length === 0) return;
-    const latestByInstrument = new Map<string, (typeof children)[number]>();
-    for (const child of children) {
-      const instrumentId =
-        typeof (child.payload as Record<string, unknown> | null)
-          ?.instrumentId === 'string'
-          ? String((child.payload as Record<string, unknown>).instrumentId)
-          : child.id;
-      const existing = latestByInstrument.get(instrumentId);
-      if (!existing || child.createdAt > existing.createdAt) {
-        latestByInstrument.set(instrumentId, child);
-      }
-    }
-    const latest = [...latestByInstrument.values()];
-    if (
-      latest.some(
-        (child) => child.status === 'queued' || child.status === 'running',
-      )
-    )
-      return;
-    const progress = await getParentPlanProgress(parentJobRunId);
-    const status =
-      parent.status === 'cancelled'
-        ? 'cancelled'
-        : latest.every((child) => child.status === 'succeeded')
-          ? 'succeeded'
-          : latest.every((child) => child.status === 'failed')
-            ? 'failed'
-            : 'partially_failed';
-    await updateJobRun(parentJobRunId, {
-      status,
-      finishedAt: new Date(),
-      result: progress as unknown as Record<string, unknown>,
+    this.tracking.completeStage(jobRunId, 'finalize', 'completed', {
+      recovered: stale.length,
     });
-    await refreshDailyStats();
+    return result;
   }
 }

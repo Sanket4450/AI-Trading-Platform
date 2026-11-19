@@ -251,7 +251,6 @@ export interface SystemSetting {
 export interface JobRunSummary {
   id: string;
   jobName: string;
-  jobType: string;
   status: string;
   startedAt: string | null;
   finishedAt: string | null;
@@ -265,27 +264,41 @@ export interface JobStats {
   p95DurationMs: number;
 }
 
+export interface JobEvent {
+  id: number;
+  occurredAt: string;
+  stage: string;
+  type: string;
+  data: Record<string, unknown>;
+}
+
+export interface JobProgress {
+  stage: string;
+  stageIndex: number;
+  stageTotal: number;
+  completed: number | null;
+  total: number | null;
+}
+
 export interface JobRun {
   id: string;
   jobName: string;
   queueName: string;
   jobType: string;
   status: string;
-  scheduledFor: string | null;
-  startedAt: string | null;
-  finishedAt: string | null;
+  groupId: string | null;
+  instrumentId: string | null;
   attempt: number;
   maxAttempts: number;
   payload?: Record<string, unknown>;
   result?: Record<string, unknown> | null;
-  errorMessage: string | null;
-  correlationId: string | null;
-  currentStage: string | null;
-  stageKeys: string[];
-  stageTotal: number | null;
+  error: Record<string, unknown> | null;
   durationMs: number | null;
-  summary: string | null;
+  latestEvent: JobEvent | null;
+  progress: JobProgress | null;
   createdAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
 }
 
 export interface JobListResponse {
@@ -296,73 +309,19 @@ export interface JobListResponse {
 export interface JobStage {
   key: string;
   status: string;
+  quantified: boolean;
+  completed: number | null;
+  total: number | null;
   enteredAt: string | null;
   completedAt: string | null;
   durationMs: number | null;
 }
 
-export interface JobMetric {
-  key: string;
-  value: number | null;
-  unit: string | null;
-  at: string;
-}
-
-export interface JobEvent {
-  id: number;
-  occurredAt: string;
-  kind: string;
-  level: string;
-  stageKey: string | null;
-  message: string | null;
-  data: Record<string, unknown>;
-  metricKey: string | null;
-  metricValue: number | null;
-  metricUnit: string | null;
-}
-
-export interface JobPlanProgress {
-  jobs: number;
-  instruments: number;
-  queued: number;
-  running: number;
-  succeeded: number;
-  partiallyFailed: number;
-  failed: number;
-  cancelled: number;
-  rowsFetched: number;
-  rowsWritten: number;
-  rowsRejected: number;
-  rowsSkipped: number;
-  rowsUpdated: number;
-}
-
-export interface JobChildRun {
-  id: string;
-  instrumentId: string | null;
-  symbol: string | null;
-  status: string;
-  attempt: number;
-  requestedFrom: string | null;
-  requestedTo: string | null;
-  rowsFetched: number;
-  rowsWritten: number;
-  rowsRejected: number;
-  rowsSkipped: number;
-  chunks: number;
-  errorMessage: string | null;
-  startedAt: string | null;
-  finishedAt: string | null;
-  createdAt: string;
-}
-
 export interface JobDetail {
   run: JobRun;
   stages: JobStage[];
-  metrics: JobMetric[];
   events: JobEvent[];
-  planProgress: JobPlanProgress | null;
-  children: JobChildRun[];
+  progress: JobProgress | null;
 }
 
 export interface HealthCheck {

@@ -5,21 +5,20 @@ import type { JobEventInput, JobStore } from './types.js';
 function createStore(): {
   store: JobStore;
   events: JobEventInput[];
-  stageUpdates: string[];
+  begins: Parameters<JobStore['beginRun']>[0][];
   finished: Parameters<JobStore['finishRun']>[0][];
 } {
   const events: JobEventInput[] = [];
-  const stageUpdates: string[] = [];
+  const begins: Parameters<JobStore['beginRun']>[0][] = [];
   const finished: Parameters<JobStore['finishRun']>[0][] = [];
 
   return {
     events,
-    stageUpdates,
+    begins,
     finished,
     store: {
-      beginRun: vi.fn<JobStore['beginRun']>(async () => undefined),
-      setStage: vi.fn<JobStore['setStage']>(async (input) => {
-        stageUpdates.push(input.stageKey);
+      beginRun: vi.fn<JobStore['beginRun']>(async (input) => {
+        begins.push(input);
       }),
       finishRun: vi.fn<JobStore['finishRun']>(async (input) => {
         finished.push(input);
@@ -36,20 +35,22 @@ afterEach(() => {
 });
 
 describe('JobTracker', () => {
-  it('flushes buffered events when the run finishes', async () => {
+  it('enters the first stage and flushes on finish', async () => {
     vi.useFakeTimers();
     const { store, events } = createStore();
     const tracker = new JobTracker(store);
 
-    await tracker.begin({ jobRunId: 'run-1', stages: ['start', 'work'] });
-    tracker.step('run-1', 'first step');
+    await tracker.begin({ jobRunId: 'run-1', stages: ['prepare', 'finalize'] });
+    tracker.progress('run-1', 'prepare', { index: 1, total: 2 });
     expect(events).toHaveLength(0);
 
     await tracker.finish('run-1', { status: 'succeeded' });
 
-    expect(events.map((event) => event.message)).toEqual(
-      expect.arrayContaining(['Job started', 'first step', 'Job finished']),
-    );
+    expect(events.map((event) => `${event.stage}:${event.type}`)).toEqual([
+      'prepare:entered',
+      'prepare:progress',
+      'prepare:completed',
+    ]);
   });
 
   it('flushes on the timer without waiting for finish', async () => {
@@ -57,27 +58,28 @@ describe('JobTracker', () => {
     const { store, events } = createStore();
     const tracker = new JobTracker(store, { flushMs: 500 });
 
-    await tracker.begin({ jobRunId: 'run-2', stages: ['start'] });
-    tracker.step('run-2', 'buffered');
+    await tracker.begin({ jobRunId: 'run-2', stages: ['scan'] });
+    tracker.progress('run-2', 'scan', { index: 1, total: 4 });
     expect(events).toHaveLength(0);
 
     await vi.advanceTimersByTimeAsync(500);
 
-    expect(events.map((event) => event.message)).toContain('buffered');
+    expect(events.map((event) => event.type)).toContain('progress');
   });
 
   it('emits entered and completed events around a stage', async () => {
     const { store, events } = createStore();
     const tracker = new JobTracker(store);
 
-    await tracker.begin({ jobRunId: 'run-3', stages: ['prepare', 'close'] });
+    await tracker.begin({ jobRunId: 'run-3', stages: ['prepare', 'finalize'] });
     const result = await tracker.stage('run-3', 'prepare', async () => 7);
     await tracker.finish('run-3', { status: 'succeeded' });
 
     expect(result).toBe(7);
-    const stageEvents = events.filter((event) => event.kind === 'stage');
-    expect(stageEvents.map((event) => event.data?.phase)).toEqual(['entered', 'completed']);
-    expect(stageEvents[1]?.data?.status).toBe('succeeded');
+    expect(events.map((event) => `${event.stage}:${event.type}`)).toEqual([
+      'prepare:entered',
+      'prepare:completed',
+    ]);
   });
 
   it('marks a failed stage and rethrows', async () => {
@@ -92,27 +94,25 @@ describe('JobTracker', () => {
     ).rejects.toThrow('boom');
     await tracker.finish('run-4', { status: 'failed', error: new Error('boom') });
 
-    const completed = events.find(
-      (event) => event.kind === 'stage' && event.data?.phase === 'completed',
-    );
-    expect(completed?.data?.status).toBe('failed');
+    const failed = events.find((event) => event.type === 'failed');
+    expect(failed?.data?.message).toBe('boom');
   });
 
   it('redacts secret-looking keys before writing', async () => {
     const { store, events } = createStore();
     const tracker = new JobTracker(store);
 
-    await tracker.begin({ jobRunId: 'run-5', stages: ['start'] });
-    tracker.step('run-5', 'calling provider', {
+    await tracker.begin({ jobRunId: 'run-5', stages: ['fetch'] });
+    tracker.progress('run-5', 'fetch', {
       authorization: 'Bearer secret',
-      nested: { apiKey: 'abc', attempt: 2 },
+      nested: { apiKey: 'abc', index: 2 },
     });
     await tracker.finish('run-5', { status: 'succeeded' });
 
-    const step = events.find((event) => event.message === 'calling provider');
-    expect(step?.data).toEqual({
+    const progress = events.find((event) => event.type === 'progress');
+    expect(progress?.data).toEqual({
       authorization: '[redacted]',
-      nested: { apiKey: '[redacted]', attempt: 2 },
+      nested: { apiKey: '[redacted]', index: 2 },
     });
   });
 
@@ -120,7 +120,6 @@ describe('JobTracker', () => {
     const onError = vi.fn<(error: unknown) => void>();
     const store: JobStore = {
       beginRun: vi.fn<JobStore['beginRun']>(async () => undefined),
-      setStage: vi.fn<JobStore['setStage']>(async () => undefined),
       finishRun: vi.fn<JobStore['finishRun']>(async () => undefined),
       appendEvents: vi.fn<JobStore['appendEvents']>(async () => {
         throw new Error('database unavailable');
@@ -128,30 +127,34 @@ describe('JobTracker', () => {
     };
     const tracker = new JobTracker(store, { onError });
 
-    await tracker.begin({ jobRunId: 'run-6', stages: ['start'] });
-    tracker.step('run-6', 'still going');
+    await tracker.begin({ jobRunId: 'run-6', stages: ['work'] });
+    tracker.progress('run-6', 'work', { index: 1, total: 2 });
     await expect(tracker.finish('run-6', { status: 'succeeded' })).resolves.toBeUndefined();
 
     expect(onError).toHaveBeenCalledTimes(1);
     expect(tracker.droppedEvents).toBeGreaterThan(0);
   });
 
-  it('reports the active stage on success and failure', async () => {
+  it('closes an open stage as failed and forwards the structured error', async () => {
     const { store, finished } = createStore();
     const tracker = new JobTracker(store);
 
-    await tracker.begin({ jobRunId: 'run-7', stages: ['prepare', 'close'] });
+    await tracker.begin({ jobRunId: 'run-7', stages: ['prepare', 'finalize'], attempt: 1 });
     tracker.enterStage('run-7', 'prepare');
-    tracker.completeStage('run-7', 'prepare');
-    tracker.enterStage('run-7', 'close');
-    tracker.completeStage('run-7', 'close');
-    await tracker.finish('run-7', { status: 'succeeded' });
+    await tracker.finish('run-7', { status: 'failed', error: new Error('stopped') });
 
-    await tracker.begin({ jobRunId: 'run-8', stages: ['prepare', 'close'] });
+    expect(finished[0]?.error).toEqual({ code: 'job_failed', message: 'stopped' });
+  });
+
+  it('does not re-enter the same stage twice', async () => {
+    const { store, events } = createStore();
+    const tracker = new JobTracker(store);
+
+    await tracker.begin({ jobRunId: 'run-8', stages: ['prepare', 'finalize'] });
     tracker.enterStage('run-8', 'prepare');
-    await tracker.finish('run-8', { status: 'failed', error: new Error('stopped') });
+    tracker.enterStage('run-8', 'prepare');
+    await tracker.finish('run-8', { status: 'succeeded' });
 
-    expect(finished[0]?.currentStage).toBe('close');
-    expect(finished[1]?.currentStage).toBe('prepare');
+    expect(events.filter((event) => event.type === 'entered')).toHaveLength(1);
   });
 });

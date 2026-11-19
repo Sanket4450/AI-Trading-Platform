@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { ArrowUpRight } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
+import { jobTypeOf } from '@ai-trading/domain';
 import type { HealthResponse, Overview } from '@/lib/types';
 import { formatDateTime, formatNumber } from '@/lib/format';
 import { label } from '@/lib/labels';
@@ -135,8 +136,10 @@ export default async function OverviewPage() {
                 {overview.recentJobs.map((job) => (
                   <TableRow key={job.id}>
                     <TableCell>
-                      <p className="font-medium">{job.jobName}</p>
-                      <p className="text-muted-foreground text-xs">{label(job.jobType)}</p>
+                      <p className="font-medium">{label(job.jobName)}</p>
+                      <p className="text-muted-foreground text-xs">
+                        {label(jobTypeOf(job.jobName) ?? '')}
+                      </p>
                     </TableCell>
                     <TableCell>
                       <StatusBadge status={job.status} />

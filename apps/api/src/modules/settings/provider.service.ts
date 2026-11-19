@@ -8,9 +8,9 @@ import type { Queue } from 'bullmq';
 import { QUEUES } from '@ai-trading/domain';
 import {
   createJobRun,
+  deleteJobRun,
   getProviderStatus,
   recordAudit,
-  updateJobRun,
 } from '@ai-trading/database';
 import type { RequestMeta } from '../../common/http/request-meta.js';
 import { BudgetStatusService } from './budget.service.js';
@@ -53,11 +53,9 @@ export class ProviderService {
   ) {
     const jobRun = await createJobRun({
       jobName,
-      queueName: QUEUES.historicalData,
-      jobType: 'ingestion',
       status: 'queued',
       payload: { source: 'operator' },
-      correlationId: meta.requestId,
+      maxAttempts: 2,
     });
     try {
       await this.historicalQueue.add(
@@ -71,13 +69,8 @@ export class ProviderService {
           removeOnFail: 500,
         },
       );
-    } catch (error) {
-      await updateJobRun(jobRun.id, {
-        status: 'failed',
-        finishedAt: new Date(),
-        errorMessage:
-          error instanceof Error ? error.message : 'Queue unavailable',
-      });
+    } catch {
+      await deleteJobRun(jobRun.id);
       throw new ServiceUnavailableException(
         'The background queue is unavailable',
       );
@@ -117,12 +110,10 @@ export class ProviderService {
 
   async refreshDailyStats(actorUserId: string, meta: RequestMeta) {
     const jobRun = await createJobRun({
-      jobName: 'refresh_materialized_view',
-      queueName: QUEUES.maintenance,
-      jobType: 'maintenance',
+      jobName: 'refresh-materialized-view',
       status: 'queued',
       payload: {},
-      correlationId: meta.requestId,
+      maxAttempts: 2,
     });
 
     try {
@@ -136,13 +127,8 @@ export class ProviderService {
           removeOnFail: 200,
         },
       );
-    } catch (error) {
-      await updateJobRun(jobRun.id, {
-        status: 'failed',
-        finishedAt: new Date(),
-        errorMessage:
-          error instanceof Error ? error.message : 'Queue unavailable',
-      });
+    } catch {
+      await deleteJobRun(jobRun.id);
       throw new ServiceUnavailableException(
         'The background queue is unavailable',
       );

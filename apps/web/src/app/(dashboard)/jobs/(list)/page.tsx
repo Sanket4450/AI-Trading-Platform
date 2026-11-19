@@ -1,56 +1,26 @@
 import { apiFetch } from '@/lib/api';
-import type { JobListResponse, JobRun } from '@/lib/types';
-import { formatDateTime, formatDuration, formatNumber } from '@/lib/format';
-import { label } from '@/lib/labels';
+import type { JobListResponse } from '@/lib/types';
+import { formatNumber, formatDuration } from '@/lib/format';
 import { TableCard } from '@/components/dashboard/table-card';
 import { TableSummary } from '@/components/dashboard/table-summary';
-import { StatusBadge } from '@/components/dashboard/status-badge';
 import { EmptyState } from '@/components/dashboard/empty-state';
-import { AutoRefresh } from '@/components/dashboard/auto-refresh';
 import {
   MultiSelectFilter,
   SearchFilter,
   TableFilters,
 } from '@/components/dashboard/table-filters';
-import {
-  TableActionLink,
-  TableActions,
-  TableRefreshButton,
-} from '@/components/dashboard/table-actions';
-import { detailHref, originHref } from '@/lib/navigation';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-
-const ACTIVE_STATUSES = new Set(['queued', 'running', 'retrying']);
+import { TableRefreshButton } from '@/components/dashboard/table-actions';
+import { originHref } from '@/lib/navigation';
+import { JobsLive } from '@/features/jobs/components/jobs-live';
 
 const STATUS_OPTIONS = [
   { value: 'queued', label: 'Queued' },
   { value: 'running', label: 'Running' },
-  { value: 'retrying', label: 'Retrying' },
   { value: 'succeeded', label: 'Succeeded' },
   { value: 'failed', label: 'Failed' },
+  { value: 'partially_failed', label: 'Partially failed' },
   { value: 'cancelled', label: 'Cancelled' },
 ] as const;
-
-function durationOf(run: JobRun): number | null {
-  if (run.durationMs !== null) return run.durationMs;
-  if (!run.startedAt) return null;
-  return Date.now() - new Date(run.startedAt).getTime();
-}
-
-function stageProgress(run: JobRun): string {
-  if (!run.currentStage) return '—';
-  const index = run.stageKeys.indexOf(run.currentStage);
-  if (index < 0) return label(run.currentStage);
-  const total = run.stageTotal ?? run.stageKeys.length;
-  return `${label(run.currentStage)} · ${index + 1}/${total}`;
-}
 
 export default async function JobsPage({
   searchParams,
@@ -70,13 +40,10 @@ export default async function JobsPage({
   query.set('limit', '60');
 
   const data = await apiFetch<JobListResponse>(`/jobs?${query.toString()}`);
-  const active = data.items.some((run) => ACTIVE_STATUSES.has(run.status));
   const hasFilters = Boolean(params.search || statuses.length > 0);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <AutoRefresh active={active} />
-
       <TableCard
         summary={
           <TableSummary
@@ -112,7 +79,7 @@ export default async function JobsPage({
           <TableFilters>
             <SearchFilter
               defaultValue={params.search ?? ''}
-              placeholder="Search job, type or ID…"
+              placeholder="Search job, status or ID…"
             />
             <MultiSelectFilter
               id="status"
@@ -137,49 +104,7 @@ export default async function JobsPage({
             />
           </div>
         ) : (
-          <Table containerClassName="h-full overflow-auto">
-            <TableHeader className="bg-card sticky top-0 z-10">
-              <TableRow>
-                <TableHead>Job</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Stage</TableHead>
-                <TableHead>Started</TableHead>
-                <TableHead>Duration</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {data.items.map((run) => (
-                <TableRow key={run.id}>
-                  <TableCell>
-                    <p className="font-medium">{label(run.jobName)}</p>
-                    <p className="text-muted-foreground mt-0.5 font-mono text-[10px]">
-                      {run.id.slice(0, 8)}
-                    </p>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-xs">
-                    {label(run.jobType)}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-xs">
-                    {stageProgress(run)}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground whitespace-nowrap text-xs">
-                    {run.startedAt ? formatDateTime(run.startedAt) : 'Queued'}
-                  </TableCell>
-                  <TableCell className="font-mono text-xs">
-                    {formatDuration(durationOf(run))}
-                  </TableCell>
-                  <TableCell>
-                    <StatusBadge status={run.status} />
-                  </TableCell>
-                  <TableActions>
-                    <TableActionLink href={detailHref(`/jobs/${run.id}`, from)} label="View job" />
-                  </TableActions>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <JobsLive items={data.items} back={from} />
         )}
       </TableCard>
     </div>

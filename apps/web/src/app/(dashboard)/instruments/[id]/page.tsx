@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { apiFetch } from '@/lib/api';
-import type { CorporateAction, InstrumentCoverageDetail, InstrumentMapping } from '@/lib/types';
+import type { CorporateAction, InstrumentCoverageDetail, InstrumentMapping, JobListResponse } from '@/lib/types';
 import { formatDate, formatNumber } from '@/lib/format';
 import { label } from '@/lib/labels';
 import { displayStatus, statusTone } from '@/lib/status';
@@ -29,6 +29,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { InstrumentDetailActions } from '../instrument-actions';
+import { InstrumentJobProgress } from '@/features/jobs/components/instrument-job-progress';
 
 export default async function InstrumentDetailPage({
   params,
@@ -45,6 +46,8 @@ export default async function InstrumentDetailPage({
     apiFetch<InstrumentMapping[]>(`/instruments/${id}/mappings`),
     apiFetch<CorporateAction[]>(`/instruments/${id}/corporate-actions`),
   ]);
+  const jobs = await apiFetch<JobListResponse>(`/jobs?instrumentId=${id}&limit=1`);
+  const latestJob = jobs.items[0] ?? null;
   const status = displayStatus(detail);
 
   return (
@@ -104,6 +107,11 @@ export default async function InstrumentDetailPage({
           tone="danger"
         />
       </StatGrid>
+
+      <InstrumentJobProgress
+        initial={latestJob}
+        returnTo={`/instruments/${detail.instrumentId}`}
+      />
 
       <div className="mt-4 grid gap-4 xl:grid-cols-[1.2fr_1fr]">
         <SectionCard

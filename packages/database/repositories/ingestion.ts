@@ -19,6 +19,17 @@ type CandleInsert = InferInsertModel<typeof marketCandles1m>;
 
 const activeBackfillStatuses = ['queued', 'running'];
 
+const ingestionJobNames = [
+  'instrument-sync',
+  'calendar-sync',
+  'historical-backfill',
+  'historical-finalize',
+  'intraday-sync',
+  'coverage-recompute',
+  'quality-scan',
+  'ingestion-reconcile',
+];
+
 export async function findActiveBackfillJob(instrumentId: string) {
   const rows = await db
     .select()
@@ -27,7 +38,7 @@ export async function findActiveBackfillJob(instrumentId: string) {
       and(
         eq(jobRuns.jobName, 'historical-backfill'),
         inArray(jobRuns.status, activeBackfillStatuses),
-        sql`${jobRuns.payload} ->> 'instrumentId' = ${instrumentId}`,
+        eq(jobRuns.instrumentId, instrumentId),
       ),
     )
     .orderBy(desc(jobRuns.createdAt))
@@ -56,7 +67,11 @@ export async function markStaleJobsFailed(minutes: number) {
     .set({
       status: 'failed',
       finishedAt: new Date(),
-      errorMessage: `Stale job recovered after ${minutes} minutes without a heartbeat`,
+      error: {
+        code: 'stale_job',
+        message: `Stale job recovered after ${minutes} minutes without a heartbeat`,
+        retryable: true,
+      },
     })
     .where(
       and(
@@ -70,74 +85,11 @@ export async function markStaleJobsFailed(minutes: number) {
   return stale;
 }
 
-export async function getParentPlanProgress(parentJobRunId: string) {
-  const [counts] = await db
-    .select({
-      jobs: sql<number>`count(*)::int`,
-      instruments: sql<number>`count(distinct ${jobRuns.payload} ->> 'instrumentId')::int`,
-      queued: sql<number>`count(*) filter (where ${jobRuns.status} = 'queued')::int`,
-      running: sql<number>`count(*) filter (where ${jobRuns.status} = 'running')::int`,
-      succeeded: sql<number>`count(*) filter (where ${jobRuns.status} = 'succeeded')::int`,
-      partiallyFailed: sql<number>`count(*) filter (where ${jobRuns.status} = 'partially_failed')::int`,
-      failed: sql<number>`count(*) filter (where ${jobRuns.status} = 'failed')::int`,
-      cancelled: sql<number>`count(*) filter (where ${jobRuns.status} = 'cancelled')::int`,
-      rowsFetched: sql<number>`coalesce(sum((${jobRuns.result} ->> 'fetched')::int), 0)::int`,
-      rowsWritten: sql<number>`coalesce(sum((${jobRuns.result} ->> 'written')::int), 0)::int`,
-      rowsRejected: sql<number>`coalesce(sum((${jobRuns.result} ->> 'rejected')::int), 0)::int`,
-      rowsSkipped: sql<number>`coalesce(sum((${jobRuns.result} ->> 'skippedChunks')::int), 0)::int`,
-      rowsUpdated: sql<number>`0::int`,
-    })
-    .from(jobRuns)
-    .where(eq(jobRuns.correlationId, parentJobRunId));
-  return (
-    counts ?? {
-      jobs: 0,
-      instruments: 0,
-      queued: 0,
-      running: 0,
-      succeeded: 0,
-      partiallyFailed: 0,
-      failed: 0,
-      cancelled: 0,
-      rowsFetched: 0,
-      rowsWritten: 0,
-      rowsRejected: 0,
-      rowsSkipped: 0,
-      rowsUpdated: 0,
-    }
-  );
-}
-
-export async function listPlanChildJobs(parentJobRunId: string) {
-  return db
-    .select({
-      id: jobRuns.id,
-      instrumentId: sql<string | null>`${jobRuns.payload} ->> 'instrumentId'`,
-      symbol: instruments.tradingSymbol,
-      status: jobRuns.status,
-      attempt: jobRuns.attempt,
-      requestedFrom: sql<string | null>`${jobRuns.payload} ->> 'from'`,
-      requestedTo: sql<string | null>`${jobRuns.payload} ->> 'to'`,
-      result: jobRuns.result,
-      errorMessage: jobRuns.errorMessage,
-      startedAt: jobRuns.startedAt,
-      finishedAt: jobRuns.finishedAt,
-      createdAt: jobRuns.createdAt,
-    })
-    .from(jobRuns)
-    .leftJoin(
-      instruments,
-      sql`${instruments.id} = (${jobRuns.payload} ->> 'instrumentId')::uuid`,
-    )
-    .where(eq(jobRuns.correlationId, parentJobRunId))
-    .orderBy(asc(jobRuns.createdAt));
-}
-
 export async function getLatestJobForInstrument(instrumentId: string) {
   const rows = await db
     .select()
     .from(jobRuns)
-    .where(sql`${jobRuns.payload} ->> 'instrumentId' = ${instrumentId}`)
+    .where(eq(jobRuns.instrumentId, instrumentId))
     .orderBy(desc(jobRuns.createdAt))
     .limit(1);
   return rows[0] ?? null;
@@ -151,7 +103,7 @@ export async function getLastSuccessfulJobForInstrument(instrumentId: string) {
       and(
         eq(jobRuns.jobName, 'historical-backfill'),
         eq(jobRuns.status, 'succeeded'),
-        sql`${jobRuns.payload} ->> 'instrumentId' = ${instrumentId}`,
+        eq(jobRuns.instrumentId, instrumentId),
       ),
     )
     .orderBy(desc(jobRuns.finishedAt))
@@ -495,7 +447,7 @@ export async function getProviderStatus() {
       queuedChunks: sql<number>`count(*) filter (where ${jobRuns.status} = 'queued')::int`,
     })
     .from(jobRuns)
-    .where(eq(jobRuns.jobType, 'ingestion'));
+    .where(inArray(jobRuns.jobName, ingestionJobNames));
   const [payloads] = await db
     .select({
       payloadCount: sql<number>`count(*)::int`,
@@ -677,11 +629,6 @@ export async function getRawPayloadByFingerprint(values: {
   return rows[0] ?? null;
 }
 
-export async function getPlanJob(id: string) {
-  const rows = await db.select().from(jobRuns).where(eq(jobRuns.id, id)).limit(1);
-  return rows[0] ?? null;
-}
-
 export async function getCandleUpdatedAt(instrumentId: string, tradingDate: string) {
   const rows = await db.execute<{ updated_at: string | null }>(sql`
     select max(${marketCandles1m.updatedAt})::text as updated_at
@@ -740,14 +687,6 @@ export async function getInstrumentStatusRow(instrumentId: string) {
     .where(eq(instrumentDataStatus.instrumentId, instrumentId))
     .limit(1);
   return rows[0] ?? null;
-}
-
-export async function listChildJobRuns(parentJobRunId: string) {
-  return db
-    .select()
-    .from(jobRuns)
-    .where(eq(jobRuns.correlationId, parentJobRunId))
-    .orderBy(asc(jobRuns.createdAt));
 }
 
 export async function getCoverageMonths(instrumentIds: string[], from: string, to: string) {

@@ -23,12 +23,16 @@ import {
   upsertQualityIssue,
   type InstrumentMasterRow,
 } from '@ai-trading/database';
+import { JobTrackingService } from '../../observability/job-tracking.service.js';
 
 @Injectable()
 export class ReferenceSyncService {
   private readonly logger = new Logger(ReferenceSyncService.name);
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(
+    private readonly config: ConfigService,
+    private readonly tracking: JobTrackingService,
+  ) {}
 
   private client(): UpstoxClient {
     return new UpstoxClient({
@@ -47,12 +51,12 @@ export class ReferenceSyncService {
     await updateJobRun(jobRunId, {
       status: 'running',
       startedAt: new Date(),
-      attempt: 1,
     });
     const client = this.client();
     const reason = client.configurationReason();
     if (reason) {
       const result = { skipped: true, reason };
+      this.tracking.completeStage(jobRunId, 'fetch', 'skipped', { reason: 'not_configured' });
       await updateJobRun(jobRunId, {
         status: 'succeeded',
         finishedAt: new Date(),
@@ -65,6 +69,8 @@ export class ReferenceSyncService {
       const provider = await findProviderByCode('upstox');
       if (!provider) throw new Error('Upstox provider is not seeded');
       const master = await client.fetchInstrumentMaster();
+      this.tracking.completeStage(jobRunId, 'fetch', 'completed', { fetched: master.length });
+      this.tracking.enterStage(jobRunId, 'normalize');
       const serialized = JSON.stringify(master);
       const raw = await createRawProviderPayload({
         providerId: provider.id,
@@ -132,6 +138,8 @@ export class ReferenceSyncService {
         safetyCap,
         indexTickFallback: '0.1000',
       });
+      this.tracking.completeStage(jobRunId, 'normalize', 'completed', { rows: rows.length });
+      this.tracking.enterStage(jobRunId, 'persist');
 
       const targets = await getSyncTargetInstruments();
       const lastCompleted =
@@ -142,6 +150,13 @@ export class ReferenceSyncService {
         '2022-01-01',
         lastCompleted,
       );
+      this.tracking.completeStage(jobRunId, 'persist', 'completed', {
+        instruments: result.instruments,
+        mappings: result.mappings,
+        skipped: result.skipped,
+        statusRows: targets.length,
+      });
+      this.tracking.enterStage(jobRunId, 'finalize');
 
       if (result.excluded > 0) {
         const finding = qualityFinding({
@@ -176,6 +191,11 @@ export class ReferenceSyncService {
         finishedAt: new Date(),
         result: summary,
       });
+      this.tracking.completeStage(jobRunId, 'finalize', 'completed', {
+        fetched: summary.fetched,
+        instruments: result.instruments,
+        excluded: result.excluded,
+      });
       this.logger.log(`Instrument sync complete: ${JSON.stringify(summary)}`);
       return summary;
     } catch (error) {
@@ -183,7 +203,12 @@ export class ReferenceSyncService {
       await updateJobRun(jobRunId, {
         status: 'failed',
         finishedAt: new Date(),
-        errorMessage: classification.message,
+        error: {
+          code: classification.kind,
+          message: classification.message,
+          retryable: classification.retryable,
+          details: { errorCode: classification.errorCode ?? null },
+        },
       });
       throw error;
     }
@@ -193,7 +218,6 @@ export class ReferenceSyncService {
     await updateJobRun(jobRunId, {
       status: 'running',
       startedAt: new Date(),
-      attempt: 1,
     });
     const provider = await findProviderByCode('upstox');
     const exchange = await findExchangeByCode('NSE');
@@ -205,6 +229,11 @@ export class ReferenceSyncService {
       provider.id,
       years,
     );
+    this.tracking.completeStage(jobRunId, 'fixture', 'completed', {
+      rows,
+      years: years.length,
+    });
+    this.tracking.enterStage(jobRunId, 'reconcile');
     const result: Record<string, unknown> = {
       rows,
       years,
@@ -266,10 +295,19 @@ export class ReferenceSyncService {
       }
     }
 
+    this.tracking.completeStage(jobRunId, 'reconcile', 'completed', {
+      mismatches: Number(result.mismatches ?? 0),
+      reconciled: result.reconciled === true,
+    });
+    this.tracking.enterStage(jobRunId, 'finalize');
     await updateJobRun(jobRunId, {
       status: 'succeeded',
       finishedAt: new Date(),
       result,
+    });
+    this.tracking.completeStage(jobRunId, 'finalize', 'completed', {
+      rows,
+      mismatches: Number(result.mismatches ?? 0),
     });
     return result;
   }

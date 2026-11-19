@@ -1,5 +1,5 @@
 import type { JobStage } from '@/lib/types';
-import { formatClock, formatDuration } from '@/lib/format';
+import { formatClock, formatDuration, formatNumber } from '@/lib/format';
 import { label } from '@/lib/labels';
 import { cn } from '@/lib/utils';
 
@@ -11,12 +11,12 @@ const stageTones: Record<string, string> = {
   pending: 'border-border/60 bg-background/40 text-muted-foreground',
 };
 
-/** Ordered rail of a job run's stages, including stages not reached yet. */
+/** Ordered rail of a job run's fixed stages, including stages not reached yet. */
 export function StageRail({ stages }: { stages: JobStage[] }) {
   if (stages.length === 0) {
     return (
       <p className="text-muted-foreground text-sm">
-        No stages recorded for this run. The timeline below still shows every event.
+        This job has no declared stages.
       </p>
     );
   }
@@ -49,6 +49,12 @@ export function StageRail({ stages }: { stages: JobStage[] }) {
                   {stage.durationMs === null ? '—' : formatDuration(stage.durationMs)}
                 </span>
               </div>
+              {stage.quantified && stage.completed !== null ? (
+                <p className="mt-1 font-mono text-[10px] opacity-80">
+                  {formatNumber(stage.completed)}
+                  {stage.total === null ? '' : ` / ${formatNumber(stage.total)}`}
+                </p>
+              ) : null}
               {stage.enteredAt ? (
                 <p className="mt-1 font-mono text-[10px] opacity-70">
                   {formatClock(stage.enteredAt)} → {formatClock(stage.completedAt)}

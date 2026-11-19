@@ -9,12 +9,12 @@ import type { Queue } from 'bullmq';
 import { QUEUES } from '@ai-trading/domain';
 import {
   createJobRun,
+  deleteJobRun,
   getCatalogSummary,
   getCoverageDayDetail,
   getInstrumentStatusDetail,
   listInstrumentCatalog,
   recordAudit,
-  updateJobRun,
 } from '@ai-trading/database';
 import type { RequestMeta } from '../../common/http/request-meta.js';
 import type {
@@ -63,15 +63,13 @@ export class InstrumentCoverageService {
   ) {
     const jobRun = await createJobRun({
       jobName: 'coverage-recompute',
-      queueName: QUEUES.historicalData,
-      jobType: 'ingestion',
+      instrumentId,
       status: 'queued',
       payload: {
-        instrumentIds: [instrumentId],
         from: body.from ?? '2022-01-01',
         to: body.to,
       },
-      correlationId: meta.requestId,
+      maxAttempts: 2,
     });
     try {
       await this.historicalQueue.add(
@@ -90,13 +88,8 @@ export class InstrumentCoverageService {
           removeOnFail: 500,
         },
       );
-    } catch (error) {
-      await updateJobRun(jobRun.id, {
-        status: 'failed',
-        finishedAt: new Date(),
-        errorMessage:
-          error instanceof Error ? error.message : 'Queue unavailable',
-      });
+    } catch {
+      await deleteJobRun(jobRun.id);
       throw new ServiceUnavailableException(
         'The background queue is unavailable',
       );

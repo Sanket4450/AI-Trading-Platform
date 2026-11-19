@@ -290,21 +290,23 @@ describe('R2 database lifecycle', () => {
       select id from instruments where trading_symbol = 'RELIANCE' limit 1
     `;
     await sql`
-      insert into job_runs (job_name, queue_name, job_type, status, payload)
-      values ('historical-backfill', 'historical-data', 'ingestion', 'queued',
-              ${sql.json({ instrumentId: instrument.id, from: '2022-01-01', to: '2022-01-31' })})
+      insert into job_runs (id, job_name, queue_name, status, instrument_id, payload)
+      values (gen_random_uuid(), 'historical-backfill', 'historical-data', 'queued',
+              ${instrument.id},
+              ${sql.json({ from: '2022-01-01', to: '2022-01-31' })})
     `;
     await expect(
       sql`
-        insert into job_runs (job_name, queue_name, job_type, status, payload)
-        values ('historical-backfill', 'historical-data', 'ingestion', 'queued',
-                ${sql.json({ instrumentId: instrument.id, from: '2022-02-01', to: '2022-02-28' })})
+        insert into job_runs (id, job_name, queue_name, status, instrument_id, payload)
+        values (gen_random_uuid(), 'historical-backfill', 'historical-data', 'queued',
+                ${instrument.id},
+                ${sql.json({ from: '2022-02-01', to: '2022-02-28' })})
       `,
     ).rejects.toThrow(/uq_job_runs_active_backfill|duplicate key/i);
     await sql`
       delete from job_runs
        where job_name = 'historical-backfill'
-         and payload ->> 'instrumentId' = ${instrument.id}
+         and instrument_id = ${instrument.id}
     `;
   });
 

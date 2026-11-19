@@ -97,51 +97,44 @@ export const strategyPerformanceDaily = pgTable(
 export const jobRuns = pgTable(
   'job_runs',
   {
-    id: uuid('id').primaryKey().defaultRandom(),
+    id: uuid('id').primaryKey(),
     jobName: varchar('job_name', { length: 80 }).notNull(),
     queueName: varchar('queue_name', { length: 40 }).notNull(),
-    jobType: varchar('job_type', { length: 30 }).notNull(),
     status: varchar('status', { length: 20 }).notNull(),
-    scheduledFor: timestamp('scheduled_for', { withTimezone: true }),
-    startedAt: timestamp('started_at', { withTimezone: true }),
-    finishedAt: timestamp('finished_at', { withTimezone: true }),
-    attempt: integer('attempt').default(0).notNull(),
-    maxAttempts: integer('max_attempts').default(0).notNull(),
+    groupId: uuid('group_id'),
+    instrumentId: uuid('instrument_id'),
+    attempt: smallint('attempt').default(0).notNull(),
+    maxAttempts: smallint('max_attempts').default(1).notNull(),
     payload: jsonb('payload')
       .default(sql`'{}'::jsonb`)
       .notNull(),
     result: jsonb('result'),
-    errorMessage: text('error_message'),
-    correlationId: uuid('correlation_id'),
-    currentStage: varchar('current_stage', { length: 60 }),
-    stageKeys: jsonb('stage_keys')
-      .default(sql`'[]'::jsonb`)
-      .notNull(),
-    stageTotal: smallint('stage_total'),
-    durationMs: integer('duration_ms'),
-    summary: text('summary'),
+    error: jsonb('error'),
+    latestEventId: bigint('latest_event_id', { mode: 'number' }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    startedAt: timestamp('started_at', { withTimezone: true }),
+    finishedAt: timestamp('finished_at', { withTimezone: true }),
   },
   (table) => [
-    index('idx_job_runs_job_name').on(table.jobName),
-    index('idx_job_runs_scheduled_for').on(table.scheduledFor),
-    index('idx_job_runs_correlation_id').on(table.correlationId),
     index('idx_job_runs_created').on(table.createdAt),
+    index('idx_job_runs_name_status_finished').on(
+      table.jobName,
+      table.status,
+      table.finishedAt,
+    ),
+    index('idx_job_runs_group').on(table.groupId),
+    index('idx_job_runs_instrument').on(table.instrumentId),
+    index('idx_job_runs_latest_event').on(table.latestEventId),
     check(
-      'chk_job_runs_job_type_1',
-      sql`${table.jobType} in ('ingestion', 'backtest', 'analytics', 'reconciliation', 'square_off', 'report', 'maintenance', 'credential_refresh')`,
+      'chk_job_runs_status',
+      sql`${table.status} in ('queued', 'running', 'succeeded', 'failed', 'partially_failed', 'cancelled')`,
     ),
     check(
-      'chk_job_runs_status_2',
-      sql`${table.status} in ('queued', 'running', 'succeeded', 'failed', 'retrying', 'cancelled')`,
-    ),
-    check(
-      'chk_job_runs_started_at_3',
+      'chk_job_runs_time',
       sql`${table.finishedAt} is null or ${table.startedAt} is null or ${table.finishedAt} >= ${table.startedAt}`,
     ),
-    check('chk_job_runs_attempt_4', sql`${table.attempt} >= 0`),
-    check('chk_job_runs_duration', sql`${table.durationMs} is null or ${table.durationMs} >= 0`),
-    check('chk_job_runs_stage_total', sql`${table.stageTotal} is null or ${table.stageTotal} >= 0`),
+    check('chk_job_runs_attempt', sql`${table.attempt} >= 0`),
+    check('chk_job_runs_max_attempts', sql`${table.maxAttempts} >= 1`),
   ],
 );
 
@@ -150,26 +143,21 @@ export const jobRunEvents = pgTable(
   {
     id: bigint('id', { mode: 'number' }).primaryKey().generatedByDefaultAsIdentity(),
     jobRunId: uuid('job_run_id').notNull(),
+    stage: varchar('stage', { length: 40 }).notNull(),
+    type: varchar('type', { length: 16 }).notNull(),
     occurredAt: timestamp('occurred_at', { withTimezone: true }).defaultNow().notNull(),
-    kind: varchar('kind', { length: 16 }).notNull(),
-    level: varchar('level', { length: 8 }).default('info').notNull(),
-    stageKey: varchar('stage_key', { length: 60 }),
-    message: text('message'),
     data: jsonb('data')
       .default(sql`'{}'::jsonb`)
       .notNull(),
-    metricKey: varchar('metric_key', { length: 50 }),
-    metricValue: numeric('metric_value', { precision: 20, scale: 4 }),
-    metricUnit: varchar('metric_unit', { length: 16 }),
   },
   (table) => [
     index('idx_job_run_events_run').on(table.jobRunId, table.id),
+    index('idx_job_run_events_stage').on(table.jobRunId, table.stage, table.id),
     index('idx_job_run_events_time').on(table.occurredAt),
     check(
-      'chk_job_run_events_kind',
-      sql`${table.kind} in ('lifecycle', 'stage', 'step', 'metric', 'warning', 'error')`,
+      'chk_job_run_events_type',
+      sql`${table.type} in ('entered', 'progress', 'completed', 'failed', 'skipped', 'warning')`,
     ),
-    check('chk_job_run_events_level', sql`${table.level} in ('debug', 'info', 'warn', 'error')`),
   ],
 );
 

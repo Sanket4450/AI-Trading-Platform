@@ -3,13 +3,14 @@
  * Structured job journal primitives. Framework-specific wiring lives in the apps.
  */
 export { JobTracker } from './job-tracker.js';
+export { toJobError } from './types.js';
 export type {
   JobBeginInput,
+  JobError,
   JobEventInput,
-  JobEventKind,
-  JobEventLevel,
+  JobEventType,
   JobFinishInput,
-  JobStageStatus,
+  JobStageOutcome,
   JobStore,
   JobTrackerOptions,
 } from './types.js';

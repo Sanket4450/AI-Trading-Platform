@@ -1,8 +1,8 @@
 import { Injectable, Logger, type OnModuleDestroy } from '@nestjs/common';
 import type { Job } from 'bullmq';
-import { JobTracker } from '@ai-trading/observability';
-import { jobStore } from './job-store.js';
-import { isInstrumentedJob, stagesForJob } from './job-stages.js';
+import { stagesForJob } from '@ai-trading/domain';
+import { JobTracker, type JobStageOutcome } from '@ai-trading/observability';
+import { JobStoreService } from './job-store.js';
 
 type TrackedJob = Pick<Job, 'name' | 'data' | 'attemptsMade'>;
 
@@ -13,79 +13,64 @@ function jobRunIdOf(data: unknown): string | null {
 }
 
 /**
- * Owns the job journal for worker jobs. The processor wrapper starts and
- * closes every run; services may add domain stages, steps and metrics.
+ * Owns the job journal for worker jobs. The processor wrapper starts and closes every run;
+ * services record the stage transitions and figures that belong to their job.
  */
 @Injectable()
 export class JobTrackingService implements OnModuleDestroy {
   private readonly logger = new Logger(JobTrackingService.name);
-  private readonly tracker = new JobTracker(jobStore, {
-    onError: (error) =>
-      this.logger.warn(
-        `Job tracking degraded: ${error instanceof Error ? error.message : String(error)}`,
-      ),
-  });
+  private readonly tracker: JobTracker;
+
+  constructor(store: JobStoreService) {
+    this.tracker = new JobTracker(store, {
+      onError: (error) =>
+        this.logger.warn(
+          `Job tracking degraded: ${error instanceof Error ? error.message : String(error)}`,
+        ),
+    });
+  }
 
   async run<T>(job: TrackedJob, handler: () => Promise<T>): Promise<T> {
     const jobRunId = jobRunIdOf(job.data);
-    if (!jobRunId) return handler();
+    const stages = stagesForJob(job.name);
+    if (!jobRunId || stages.length === 0) return handler();
 
-    const instrumented = isInstrumentedJob(job.name);
-    await this.tracker.begin({ jobRunId, stages: stagesForJob(job.name) });
-
-    if (!instrumented) {
-      this.tracker.enterStage(jobRunId, 'start');
-      this.tracker.completeStage(jobRunId, 'start');
-      this.tracker.enterStage(jobRunId, 'work');
-    }
+    await this.tracker.begin({
+      jobRunId,
+      stages,
+      attempt: job.attemptsMade ?? 0,
+    });
 
     try {
       const result = await handler();
-      if (!instrumented) {
-        this.tracker.completeStage(jobRunId, 'work');
-        this.tracker.enterStage(jobRunId, 'finish');
-        this.tracker.completeStage(jobRunId, 'finish');
-      }
       await this.tracker.finish(jobRunId, { status: 'succeeded' });
       return result;
     } catch (error) {
-      if (!instrumented) this.tracker.completeStage(jobRunId, 'work', 'failed');
       await this.tracker.finish(jobRunId, { status: 'failed', error });
       throw error;
     }
   }
 
-  enterStage(jobRunId: string, key: string, message?: string): void {
-    this.tracker.enterStage(jobRunId, key, message);
+  enterStage(jobRunId: string, stage: string): void {
+    this.tracker.enterStage(jobRunId, stage);
+  }
+
+  /** Records one unit of work inside a quantified stage. */
+  progress(jobRunId: string, stage: string, data: Record<string, unknown>): void {
+    this.tracker.progress(jobRunId, stage, data);
   }
 
   completeStage(
     jobRunId: string,
-    key: string,
-    status: 'succeeded' | 'failed' | 'skipped' = 'succeeded',
-    message?: string,
-  ): void {
-    this.tracker.completeStage(jobRunId, key, status, message);
-  }
-
-  step(
-    jobRunId: string,
-    message: string,
+    stage: string,
+    outcome: JobStageOutcome = 'completed',
     data?: Record<string, unknown>,
   ): void {
-    this.tracker.step(jobRunId, message, data);
+    this.tracker.completeStage(jobRunId, stage, outcome, data);
   }
 
-  metric(jobRunId: string, key: string, value: number, unit = 'count'): void {
-    this.tracker.metric(jobRunId, key, value, unit);
-  }
-
-  warn(
-    jobRunId: string,
-    message: string,
-    data?: Record<string, unknown>,
-  ): void {
-    this.tracker.warn(jobRunId, message, data);
+  warning(jobRunId: string, stage: string, data: Record<string, unknown>): void {
+    this.tracker.warning(jobRunId, stage, data);
   }
 
   async onModuleDestroy(): Promise<void> {

@@ -5,6 +5,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { randomUUID } from 'node:crypto';
 import { InjectQueue } from '@nestjs/bullmq';
 import type { Queue } from 'bullmq';
 import { QUEUES } from '@ai-trading/domain';
@@ -16,13 +17,12 @@ import {
 } from '@ai-trading/market-data';
 import {
   createJobRun,
+  deleteJobRun,
   findActiveBackfillJob,
   getCoverageMonths,
   getInstrumentsByIds,
   getLatestCompletedSession,
-  getPlanJob,
   getTradingSessionsForRange,
-  listChildJobRuns,
   recordAudit,
   updateJobRun,
 } from '@ai-trading/database';
@@ -179,7 +179,7 @@ export class InstrumentIngestionService {
       return {
         dryRun: false,
         preview,
-        plan: null,
+        job: null,
         queued: [],
         existingJobIds: [{ instrumentId, jobRunId: active.id }],
       };
@@ -197,42 +197,25 @@ export class InstrumentIngestionService {
       );
     }
 
-    const parent = await createJobRun({
-      jobName: 'backfill-plan',
-      queueName: QUEUES.historicalData,
-      jobType: 'ingestion',
+    const job = await createJobRun({
+      jobName: 'historical-backfill',
+      groupId: randomUUID(),
+      instrumentId,
       status: 'queued',
       payload: {
-        instrumentIds: [instrumentId],
         from: scope.from,
         to: scope.to,
         mode,
         reason: body.reason ?? null,
       },
-      correlationId: meta.requestId,
-    });
-    const child = await createJobRun({
-      jobName: 'historical-backfill',
-      queueName: QUEUES.historicalData,
-      jobType: 'ingestion',
-      status: 'queued',
-      payload: {
-        parentJobRunId: parent.id,
-        instrumentId,
-        from: window.from,
-        to: window.to,
-        mode,
-        reason: body.reason ?? null,
-      },
-      correlationId: parent.id,
+      maxAttempts: 1,
     });
 
     try {
       await this.historicalQueue.add(
         'historical-backfill',
         {
-          jobRunId: child.id,
-          parentJobRunId: parent.id,
+          jobRunId: job.id,
           instrumentId,
           from: window.from,
           to: window.to,
@@ -240,25 +223,15 @@ export class InstrumentIngestionService {
           reason: body.reason ?? null,
         },
         {
-          jobId: child.id,
+          jobId: job.id,
           priority: 10,
           attempts: 1,
           removeOnComplete: 500,
           removeOnFail: 1000,
         },
       );
-    } catch (error) {
-      await updateJobRun(child.id, {
-        status: 'failed',
-        finishedAt: new Date(),
-        errorMessage:
-          error instanceof Error ? error.message : 'Queue unavailable',
-      });
-      await updateJobRun(parent.id, {
-        status: 'failed',
-        finishedAt: new Date(),
-        errorMessage: 'No instrument could be queued',
-      });
+    } catch {
+      await deleteJobRun(job.id);
       throw new ServiceUnavailableException(
         'The background queue is unavailable',
       );
@@ -269,7 +242,7 @@ export class InstrumentIngestionService {
       accountId: null,
       action: 'data.instruments_fetch_requested',
       entityType: 'job_run',
-      entityId: parent.id,
+      entityId: job.id,
       beforeState: null,
       afterState: {
         instrumentId,
@@ -286,12 +259,12 @@ export class InstrumentIngestionService {
     return {
       dryRun: false,
       preview,
-      plan: parent,
+      job,
       queued: [
         {
           instrumentId,
           symbol: scope.instrument.symbol,
-          jobRunId: child.id,
+          jobRunId: job.id,
           from: window.from,
           to: window.to,
         },
@@ -307,40 +280,25 @@ export class InstrumentIngestionService {
         'No active backfill job for this instrument',
       );
     }
-    if (!active.correlationId) {
-      throw new BadRequestException('The active job has no parent plan');
-    }
-    const plan = await getPlanJob(active.correlationId);
-    if (!plan) throw new NotFoundException('Parent plan not found');
-    const children = await listChildJobRuns(plan.id);
-    const child = children.find(
-      (candidate) =>
-        (candidate.payload as Record<string, unknown> | null)?.instrumentId ===
-        instrumentId,
-    );
-    if (child) {
-      await updateJobRun(child.id, {
-        status: 'cancelled',
-        finishedAt: new Date(),
-      });
-    } else {
-      await updateJobRun(plan.id, {
-        status: 'cancelled',
-        finishedAt: new Date(),
-      });
-    }
+
+    await updateJobRun(active.id, {
+      status: 'cancelled',
+      finishedAt: new Date(),
+    });
+    await this.historicalQueue.remove(active.id).catch(() => undefined);
+
     await recordAudit({
       actorUserId,
       accountId: null,
       action: 'data.instrument_cancelled',
       entityType: 'job_run',
-      entityId: child?.id ?? plan.id,
-      beforeState: { status: child?.status ?? plan.status },
+      entityId: active.id,
+      beforeState: { status: active.status },
       afterState: { status: 'cancelled', instrumentId },
       requestId: meta.requestId,
       ipAddress: meta.ipAddress,
       userAgent: meta.userAgent,
     });
-    return { planId: plan.id, instrumentId, status: 'cancelled' };
+    return { jobRunId: active.id, instrumentId, status: 'cancelled' };
   }
 }

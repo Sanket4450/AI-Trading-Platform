@@ -15,17 +15,8 @@ export class HistoricalDataService {
 
   async run(jobName: string, payload: Record<string, unknown>) {
     switch (jobName) {
-      case 'historical-backfill': {
-        const jobRunId = String(payload.jobRunId);
-        const parentJobRunId =
-          typeof payload.parentJobRunId === 'string'
-            ? payload.parentJobRunId
-            : jobRunId;
-        return this.ingestion.runInstrumentBackfill({
-          ...payload,
-          parentJobRunId,
-        });
-      }
+      case 'historical-backfill':
+        return this.ingestion.runInstrumentBackfill(payload);
       case 'historical-finalize':
         return this.ingestion.historicalFinalize(
           String(payload.jobRunId),

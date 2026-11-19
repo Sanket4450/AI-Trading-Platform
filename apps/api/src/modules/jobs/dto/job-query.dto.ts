@@ -6,6 +6,7 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  IsUUID,
   Max,
   MaxLength,
   Min,
@@ -14,9 +15,9 @@ import {
 export const JOB_STATUSES = [
   'queued',
   'running',
-  'retrying',
   'succeeded',
   'failed',
+  'partially_failed',
   'cancelled',
 ] as const;
 
@@ -37,15 +38,14 @@ export class JobQueryDto {
   @IsIn(JOB_STATUSES, { each: true })
   status?: string[];
 
-  @ApiPropertyOptional({ maxLength: 30, example: 'ingestion' })
+  @ApiPropertyOptional({ format: 'uuid', description: 'Only jobs for one instrument.' })
   @IsOptional()
-  @IsString()
-  jobType?: string;
+  @IsUUID()
+  instrumentId?: string;
 
   @ApiPropertyOptional({
     maxLength: 120,
-    description:
-      'Case-insensitive match on job name, type, status, summary or run ID.',
+    description: 'Case-insensitive match on job name, status or run ID.',
   })
   @IsOptional()
   @IsString()

@@ -128,7 +128,6 @@ export class OverviewDto {
       properties: {
         id: { type: 'string', format: 'uuid' },
         jobName: { type: 'string' },
-        jobType: { type: 'string' },
         status: { type: 'string' },
         startedAt: { type: 'string', format: 'date-time', nullable: true },
         finishedAt: { type: 'string', format: 'date-time', nullable: true },
@@ -137,7 +136,6 @@ export class OverviewDto {
       required: [
         'id',
         'jobName',
-        'jobType',
         'status',
         'startedAt',
         'finishedAt',
@@ -148,7 +146,7 @@ export class OverviewDto {
   recentJobs!: Array<
     Pick<
       JobRunDto,
-      'id' | 'jobName' | 'jobType' | 'status' | 'startedAt' | 'finishedAt' | 'createdAt'
+      'id' | 'jobName' | 'status' | 'startedAt' | 'finishedAt' | 'createdAt'
     >
   >;
 

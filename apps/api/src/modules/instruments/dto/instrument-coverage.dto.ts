@@ -338,7 +338,7 @@ export class InstrumentFetchResponseDto {
   preview!: InstrumentFetchPreviewDto;
 
   @ApiProperty({ type: JobRunDto, nullable: true, required: false })
-  plan?: JobRunDto | null;
+  job?: JobRunDto | null;
 
   @ApiProperty({ type: [QueuedInstrumentDto], required: false })
   queued?: QueuedInstrumentDto[];
@@ -349,7 +349,7 @@ export class InstrumentFetchResponseDto {
 
 export class CancelInstrumentFetchDto {
   @ApiProperty({ format: 'uuid' })
-  planId!: string;
+  jobRunId!: string;
 
   @ApiProperty({ format: 'uuid' })
   instrumentId!: string;

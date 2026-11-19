@@ -16,7 +16,7 @@ export const JOB_STATUSES = [
   'running',
   'succeeded',
   'failed',
-  'retrying',
+  'partially_failed',
   'cancelled',
 ] as const;
 

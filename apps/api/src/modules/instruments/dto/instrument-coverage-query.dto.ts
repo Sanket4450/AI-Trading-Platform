@@ -111,7 +111,7 @@ export class FetchInstrumentDto {
 
   @ApiPropertyOptional({
     default: true,
-    description: 'Preview only. Set false to enqueue the plan.',
+    description: 'Preview only. Set false to enqueue the backfill.',
   })
   @IsOptional()
   @IsBoolean()

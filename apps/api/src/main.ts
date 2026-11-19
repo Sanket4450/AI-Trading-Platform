@@ -7,6 +7,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { assertResearchMode } from '@ai-trading/configuration';
+import { IoAdapter } from '@nestjs/platform-socket.io';
 import { SESSION_COOKIE } from './common/auth/auth.constants.js';
 import { AppModule } from './app.module.js';
 
@@ -16,6 +17,7 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
   const config = app.get(ConfigService);
 
+  app.useWebSocketAdapter(new IoAdapter(app));
   app.use(helmet());
   app.use(cookieParser());
   app.enableCors({
@@ -68,7 +70,7 @@ async function bootstrap() {
     .addTag('strategies', 'Strategies, versions and effective configuration lookup.')
     .addTag('configuration', 'Versioned strategy, risk and system configuration.')
     .addTag('data', 'Reference ingestion, backfills, coverage and catalog.')
-    .addTag('jobs', 'Background job runs, stages, metrics and events.')
+    .addTag('jobs', 'Background job runs, fixed stages, live events and progress.')
     .addTag('audit', 'Immutable operator audit trail.')
     .addTag('settings', 'Runtime system settings.')
     .addTag('system', 'System status, dashboard overview and operational feeds.')

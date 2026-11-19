@@ -207,17 +207,18 @@ R1 lifecycle tables.
   preserves legacy resolved/ignored issues with an explicit migration note.
 - The seed flags the 51 reference instruments as `is_sync_target`, creates one status row per target,
   a 2022–2027 NSE calendar, corrected tick sizes and a research-mode account/system setting.
-- `0009_process_tracking.sql` adds stage columns to `job_runs` and the append-only
-  `job_run_events` stream behind `/jobs`. Every worker job now records start, stage, step,
-  metric and terminal events with timestamps.
+- `0009_process_tracking.sql` added the first job stage columns and the append-only
+  `job_run_events` stream behind `/jobs`.
 - `0010_drop_universes.sql` replaces versioned instrument universes and strategy membership rows with
   `instruments.is_sync_target`.
 - `0011_drop_daily_validation.sql` removes the daily-oracle validation feature: the
   `market_data_daily_validation` table, the coverage comparison columns and the `partial_reconciled`
   data status.
-- `0012_drop_ingestion_runs.sql` removes the per-chunk `market_data_ingestion_runs` ledger. Child
-  `job_runs` plus `job_run_events` carry orchestration, progress and failure diagnostics, while candles
-  keep their `raw_payload_id` lineage. The database ends at 55 logical tables.
+- `0012_drop_ingestion_runs.sql` removes the per-chunk `market_data_ingestion_runs` ledger.
+- `0014_job_ledger_v2.sql` rebuilds `job_runs` and `job_run_events` as the current ledger: one row per
+  BullMQ job, typed `instrument_id`/`group_id`, structured `error`, six event columns (`stage`, `type`,
+  `occurred_at`, `data`) and a `latest_event_id` pointer. The old ledger is discarded by design.
+  The database ends at 55 logical tables.
 - `pnpm db:verify` asserts 55 tables, the R2 tables and indexes, 51 sync targets, 51 status rows,
   51 primary mappings, valid tick sizes, calendar coverage and zero orders.
 
@@ -227,9 +228,9 @@ R1 lifecycle tables.
   error classification and the rate-limiter interface. It still has no order method.
 - `packages/market-data` owns tuple normalization, IST/UTC conversion, session windows, strict
   coverage, gap runs, the 22-rule catalog, dedupe keys and catalog status precedence.
-- The worker runs one child job per instrument, iterates month chunks inside that job, and records
-  chunk steps and metrics on the job timeline. It also runs a Redis-backed three-window provider budget,
-  retry/backoff, cooperative cancellation, stale-job recovery and parent-plan completion.
+- The worker runs one job per instrument, iterates month chunks inside that job, and records one
+  `progress` event per chunk on the job timeline. It also runs a Redis-backed three-window provider budget,
+  retry/backoff and cooperative cancellation.
 
 ### API and dashboard
 

@@ -7,8 +7,8 @@ import { QUEUES } from '@ai-trading/domain';
 import { istToday } from '@ai-trading/market-data';
 import {
   createJobRun,
+  deleteJobRun,
   getTradingCalendarRow,
-  updateJobRun,
 } from '@ai-trading/database';
 
 @Injectable()
@@ -37,7 +37,7 @@ export class MarketScheduler {
   @Cron('0 8 * * 1-5', { timeZone: 'Asia/Kolkata' })
   async preMarketInstrumentSync(): Promise<void> {
     if (!this.enabled) return;
-    await this.enqueue(this.historicalQueue, 'instrument-sync', 'ingestion', {
+    await this.enqueue(this.historicalQueue, 'instrument-sync', {
       source: 'schedule',
     });
   }
@@ -45,7 +45,7 @@ export class MarketScheduler {
   @Cron('5 8 * * 1-5', { timeZone: 'Asia/Kolkata' })
   async preMarketCalendarSync(): Promise<void> {
     if (!this.enabled) return;
-    await this.enqueue(this.historicalQueue, 'calendar-sync', 'ingestion', {
+    await this.enqueue(this.historicalQueue, 'calendar-sync', {
       source: 'schedule',
     });
   }
@@ -56,7 +56,6 @@ export class MarketScheduler {
     await this.enqueue(
       this.historicalQueue,
       'historical-finalize',
-      'ingestion',
       { source: 'schedule' },
       1,
     );
@@ -65,14 +64,9 @@ export class MarketScheduler {
   @Cron('30 8 * * 1-5', { timeZone: 'Asia/Kolkata' })
   async ingestionReconcile(): Promise<void> {
     if (!this.enabled) return;
-    await this.enqueue(
-      this.historicalQueue,
-      'ingestion-reconcile',
-      'ingestion',
-      {
-        source: 'schedule',
-      },
-    );
+    await this.enqueue(this.historicalQueue, 'ingestion-reconcile', {
+      source: 'schedule',
+    });
   }
 
   @Cron('0 16 * * 1-5', { timeZone: 'Asia/Kolkata' })
@@ -81,7 +75,6 @@ export class MarketScheduler {
     await this.enqueue(
       this.historicalQueue,
       'intraday-sync',
-      'ingestion',
       { source: 'schedule' },
       1,
     );
@@ -90,20 +83,15 @@ export class MarketScheduler {
   @Cron('15 16 * * 1-5', { timeZone: 'Asia/Kolkata' })
   async coverageRecompute(): Promise<void> {
     if (!this.enabled || !(await this.isTradingDay())) return;
-    await this.enqueue(
-      this.historicalQueue,
-      'coverage-recompute',
-      'ingestion',
-      {
-        source: 'schedule',
-      },
-    );
+    await this.enqueue(this.historicalQueue, 'coverage-recompute', {
+      source: 'schedule',
+    });
   }
 
   @Cron('30 16 * * 1-5', { timeZone: 'Asia/Kolkata' })
   async qualityScan(): Promise<void> {
     if (!this.enabled || !(await this.isTradingDay())) return;
-    await this.enqueue(this.historicalQueue, 'quality-scan', 'ingestion', {
+    await this.enqueue(this.historicalQueue, 'quality-scan', {
       source: 'schedule',
       days: 10,
     });
@@ -112,18 +100,15 @@ export class MarketScheduler {
   @Cron('0 18 * * 1-5', { timeZone: 'Asia/Kolkata' })
   async postMarketRefresh(): Promise<void> {
     if (!this.enabled) return;
-    await this.enqueue(
-      this.maintenanceQueue,
-      'refresh-materialized-view',
-      'maintenance',
-      { source: 'schedule' },
-    );
+    await this.enqueue(this.maintenanceQueue, 'refresh-materialized-view', {
+      source: 'schedule',
+    });
   }
 
   @Cron('0 9 * * 6', { timeZone: 'Asia/Kolkata' })
   async weeklyFullQualityScan(): Promise<void> {
     if (!this.enabled) return;
-    await this.enqueue(this.historicalQueue, 'quality-scan', 'ingestion', {
+    await this.enqueue(this.historicalQueue, 'quality-scan', {
       source: 'schedule',
       full: true,
     });
@@ -132,27 +117,22 @@ export class MarketScheduler {
   @Cron('0 8 1 * *', { timeZone: 'Asia/Kolkata' })
   async monthlyPartitionMaintenance(): Promise<void> {
     if (!this.enabled) return;
-    await this.enqueue(
-      this.maintenanceQueue,
-      'ensure-partitions',
-      'maintenance',
-      { source: 'schedule' },
-    );
+    await this.enqueue(this.maintenanceQueue, 'ensure-partitions', {
+      source: 'schedule',
+    });
   }
 
   private async enqueue(
     queue: Queue,
     jobName: string,
-    jobType: string,
     payload: Record<string, unknown>,
     priority = 10,
   ): Promise<void> {
     const jobRun = await createJobRun({
       jobName,
-      queueName: queue.name,
-      jobType,
       status: 'queued',
       payload,
+      maxAttempts: 3,
     });
 
     try {
@@ -170,12 +150,7 @@ export class MarketScheduler {
       );
       this.logger.log(`Queued scheduled job ${jobName} (${jobRun.id})`);
     } catch (error) {
-      await updateJobRun(jobRun.id, {
-        status: 'failed',
-        finishedAt: new Date(),
-        errorMessage:
-          error instanceof Error ? error.message : 'Queue unavailable',
-      });
+      await deleteJobRun(jobRun.id);
       this.logger.error(`Failed to queue ${jobName}: ${String(error)}`);
     }
   }
