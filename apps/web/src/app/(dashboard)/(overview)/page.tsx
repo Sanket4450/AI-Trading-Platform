@@ -6,7 +6,7 @@ import type { HealthResponse, Overview } from '@/lib/types';
 import { formatDateTime, formatNumber } from '@/lib/format';
 import { label } from '@/lib/labels';
 import { detailHref } from '@/lib/navigation';
-import { issueWindow } from '@/features/issues/issue-format';
+import { IssueList } from '@/features/issues/components/issue-list';
 import { PageMeta } from '@/components/shell/page-meta';
 import { StatCard, StatGrid } from '@/components/dashboard/stat-card';
 import { SectionCard } from '@/components/dashboard/section-card';
@@ -177,24 +177,13 @@ export default async function OverviewPage() {
               description="No active problem is recorded."
             />
           ) : (
-            <div className="space-y-3">
-              {overview.openIssues.map((issue) => (
-                <Link
-                  key={issue.id}
-                  href={detailHref(`/issues/${issue.id}`, '/')}
-                  className="border-border/70 bg-background/40 block rounded-lg border p-3"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm font-medium">{label(issue.kind)}</p>
-                    <StatusBadge status={issue.severity} />
-                  </div>
-                  <p className="text-muted-foreground mt-1 text-xs">
-                    {issue.symbol ?? 'System-wide'} · {issueWindow(issue.payload) ?? 'No window'} ·
-                    last seen {formatDateTime(issue.lastSeenAt)}
-                  </p>
-                </Link>
-              ))}
-            </div>
+            <IssueList
+              issues={overview.openIssues}
+              from="/"
+              className="sm:grid-cols-1"
+              emptyTitle="No issues"
+              emptyDescription="No active problem is recorded."
+            />
           )}
         </SectionCard>
       </div>

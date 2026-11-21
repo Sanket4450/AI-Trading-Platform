@@ -24,15 +24,19 @@ export function DetailDialog({
   description,
   children,
   className,
+  open,
+  onOpenChange,
 }: {
   trigger: ReactNode;
   title: string;
   description?: string;
   children: ReactNode;
   className?: string;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
   return (
-    <Dialog>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent className={cn('sm:max-w-xl', className)}>
         <DialogHeader>

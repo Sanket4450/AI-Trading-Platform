@@ -59,13 +59,6 @@ const detailRoutes: Array<{ prefix: string; meta: RouteMeta }> = [
     },
   },
   {
-    prefix: '/issues/',
-    meta: {
-      title: 'Issue',
-      description: 'What was detected, the state that could not be determined and the payload.',
-    },
-  },
-  {
     prefix: '/instruments/',
     meta: {
       title: 'Instrument',

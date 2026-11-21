@@ -79,6 +79,7 @@ export default async function InstrumentCoverageDayPage({
         <IssueList
           issues={detail.issues}
           from={back.href}
+          currentInstrumentId={id}
           emptyTitle="No issues recorded"
           emptyDescription="No active finding for this instrument-day."
         />

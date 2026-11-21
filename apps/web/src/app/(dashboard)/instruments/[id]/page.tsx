@@ -223,6 +223,7 @@ export default async function InstrumentDetailPage({
         <IssueList
           issues={detail.issues}
           from={back.href}
+          currentInstrumentId={id}
           emptyTitle="No issues"
           emptyDescription="The validation layer is clean."
         />

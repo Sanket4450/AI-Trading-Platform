@@ -246,13 +246,19 @@ export function IssueListSkeleton({ rows = 3 }: { rows?: number }) {
   return (
     <div className="space-y-2">
       {Array.from({ length: rows }).map((_, index) => (
-        <div key={index} className="border-border/70 bg-background/40 block rounded-lg border p-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <Skeleton className="h-3 w-16" />
-            <Skeleton className="h-5 w-16 rounded-full" />
+        <div
+          key={index}
+          className="border-border/70 bg-background/40 flex items-start justify-between gap-3 rounded-lg border p-3"
+        >
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <Skeleton className="h-3 w-20" />
+              <Skeleton className="h-5 w-16 rounded-full" />
+            </div>
+            <Skeleton className="mt-2 h-2.5 w-3/4" />
+            <Skeleton className="mt-1.5 h-2.5 w-1/2" />
           </div>
-          <Skeleton className="mt-2 h-2.5 w-3/4" />
-          <Skeleton className="mt-1.5 h-2.5 w-1/2" />
+          <Skeleton className="size-7 rounded-md" />
         </div>
       ))}
     </div>

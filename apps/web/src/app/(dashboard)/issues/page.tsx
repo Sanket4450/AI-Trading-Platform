@@ -2,14 +2,15 @@ import { apiFetch } from '@/lib/api';
 import type { SystemIssue } from '@/lib/types';
 import { formatDateTime, formatNumber } from '@/lib/format';
 import { label } from '@/lib/labels';
-import { detailHref, originHref } from '@/lib/navigation';
-import { issueWindow } from '@/features/issues/issue-format';
+import { originHref } from '@/lib/navigation';
+import { issuePreview, issueWindow } from '@/features/issues/issue-format';
+import { IssueDialog } from '@/features/issues/components/issue-dialog';
 import { TableCard } from '@/components/dashboard/table-card';
 import { TableSummary } from '@/components/dashboard/table-summary';
 import { EmptyState } from '@/components/dashboard/empty-state';
 import { StatusBadge } from '@/components/dashboard/status-badge';
 import { FilterSelect, TableFilters } from '@/components/dashboard/table-filters';
-import { TableActionLink, TableActions, TableRefreshButton } from '@/components/dashboard/table-actions';
+import { TableActions, TableRefreshButton } from '@/components/dashboard/table-actions';
 import {
   Table,
   TableBody,
@@ -205,10 +206,7 @@ export default async function IssuesPage({
                       {formatDateTime(issue.lastSeenAt)}
                     </TableCell>
                     <TableActions>
-                      <TableActionLink
-                        href={detailHref(`/issues/${issue.id}`, from)}
-                        label="View issue"
-                      />
+                      <IssueDialog issue={issuePreview(issue)} from={from} />
                     </TableActions>
                   </TableRow>
                 ))}
