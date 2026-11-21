@@ -10,6 +10,7 @@ export function SectionCard({
   description,
   actions,
   toolbar,
+  footer,
   children,
   className,
   contentClassName,
@@ -18,6 +19,7 @@ export function SectionCard({
   description?: React.ReactNode;
   actions?: React.ReactNode;
   toolbar?: React.ReactNode;
+  footer?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
   contentClassName?: string;
@@ -41,6 +43,9 @@ export function SectionCard({
         </div>
       </CardHeader>
       <CardContent className={contentClassName}>{children}</CardContent>
+      {footer ? (
+        <div className="border-border/70 border-t px-6 py-2">{footer}</div>
+      ) : null}
     </Card>
   );
 }

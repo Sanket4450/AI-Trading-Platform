@@ -1,24 +1,36 @@
 import { InjectQueue } from '@nestjs/bullmq';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import type { Queue } from 'bullmq';
 import { isQuantifiedStage, jobTypeOf, QUEUES, queueNameOf, stagesForJob } from '@ai-trading/domain';
 import {
+  getAllJobRunEvents,
   getJobRun,
-  getJobRunEvents,
+  getJobRunEventsPage,
   getJobRunSummary,
   getLatestJobRunEvent,
   listTrackedJobRuns,
   recordAudit,
   updateJobRun,
 } from '@ai-trading/database';
-import type { JobRunBroadcast } from '@ai-trading/domain';
+import {
+  PAGINATION_DEFAULT_LIMIT,
+  type JobRunBroadcast,
+} from '@ai-trading/domain';
+import {
+  filterFingerprint,
+  parseTimestampCursor,
+  readDirectionalCursor,
+  readCursor,
+} from '../../common/pagination/cursor.js';
+import { backwardPage, forwardPage, olderPage } from '../../common/pagination/page.js';
 import type { RequestMeta } from '../../common/http/request-meta.js';
+import type { CursorQueryDto } from '../../common/pagination/pagination.dto.js';
 import type { JobQueryDto } from './dto/job-query.dto.js';
 import { JobEventsPublisher } from './jobs-events.publisher.js';
 
 type RunRow = NonNullable<Awaited<ReturnType<typeof getJobRun>>>;
-type EventRow = Awaited<ReturnType<typeof getJobRunEvents>>[number];
-type ListRow = Awaited<ReturnType<typeof listTrackedJobRuns>>[number];
+type EventRow = Awaited<ReturnType<typeof getAllJobRunEvents>>[number];
+type ListRow = Awaited<ReturnType<typeof listTrackedJobRuns>>['items'][number];
 
 const TERMINAL_STATUSES = new Set(['succeeded', 'failed', 'partially_failed', 'cancelled']);
 const CLOSED_TYPES = new Set(['completed', 'failed', 'skipped']);
@@ -189,40 +201,108 @@ export class JobsService {
   ) {}
 
   async list(query: JobQueryDto) {
-    const [summary, runs] = await Promise.all([
-      getJobRunSummary(),
-      listTrackedJobRuns({
-        limit: query.limit ?? 50,
-        status: query.status,
-        instrumentId: query.instrumentId,
-        search: query.search,
-      }),
-    ]);
+    const fingerprint = filterFingerprint({
+      scope: 'jobs',
+      status: query.status ?? [],
+      instrumentId: query.instrumentId ?? null,
+      search: query.search ?? null,
+    });
+    const { after, before } = readDirectionalCursor(query, fingerprint);
+    const limit = query.limit ?? PAGINATION_DEFAULT_LIMIT;
 
-    return {
-      summary: summary ?? {
-        running: 0,
-        failed24h: 0,
-        succeeded24h: 0,
-        p95DurationMs: 0,
-      },
-      items: runs.map(mapListRun),
-    };
+    const result = await listTrackedJobRuns({
+      limit,
+      status: query.status,
+      instrumentId: query.instrumentId,
+      search: query.search,
+      after: after ? parseTimestampCursor(after) : undefined,
+      before: before ? parseTimestampCursor(before) : undefined,
+    });
+
+    const items = result.items.map(mapListRun);
+    const keyOf = (item: (typeof items)[number]) => item.createdAt;
+    const idOf = (item: (typeof items)[number]) => item.id;
+
+    if (before) {
+      return backwardPage({
+        items: items.reverse(),
+        total: result.total,
+        limit,
+        hasExtra: result.hasExtra,
+        fingerprint,
+        keyOf,
+        idOf,
+      });
+    }
+
+    return forwardPage({
+      items,
+      total: result.total,
+      limit,
+      hasExtra: result.hasExtra,
+      fingerprint,
+      keyOf,
+      idOf,
+      hadAfter: Boolean(after),
+    });
+  }
+
+  summary() {
+    return getJobRunSummary();
+  }
+
+  async listEvents(id: string, query: CursorQueryDto) {
+    if (query.after) throw new BadRequestException('Use before for event history');
+    const run = await getJobRun(id);
+    if (!run) throw new NotFoundException('Job not found');
+
+    const fingerprint = filterFingerprint({ scope: 'job-events', jobRunId: id });
+    const cursor = readCursor(query.before, fingerprint);
+    const beforeId = cursor ? Number(cursor.key) : undefined;
+    if (beforeId !== undefined && !Number.isInteger(beforeId)) {
+      throw new BadRequestException('Pagination cursor has an invalid event id');
+    }
+    const limit = query.limit ?? PAGINATION_DEFAULT_LIMIT;
+
+    const result = await getJobRunEventsPage(id, { limit, beforeId });
+    const items = result.items.map(mapEvent);
+
+    return olderPage({
+      items,
+      total: result.total,
+      limit,
+      hasExtra: result.hasExtra,
+      fingerprint,
+      keyOf: (item) => String(item.id),
+      idOf: (item) => String(item.id),
+    });
   }
 
   async detail(id: string) {
     const run = await getJobRun(id);
     if (!run) throw new NotFoundException('Job not found');
 
-    const [events, latest] = await Promise.all([
-      getJobRunEvents(id, 500),
+    const fingerprint = filterFingerprint({ scope: 'job-events', jobRunId: id });
+    const [allEvents, latest, eventPage] = await Promise.all([
+      getAllJobRunEvents(id),
       getLatestJobRunEvent(id),
+      getJobRunEventsPage(id, { limit: PAGINATION_DEFAULT_LIMIT }),
     ]);
+    const events = eventPage.items.map(mapEvent);
 
     return {
       run: mapRun(run, latest),
-      stages: deriveStages(run, events),
-      events: events.map(mapEvent),
+      stages: deriveStages(run, allEvents),
+      events,
+      eventsPage: olderPage({
+        items: events,
+        total: eventPage.total,
+        limit: PAGINATION_DEFAULT_LIMIT,
+        hasExtra: eventPage.hasExtra,
+        fingerprint,
+        keyOf: (item) => String(item.id),
+        idOf: (item) => String(item.id),
+      }).page,
       progress: progressOf(run.jobName, latest),
     };
   }

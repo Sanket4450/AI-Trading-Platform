@@ -12,40 +12,80 @@ import {
   tradingSessions,
 } from '../schema/index.js';
 
-export async function listStrategies(search?: string) {
-  const term = search ? `%${search}%` : null;
-  const conditions = term ? [or(ilike(strategies.code, term), ilike(strategies.name, term))] : [];
+function strategyConditions(search?: string) {
+  return search
+    ? [or(ilike(strategies.code, `%${search}%`), ilike(strategies.name, `%${search}%`))]
+    : [];
+}
 
-  return db
+export async function listStrategies(filters: {
+  search?: string;
+  limit: number;
+  offset: number;
+}) {
+  const conditions = strategyConditions(filters.search);
+
+  const [items, totalRows] = await Promise.all([
+    db
+      .select({
+        id: strategies.id,
+        code: strategies.code,
+        name: strategies.name,
+        description: strategies.description,
+        status: strategies.status,
+        latestVersion: sql<number | null>`(
+          select v.version from strategy_versions v
+          where v.strategy_id = "strategies"."id"
+          order by v.version desc limit 1
+        )`,
+        latestVersionStatus: sql<string | null>`(
+          select v.status from strategy_versions v
+          where v.strategy_id = "strategies"."id"
+          order by v.version desc limit 1
+        )`,
+        versionCount: sql<number>`(
+          select count(*)::int from strategy_versions v
+          where v.strategy_id = "strategies"."id"
+        )`,
+        activeActivations: sql<number>`(
+          select count(*)::int from strategy_activations a
+          join strategy_versions v on v.id = a.strategy_version_id
+          where v.strategy_id = "strategies"."id" and a.status = 'active'
+        )`,
+      })
+      .from(strategies)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(asc(strategies.code))
+      .limit(filters.limit)
+      .offset(filters.offset),
+    db
+      .select({ total: sql<number>`count(*)::int` })
+      .from(strategies)
+      .where(conditions.length > 0 ? and(...conditions) : undefined),
+  ]);
+
+  return { items, total: totalRows[0]?.total ?? 0 };
+}
+
+export async function getStrategySummary(search?: string) {
+  const conditions = strategyConditions(search);
+  const [row] = await db
     .select({
-      id: strategies.id,
-      code: strategies.code,
-      name: strategies.name,
-      description: strategies.description,
-      status: strategies.status,
-      latestVersion: sql<number | null>`(
-        select v.version from strategy_versions v
-        where v.strategy_id = "strategies"."id"
-        order by v.version desc limit 1
-      )`,
-      latestVersionStatus: sql<string | null>`(
-        select v.status from strategy_versions v
-        where v.strategy_id = "strategies"."id"
-        order by v.version desc limit 1
-      )`,
-      versionCount: sql<number>`(
+      total: sql<number>`count(*)::int`,
+      versions: sql<number>`coalesce(sum((
         select count(*)::int from strategy_versions v
         where v.strategy_id = "strategies"."id"
-      )`,
-      activeActivations: sql<number>`(
+      )), 0)::int`,
+      activeActivations: sql<number>`coalesce(sum((
         select count(*)::int from strategy_activations a
         join strategy_versions v on v.id = a.strategy_version_id
         where v.strategy_id = "strategies"."id" and a.status = 'active'
-      )`,
+      )), 0)::int`,
     })
     .from(strategies)
-    .where(conditions.length > 0 ? and(...conditions) : undefined)
-    .orderBy(asc(strategies.code));
+    .where(conditions.length > 0 ? and(...conditions) : undefined);
+
+  return row ?? { total: 0, versions: 0, activeActivations: 0 };
 }
 
 export async function getStrategy(id: string) {
@@ -158,34 +198,66 @@ export async function createStrategyVersion(values: {
   });
 }
 
+function configurationConditions(filters: { configType?: string; scopeKey?: string }) {
+  const conditions = [];
+  if (filters.configType) conditions.push(eq(configurationVersions.configType, filters.configType));
+  if (filters.scopeKey) conditions.push(ilike(configurationVersions.scopeKey, `%${filters.scopeKey}%`));
+  return conditions;
+}
+
 export async function listConfigurationVersions(filters: {
   configType?: string;
   scopeKey?: string;
-  limit?: number;
+  limit: number;
+  offset: number;
 }) {
-  const conditions = [];
-  if (filters.configType) conditions.push(eq(configurationVersions.configType, filters.configType));
-  if (filters.scopeKey) conditions.push(eq(configurationVersions.scopeKey, filters.scopeKey));
+  const conditions = configurationConditions(filters);
 
-  return db
+  const [items, totalRows] = await Promise.all([
+    db
+      .select({
+        id: configurationVersions.id,
+        configType: configurationVersions.configType,
+        scopeKey: configurationVersions.scopeKey,
+        version: configurationVersions.version,
+        payload: configurationVersions.payload,
+        payloadHash: configurationVersions.payloadHash,
+        schemaVersion: configurationVersions.schemaVersion,
+        effectiveFrom: configurationVersions.effectiveFrom,
+        effectiveTo: configurationVersions.effectiveTo,
+        supersedesId: configurationVersions.supersedesId,
+        createdBy: configurationVersions.createdBy,
+        createdAt: configurationVersions.createdAt,
+      })
+      .from(configurationVersions)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(desc(configurationVersions.createdAt), desc(configurationVersions.id))
+      .limit(filters.limit)
+      .offset(filters.offset),
+    db
+      .select({ total: sql<number>`count(*)::int` })
+      .from(configurationVersions)
+      .where(conditions.length > 0 ? and(...conditions) : undefined),
+  ]);
+
+  return { items, total: totalRows[0]?.total ?? 0 };
+}
+
+export async function getConfigurationSummary(filters: {
+  configType?: string;
+  scopeKey?: string;
+}) {
+  const conditions = configurationConditions(filters);
+  const [row] = await db
     .select({
-      id: configurationVersions.id,
-      configType: configurationVersions.configType,
-      scopeKey: configurationVersions.scopeKey,
-      version: configurationVersions.version,
-      payload: configurationVersions.payload,
-      payloadHash: configurationVersions.payloadHash,
-      schemaVersion: configurationVersions.schemaVersion,
-      effectiveFrom: configurationVersions.effectiveFrom,
-      effectiveTo: configurationVersions.effectiveTo,
-      supersedesId: configurationVersions.supersedesId,
-      createdBy: configurationVersions.createdBy,
-      createdAt: configurationVersions.createdAt,
+      total: sql<number>`count(*)::int`,
+      configTypes: sql<number>`count(distinct ${configurationVersions.configType})::int`,
+      scopeKeys: sql<number>`count(distinct ${configurationVersions.scopeKey})::int`,
     })
     .from(configurationVersions)
-    .where(conditions.length > 0 ? and(...conditions) : undefined)
-    .orderBy(desc(configurationVersions.createdAt))
-    .limit(filters.limit ?? 100);
+    .where(conditions.length > 0 ? and(...conditions) : undefined);
+
+  return row ?? { total: 0, configTypes: 0, scopeKeys: 0 };
 }
 
 export async function getConfigurationVersion(id: string) {
@@ -334,26 +406,61 @@ export async function resolveEffectiveConfiguration(
   return rows[0] ?? null;
 }
 
-export async function listTradingSessions(filters: { accountId?: string; limit?: number }) {
-  return db
-    .select({
-      id: tradingSessions.id,
-      accountId: tradingSessions.accountId,
-      accountCode: accounts.code,
-      tradingDate: tradingSessions.tradingDate,
-      mode: tradingSessions.mode,
-      status: tradingSessions.status,
-      startedAt: tradingSessions.startedAt,
-      endedAt: tradingSessions.endedAt,
-      openingEquity: tradingSessions.openingEquity,
-      closingEquity: tradingSessions.closingEquity,
-      killSwitchEngaged: tradingSessions.killSwitchEngaged,
-    })
-    .from(tradingSessions)
-    .innerJoin(accounts, eq(accounts.id, tradingSessions.accountId))
-    .where(filters.accountId ? eq(tradingSessions.accountId, filters.accountId) : undefined)
-    .orderBy(desc(tradingSessions.tradingDate))
-    .limit(filters.limit ?? 50);
+export async function listTradingSessions(filters: {
+  accountId?: string;
+  limit: number;
+  after?: { tradingDate: string; id: string };
+  before?: { tradingDate: string; id: string };
+}) {
+  const backward = Boolean(filters.before);
+  const cursor = filters.before ?? filters.after;
+  const conditions = [];
+  if (filters.accountId) conditions.push(eq(tradingSessions.accountId, filters.accountId));
+  if (cursor) {
+    conditions.push(
+      backward
+        ? sql`(${tradingSessions.tradingDate}, ${tradingSessions.id}) > (${cursor.tradingDate}::date, ${cursor.id}::uuid)`
+        : sql`(${tradingSessions.tradingDate}, ${tradingSessions.id}) < (${cursor.tradingDate}::date, ${cursor.id}::uuid)`,
+    );
+  }
+  const totalConditions = filters.accountId
+    ? eq(tradingSessions.accountId, filters.accountId)
+    : undefined;
+
+  const [rows, totalRows] = await Promise.all([
+    db
+      .select({
+        id: tradingSessions.id,
+        accountId: tradingSessions.accountId,
+        accountCode: accounts.code,
+        tradingDate: tradingSessions.tradingDate,
+        mode: tradingSessions.mode,
+        status: tradingSessions.status,
+        startedAt: tradingSessions.startedAt,
+        endedAt: tradingSessions.endedAt,
+        openingEquity: tradingSessions.openingEquity,
+        closingEquity: tradingSessions.closingEquity,
+        killSwitchEngaged: tradingSessions.killSwitchEngaged,
+      })
+      .from(tradingSessions)
+      .innerJoin(accounts, eq(accounts.id, tradingSessions.accountId))
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(
+        backward ? asc(tradingSessions.tradingDate) : desc(tradingSessions.tradingDate),
+        backward ? asc(tradingSessions.id) : desc(tradingSessions.id),
+      )
+      .limit(filters.limit + 1),
+    db
+      .select({ total: sql<number>`count(*)::int` })
+      .from(tradingSessions)
+      .where(totalConditions),
+  ]);
+
+  return {
+    items: rows.slice(0, filters.limit),
+    total: totalRows[0]?.total ?? 0,
+    hasExtra: rows.length > filters.limit,
+  };
 }
 
 export async function listRiskEvents(filters: { accountId?: string; limit?: number }) {

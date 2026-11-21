@@ -1,19 +1,30 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { PAGINATION_DEFAULT_LIMIT } from '@ai-trading/domain';
 import {
   createStrategyVersion,
   getStrategy,
+  getStrategySummary,
   getStrategyVersion,
   listStrategies,
   recordAudit,
   resolveEffectiveConfiguration,
 } from '@ai-trading/database';
+import { offsetPage } from '../../common/pagination/page.js';
+import type { SearchOffsetQueryDto } from '../../common/pagination/search-offset-query.dto.js';
 import type { CreateStrategyVersionDto } from './dto/create-strategy-version.dto.js';
 import type { RequestMeta } from '../../common/http/request-meta.js';
 
 @Injectable()
 export class StrategiesService {
-  list(search?: string) {
-    return listStrategies(search);
+  async list(query: SearchOffsetQueryDto) {
+    const limit = query.limit ?? PAGINATION_DEFAULT_LIMIT;
+    const offset = query.offset ?? 0;
+    const result = await listStrategies({ search: query.search, limit, offset });
+    return offsetPage(result.items, result.total, limit, offset);
+  }
+
+  summary(query: SearchOffsetQueryDto) {
+    return getStrategySummary(query.search);
   }
 
   async detail(id: string) {

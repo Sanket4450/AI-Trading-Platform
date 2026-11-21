@@ -1,16 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Transform, Type } from 'class-transformer';
-import {
-  IsArray,
-  IsIn,
-  IsInt,
-  IsOptional,
-  IsString,
-  IsUUID,
-  Max,
-  MaxLength,
-  Min,
-} from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsArray, IsIn, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import { CursorQueryDto } from '../../../common/pagination/pagination.dto.js';
 
 export const JOB_STATUSES = [
   'queued',
@@ -21,7 +12,7 @@ export const JOB_STATUSES = [
   'cancelled',
 ] as const;
 
-export class JobQueryDto {
+export class JobQueryDto extends CursorQueryDto {
   @ApiPropertyOptional({
     enum: [...JOB_STATUSES],
     isArray: true,
@@ -51,12 +42,4 @@ export class JobQueryDto {
   @IsString()
   @MaxLength(120)
   search?: string;
-
-  @ApiPropertyOptional({ type: Number, minimum: 1, maximum: 200, default: 50 })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(200)
-  limit?: number;
 }

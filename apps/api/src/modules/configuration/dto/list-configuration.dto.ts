@@ -1,9 +1,9 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
+import { OffsetQueryDto } from '../../../common/pagination/pagination.dto.js';
 import { configurationTypes } from './create-configuration.dto.js';
 
-export class ListConfigurationDto {
+export class ListConfigurationDto extends OffsetQueryDto {
   @ApiPropertyOptional({ enum: [...configurationTypes] })
   @IsOptional()
   @IsIn(configurationTypes)
@@ -12,13 +12,6 @@ export class ListConfigurationDto {
   @ApiPropertyOptional({ maxLength: 80 })
   @IsOptional()
   @IsString()
+  @MaxLength(80)
   scopeKey?: string;
-
-  @ApiPropertyOptional({ type: Number, minimum: 1, maximum: 500, default: 100 })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(500)
-  limit?: number;
 }

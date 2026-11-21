@@ -1,4 +1,4 @@
-import { and, desc, eq, ilike, inArray, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, ilike, inArray, lt, or, sql } from 'drizzle-orm';
 import { db } from '../client.js';
 import { jobRunEvents, jobRuns } from '../schema/index.js';
 
@@ -113,8 +113,7 @@ export async function finishJobRunTracking(input: {
   return updated ?? null;
 }
 
-export async function listTrackedJobRuns(filters: {
-  limit: number;
+function jobRunConditions(filters: {
   status?: string[];
   instrumentId?: string;
   search?: string;
@@ -135,32 +134,73 @@ export async function listTrackedJobRuns(filters: {
     );
     if (searchCondition) conditions.push(searchCondition);
   }
+  return conditions;
+}
 
-  return db
-    .select({
-      id: jobRuns.id,
-      jobName: jobRuns.jobName,
-      status: jobRuns.status,
-      groupId: jobRuns.groupId,
-      instrumentId: jobRuns.instrumentId,
-      attempt: jobRuns.attempt,
-      maxAttempts: jobRuns.maxAttempts,
-      createdAt: jobRuns.createdAt,
-      startedAt: jobRuns.startedAt,
-      finishedAt: jobRuns.finishedAt,
-      result: jobRuns.result,
-      error: jobRuns.error,
-      latestEventId: jobRuns.latestEventId,
-      latestStage: jobRunEvents.stage,
-      latestType: jobRunEvents.type,
-      latestData: jobRunEvents.data,
-      latestOccurredAt: jobRunEvents.occurredAt,
-    })
-    .from(jobRuns)
-    .leftJoin(jobRunEvents, eq(jobRunEvents.id, jobRuns.latestEventId))
-    .where(conditions.length > 0 ? and(...conditions) : undefined)
-    .orderBy(desc(jobRuns.createdAt))
-    .limit(filters.limit);
+/**
+ * One page of tracked runs. The cursor is a `(created_at, id)` value tuple: `created_at` alone is
+ * not unique because a batch enqueue shares one transaction timestamp.
+ */
+export async function listTrackedJobRuns(filters: {
+  limit: number;
+  status?: string[];
+  instrumentId?: string;
+  search?: string;
+  after?: { createdAt: Date; id: string };
+  before?: { createdAt: Date; id: string };
+}) {
+  const conditions = jobRunConditions(filters);
+  const backward = Boolean(filters.before);
+  const cursor = filters.before ?? filters.after;
+  const pageConditions = cursor
+    ? [
+        ...conditions,
+        backward
+          ? sql`(${jobRuns.createdAt}, ${jobRuns.id}) > (${cursor.createdAt.toISOString()}::timestamptz, ${cursor.id}::uuid)`
+          : sql`(${jobRuns.createdAt}, ${jobRuns.id}) < (${cursor.createdAt.toISOString()}::timestamptz, ${cursor.id}::uuid)`,
+      ]
+    : conditions;
+
+  const [rows, totalRows] = await Promise.all([
+    db
+      .select({
+        id: jobRuns.id,
+        jobName: jobRuns.jobName,
+        status: jobRuns.status,
+        groupId: jobRuns.groupId,
+        instrumentId: jobRuns.instrumentId,
+        attempt: jobRuns.attempt,
+        maxAttempts: jobRuns.maxAttempts,
+        createdAt: jobRuns.createdAt,
+        startedAt: jobRuns.startedAt,
+        finishedAt: jobRuns.finishedAt,
+        result: jobRuns.result,
+        error: jobRuns.error,
+        latestEventId: jobRuns.latestEventId,
+        latestStage: jobRunEvents.stage,
+        latestType: jobRunEvents.type,
+        latestData: jobRunEvents.data,
+        latestOccurredAt: jobRunEvents.occurredAt,
+      })
+      .from(jobRuns)
+      .leftJoin(jobRunEvents, eq(jobRunEvents.id, jobRuns.latestEventId))
+      .where(pageConditions.length > 0 ? and(...pageConditions) : undefined)
+      .orderBy(
+        backward ? asc(jobRuns.createdAt) : desc(jobRuns.createdAt),
+        backward ? asc(jobRuns.id) : desc(jobRuns.id),
+      )
+      .limit(filters.limit + 1),
+    db
+      .select({ total: sql<number>`count(*)::int` })
+      .from(jobRuns)
+      .where(conditions.length > 0 ? and(...conditions) : undefined),
+  ]);
+
+  return {
+    items: rows.slice(0, filters.limit),
+    total: totalRows[0]?.total ?? 0,
+    hasExtra: rows.length > filters.limit,
+  };
 }
 
 export async function getJobRun(id: string) {
@@ -178,15 +218,46 @@ export async function getLatestJobRunEvent(jobRunId: string) {
   return rows[0] ?? null;
 }
 
-/** Returns the newest events in chronological order so the timeline reads top to bottom. */
-export async function getJobRunEvents(jobRunId: string, limit: number) {
-  const rows = await db
+/** Returns every event for a run in chronological order; used to derive the stage rail. */
+export async function getAllJobRunEvents(jobRunId: string) {
+  return db
     .select()
     .from(jobRunEvents)
     .where(eq(jobRunEvents.jobRunId, jobRunId))
-    .orderBy(desc(jobRunEvents.id))
-    .limit(limit);
-  return rows.reverse();
+    .orderBy(asc(jobRunEvents.id));
+}
+
+/**
+ * One page of a run's events. The response stays chronological: the newest page is fetched
+ * descending and reversed, and `beforeId` walks toward older events.
+ */
+export async function getJobRunEventsPage(
+  jobRunId: string,
+  filters: { limit: number; beforeId?: number },
+) {
+  const conditions = [eq(jobRunEvents.jobRunId, jobRunId)];
+  if (filters.beforeId !== undefined) {
+    conditions.push(lt(jobRunEvents.id, filters.beforeId));
+  }
+
+  const [rows, totalRows] = await Promise.all([
+    db
+      .select()
+      .from(jobRunEvents)
+      .where(and(...conditions))
+      .orderBy(desc(jobRunEvents.id))
+      .limit(filters.limit + 1),
+    db
+      .select({ total: sql<number>`count(*)::int` })
+      .from(jobRunEvents)
+      .where(eq(jobRunEvents.jobRunId, jobRunId)),
+  ]);
+
+  return {
+    items: rows.slice(0, filters.limit).reverse(),
+    total: totalRows[0]?.total ?? 0,
+    hasExtra: rows.length > filters.limit,
+  };
 }
 
 export async function getJobRunSummary() {

@@ -8,11 +8,14 @@ import {
   createConfigurationVersion,
   findConfigurationByHash,
   findLatestStrategyVersionByCode,
+  getConfigurationSummary,
   getConfigurationVersion,
   getStrategyVersion,
   listConfigurationVersions,
   recordAudit,
 } from '@ai-trading/database';
+import { PAGINATION_DEFAULT_LIMIT } from '@ai-trading/domain';
+import { offsetPage } from '../../common/pagination/page.js';
 import {
   hashPayload,
   riskConfigurationSchema,
@@ -29,11 +32,22 @@ import type { RequestMeta } from '../../common/http/request-meta.js';
 
 @Injectable()
 export class ConfigurationService {
-  list(query: ListConfigurationDto) {
-    return listConfigurationVersions({
+  async list(query: ListConfigurationDto) {
+    const limit = query.limit ?? PAGINATION_DEFAULT_LIMIT;
+    const offset = query.offset ?? 0;
+    const result = await listConfigurationVersions({
       configType: query.configType,
       scopeKey: query.scopeKey,
-      limit: query.limit,
+      limit,
+      offset,
+    });
+    return offsetPage(result.items, result.total, limit, offset);
+  }
+
+  summary(query: ListConfigurationDto) {
+    return getConfigurationSummary({
+      configType: query.configType,
+      scopeKey: query.scopeKey,
     });
   }
 

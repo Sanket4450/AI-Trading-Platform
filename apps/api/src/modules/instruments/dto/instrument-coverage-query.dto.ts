@@ -5,16 +5,14 @@ import {
   IsArray,
   IsBoolean,
   IsIn,
-  IsInt,
   IsObject,
   IsOptional,
   IsString,
   Matches,
-  Max,
   MaxLength,
-  Min,
   ValidateNested,
 } from 'class-validator';
+import { OffsetQueryDto } from '../../../common/pagination/pagination.dto.js';
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -48,7 +46,7 @@ export const CORPORATE_ACTION_TYPES = [
   'symbol_change',
 ] as const;
 
-export class InstrumentCoverageQueryDto {
+export class InstrumentCoverageQueryDto extends OffsetQueryDto {
   @ApiPropertyOptional({ enum: [...FETCH_STATUSES] })
   @IsOptional()
   @IsIn(FETCH_STATUSES)
@@ -64,21 +62,6 @@ export class InstrumentCoverageQueryDto {
   @IsString()
   @MaxLength(80)
   search?: string;
-
-  @ApiPropertyOptional({ type: Number, minimum: 1, maximum: 2000, default: 200 })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(2000)
-  limit?: number;
-
-  @ApiPropertyOptional({ type: Number, minimum: 0, default: 0 })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  offset?: number;
 }
 
 export class FetchInstrumentDto {

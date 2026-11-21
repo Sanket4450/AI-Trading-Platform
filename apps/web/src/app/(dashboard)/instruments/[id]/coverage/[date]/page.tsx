@@ -1,14 +1,17 @@
 import { apiFetch } from '@/lib/api';
-import type { CoverageRow, SystemIssue } from '@/lib/types';
+import type { CoverageRow, Paginated, SystemIssue } from '@/lib/types';
+import { PAGINATION_DEFAULT_LIMIT } from '@ai-trading/domain';
+import { readOffset } from '@/lib/pagination';
 import { formatNumber } from '@/lib/format';
 import { label } from '@/lib/labels';
-import { backLinkFor, detailHref, type DetailSearchParams } from '@/lib/navigation';
+import { backLinkFor, detailHref } from '@/lib/navigation';
 import { PageMeta } from '@/components/shell/page-meta';
 import { StatCard, StatGrid } from '@/components/dashboard/stat-card';
 import { SectionCard } from '@/components/dashboard/section-card';
 import { DetailHeader } from '@/components/dashboard/detail-header';
 import { StatusBadge } from '@/components/dashboard/status-badge';
 import { IssueList } from '@/features/issues/components/issue-list';
+import { Pagination } from '@/components/dashboard/pagination';
 
 interface DayDetail {
   instrument: { id: string; symbol: string; name: string; segment?: string; tickSize: string } | null;
@@ -21,12 +24,19 @@ export default async function InstrumentCoverageDayPage({
   searchParams,
 }: {
   params: Promise<{ id: string; date: string }>;
-  searchParams: DetailSearchParams;
+  searchParams: Promise<{ from?: string | string[]; issuesOffset?: string | string[] }>;
 }) {
   const { id, date } = await params;
-  const { from: fromParam } = await searchParams;
+  const queryParams = await searchParams;
+  const fromParam = queryParams.from;
   const back = backLinkFor(fromParam, `/instruments/${id}`);
-  const detail = await apiFetch<DayDetail>(`/instruments/${id}/coverage/${date}`);
+  const issuesOffset = readOffset(queryParams.issuesOffset);
+  const [detail, issues] = await Promise.all([
+    apiFetch<DayDetail>(`/instruments/${id}/coverage/${date}`),
+    apiFetch<Paginated<SystemIssue>>(
+      `/instruments/${id}/coverage/${date}/issues?limit=${PAGINATION_DEFAULT_LIMIT}&offset=${issuesOffset}`,
+    ),
+  ]);
   const coverage = detail.coverage;
   const missing = coverage ? Math.max(coverage.expectedBars - coverage.storedBars, 0) : 0;
 
@@ -75,9 +85,19 @@ export default async function InstrumentCoverageDayPage({
         className="mt-4"
         title="Issues for this day"
         description="Active findings anchored to this instrument-day."
+        footer={
+          <Pagination
+            page={issues.page}
+            itemsCount={issues.items.length}
+            pathname={`/instruments/${id}/coverage/${date}`}
+            searchParams={queryParams}
+            itemLabel="issues"
+            names={{ offset: 'issuesOffset' }}
+          />
+        }
       >
         <IssueList
-          issues={detail.issues}
+          issues={issues.items}
           from={back.href}
           currentInstrumentId={id}
           emptyTitle="No issues recorded"

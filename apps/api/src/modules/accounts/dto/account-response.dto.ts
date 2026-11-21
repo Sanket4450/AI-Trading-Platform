@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { PaginationMetaDto } from '../../../common/pagination/pagination.dto.js';
 
 export class AccountDto {
   @ApiProperty({ format: 'uuid' })
@@ -185,4 +186,58 @@ export class TradingSessionDto {
 
   @ApiProperty()
   killSwitchEngaged!: boolean;
+}
+
+export class AccountListResponseDto {
+  @ApiProperty({ type: [AccountDto] })
+  items!: AccountDto[];
+
+  @ApiProperty({ type: PaginationMetaDto })
+  page!: PaginationMetaDto;
+}
+
+export class AccountSummaryDto {
+  @ApiProperty()
+  total!: number;
+
+  @ApiProperty()
+  active!: number;
+
+  @ApiProperty()
+  permissionTotal!: number;
+
+  @ApiProperty()
+  credentialsTracked!: number;
+}
+
+export class AccountPermissionListResponseDto {
+  @ApiProperty({ type: [AccountPermissionDto] })
+  items!: AccountPermissionDto[];
+
+  @ApiProperty({ type: PaginationMetaDto })
+  page!: PaginationMetaDto;
+}
+
+export class AccountAccessListResponseDto {
+  @ApiProperty({ type: [AccountAccessDto] })
+  items!: AccountAccessDto[];
+
+  @ApiProperty({ type: PaginationMetaDto })
+  page!: PaginationMetaDto;
+}
+
+export class EquitySnapshotListResponseDto {
+  @ApiProperty({ type: [EquitySnapshotDto] })
+  items!: EquitySnapshotDto[];
+
+  @ApiProperty({ type: PaginationMetaDto })
+  page!: PaginationMetaDto;
+}
+
+export class TradingSessionListResponseDto {
+  @ApiProperty({ type: [TradingSessionDto] })
+  items!: TradingSessionDto[];
+
+  @ApiProperty({ type: PaginationMetaDto })
+  page!: PaginationMetaDto;
 }

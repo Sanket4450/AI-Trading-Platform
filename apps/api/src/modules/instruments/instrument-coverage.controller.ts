@@ -34,10 +34,14 @@ import {
   CancelInstrumentFetchDto,
   CoverageDayDetailDto,
   InstrumentCoverageDetailDto,
-  InstrumentCoverageRowDto,
   InstrumentCoverageSummaryDto,
   InstrumentFetchResponseDto,
 } from './dto/instrument-coverage.dto.js';
+import { OffsetQueryDto } from '../../common/pagination/pagination.dto.js';
+import {
+  InstrumentCoverageListResponseDto,
+  InstrumentIssueListResponseDto,
+} from './dto/instrument-list-response.dto.js';
 import { InstrumentCoverageService } from './instrument-coverage.service.js';
 import { InstrumentIngestionService } from './instrument-ingestion.service.js';
 
@@ -52,7 +56,7 @@ export class InstrumentCoverageController {
 
   @Get('status')
   @ApiOperation({ summary: 'List sync-target instruments with fetch and coverage status' })
-  @ApiOkResponse({ type: InstrumentCoverageRowDto, isArray: true })
+  @ApiOkResponse({ type: InstrumentCoverageListResponseDto })
   list(@Query() query: InstrumentCoverageQueryDto) {
     return this.coverage.list(query);
   }
@@ -60,8 +64,20 @@ export class InstrumentCoverageController {
   @Get('status/summary')
   @ApiOperation({ summary: 'Summarise catalog fetch and coverage status for sync targets' })
   @ApiOkResponse({ type: InstrumentCoverageSummaryDto })
-  summary() {
-    return this.coverage.summary();
+  summary(@Query() query: InstrumentCoverageQueryDto) {
+    return this.coverage.summary(query);
+  }
+
+  @Get(':instrumentId/issues')
+  @ApiOperation({ summary: 'List active issues for one instrument' })
+  @ApiParam({ name: 'instrumentId', format: 'uuid' })
+  @ApiOkResponse({ type: InstrumentIssueListResponseDto })
+  @ApiNotFoundResponse({ type: ErrorResponseDto, description: 'Instrument not found' })
+  issues(
+    @Param('instrumentId', ParseUUIDPipe) instrumentId: string,
+    @Query() query: OffsetQueryDto,
+  ) {
+    return this.coverage.issues(instrumentId, query);
   }
 
   @Get(':instrumentId/coverage')
@@ -83,6 +99,19 @@ export class InstrumentCoverageController {
     @Param('date') date: string,
   ) {
     return this.coverage.coverageDay(instrumentId, date);
+  }
+
+  @Get(':instrumentId/coverage/:date/issues')
+  @ApiOperation({ summary: 'List active issues for one instrument/day' })
+  @ApiParam({ name: 'instrumentId', format: 'uuid' })
+  @ApiParam({ name: 'date', format: 'date' })
+  @ApiOkResponse({ type: InstrumentIssueListResponseDto })
+  dayIssues(
+    @Param('instrumentId', ParseUUIDPipe) instrumentId: string,
+    @Param('date') date: string,
+    @Query() query: OffsetQueryDto,
+  ) {
+    return this.coverage.coverageDayIssues(instrumentId, date, query);
   }
 
   @Post(':instrumentId/coverage/recompute')

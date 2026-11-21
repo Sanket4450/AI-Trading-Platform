@@ -1,8 +1,9 @@
 import { apiFetch } from '@/lib/api';
-import type { SystemIssue } from '@/lib/types';
+import type { IssueSummary, Paginated, SystemIssue } from '@/lib/types';
 import { formatDateTime, formatNumber } from '@/lib/format';
 import { label } from '@/lib/labels';
 import { originHref } from '@/lib/navigation';
+import { readCursorValue, readLimit } from '@/lib/pagination';
 import { issuePreview, issueWindow } from '@/features/issues/issue-format';
 import { IssueDialog } from '@/features/issues/components/issue-dialog';
 import { TableCard } from '@/components/dashboard/table-card';
@@ -11,6 +12,8 @@ import { EmptyState } from '@/components/dashboard/empty-state';
 import { StatusBadge } from '@/components/dashboard/status-badge';
 import { FilterSelect, TableFilters } from '@/components/dashboard/table-filters';
 import { TableActions, TableRefreshButton } from '@/components/dashboard/table-actions';
+import { PageSizeSelect } from '@/components/dashboard/page-size-select';
+import { Pagination } from '@/components/dashboard/pagination';
 import {
   Table,
   TableBody,
@@ -73,21 +76,30 @@ export default async function IssuesPage({
     source?: string;
     kind?: string;
     scope?: string;
+    limit?: string | string[];
+    after?: string | string[];
+    before?: string | string[];
   }>;
 }) {
   const params = await searchParams;
   const from = originHref('/issues', params);
+  const limit = readLimit(params.limit);
+  const after = readCursorValue(params.after);
+  const before = readCursorValue(params.before);
   const query = new URLSearchParams();
   if (params.severity) query.set('severity', params.severity);
   if (params.source) query.set('source', params.source);
   if (params.kind) query.set('kind', params.kind);
   if (params.scope) query.set('scope', params.scope);
-  query.set('limit', '100');
+  query.set('limit', String(limit));
+  if (after) query.set('after', after);
+  if (before) query.set('before', before);
 
-  const issues = await apiFetch<SystemIssue[]>(`/issues?${query.toString()}`);
-  const critical = issues.filter((issue) => issue.severity === 'critical').length;
-  const instrumentScoped = issues.filter((issue) => issue.scope === 'instrument').length;
-  const providerScoped = issues.filter((issue) => issue.scope === 'provider').length;
+  const [data, summary] = await Promise.all([
+    apiFetch<Paginated<SystemIssue>>(`/issues?${query.toString()}`),
+    apiFetch<IssueSummary>(`/issues/summary?${query.toString()}`),
+  ]);
+  const issues = data.items;
   const hasFilters = Boolean(params.severity || params.source || params.kind || params.scope);
 
   return (
@@ -97,26 +109,26 @@ export default async function IssuesPage({
           <TableSummary
             items={[
               {
-                label: 'Shown',
-                value: formatNumber(issues.length),
-                hint: 'Active rows in this view',
+                label: 'Active',
+                value: formatNumber(summary.total),
+                hint: 'Rows matching these filters',
                 tone: 'info',
               },
               {
                 label: 'Critical',
-                value: formatNumber(critical),
+                value: formatNumber(summary.critical),
                 hint: 'Blocks preflight',
-                tone: critical > 0 ? 'danger' : 'success',
+                tone: summary.critical > 0 ? 'danger' : 'success',
               },
               {
                 label: 'Instrument',
-                value: formatNumber(instrumentScoped),
+                value: formatNumber(summary.instrumentScoped),
                 hint: 'Single-instrument scope',
                 tone: 'warning',
               },
               {
                 label: 'Provider',
-                value: formatNumber(providerScoped),
+                value: formatNumber(summary.providerScoped),
                 hint: 'Provider-wide scope',
                 tone: 'highlight',
               },
@@ -156,6 +168,16 @@ export default async function IssuesPage({
           </TableFilters>
         }
         actions={<TableRefreshButton />}
+        footer={
+          <Pagination
+            pageSizeControl={<PageSizeSelect value={limit} />}
+            page={data.page}
+            itemsCount={issues.length}
+            pathname="/issues"
+            searchParams={params}
+            itemLabel="issues"
+          />
+        }
       >
         {issues.length === 0 ? (
           <div className="p-4">

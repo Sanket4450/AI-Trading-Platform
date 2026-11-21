@@ -1,10 +1,19 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { apiFetch } from '@/lib/api';
-import type { Account, AccountAccess, AccountPermission, EquitySnapshot } from '@/lib/types';
+import { ApiError } from '@/lib/api-error';
+import type {
+  Account,
+  AccountAccess,
+  AccountPermission,
+  EquitySnapshot,
+  Paginated,
+} from '@/lib/types';
+import { PAGINATION_DEFAULT_LIMIT } from '@ai-trading/domain';
+import { readCursorValue, readOffset } from '@/lib/pagination';
 import { formatDateTime, formatMoney, formatNumber } from '@/lib/format';
 import { label } from '@/lib/labels';
-import { backLinkFor, detailHref, type DetailSearchParams } from '@/lib/navigation';
+import { backLinkFor, detailHref } from '@/lib/navigation';
 import { PageMeta } from '@/components/shell/page-meta';
 import { StatCard, StatGrid } from '@/components/dashboard/stat-card';
 import { SectionCard } from '@/components/dashboard/section-card';
@@ -28,6 +37,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { Pagination } from '@/components/dashboard/pagination';
 import { RotateCredentialDialog } from './rotate-credential-dialog';
 
 interface TradingSession {
@@ -47,21 +57,54 @@ export default async function AccountDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: DetailSearchParams;
+  searchParams: Promise<{
+    from?: string | string[];
+    permissionsOffset?: string | string[];
+    accessOffset?: string | string[];
+    equityAfter?: string | string[];
+    equityBefore?: string | string[];
+    sessionsAfter?: string | string[];
+    sessionsBefore?: string | string[];
+  }>;
 }) {
   const { id } = await params;
-  const { from: fromParam } = await searchParams;
+  const queryParams = await searchParams;
+  const fromParam = queryParams.from;
   const back = backLinkFor(fromParam, '/accounts');
-  const accounts = await apiFetch<Account[]>('/accounts');
-  const account = accounts.find((entry) => entry.id === id);
+  const account = await apiFetch<Account>(`/accounts/${id}`).catch((error: unknown) => {
+    if (error instanceof ApiError && error.status === 404) return null;
+    throw error;
+  });
 
   if (!account) notFound();
 
+  const permissionsOffset = readOffset(queryParams.permissionsOffset);
+  const accessOffset = readOffset(queryParams.accessOffset);
+  const equityAfter = readCursorValue(queryParams.equityAfter);
+  const equityBefore = readCursorValue(queryParams.equityBefore);
+  const sessionsAfter = readCursorValue(queryParams.sessionsAfter);
+  const sessionsBefore = readCursorValue(queryParams.sessionsBefore);
+
+  const equityQuery = new URLSearchParams({ limit: String(PAGINATION_DEFAULT_LIMIT) });
+  if (equityAfter) equityQuery.set('after', equityAfter);
+  if (equityBefore) equityQuery.set('before', equityBefore);
+  const sessionsQuery = new URLSearchParams({ limit: String(PAGINATION_DEFAULT_LIMIT) });
+  if (sessionsAfter) sessionsQuery.set('after', sessionsAfter);
+  if (sessionsBefore) sessionsQuery.set('before', sessionsBefore);
+
   const [permissions, access, equity, sessions] = await Promise.all([
-    apiFetch<AccountPermission[]>(`/accounts/${account.id}/permissions`),
-    apiFetch<AccountAccess[]>(`/accounts/${account.id}/access`),
-    apiFetch<EquitySnapshot[]>(`/accounts/${account.id}/equity`),
-    apiFetch<TradingSession[]>(`/accounts/${account.id}/sessions`),
+    apiFetch<Paginated<AccountPermission>>(
+      `/accounts/${account.id}/permissions?limit=${PAGINATION_DEFAULT_LIMIT}&offset=${permissionsOffset}`,
+    ),
+    apiFetch<Paginated<AccountAccess>>(
+      `/accounts/${account.id}/access?limit=${PAGINATION_DEFAULT_LIMIT}&offset=${accessOffset}`,
+    ),
+    apiFetch<Paginated<EquitySnapshot>>(
+      `/accounts/${account.id}/equity?${equityQuery.toString()}`,
+    ),
+    apiFetch<Paginated<TradingSession>>(
+      `/accounts/${account.id}/sessions?${sessionsQuery.toString()}`,
+    ),
   ]);
 
   return (
@@ -91,13 +134,13 @@ export default async function AccountDetailPage({
       <StatGrid>
         <StatCard
           label="Permissions"
-          value={formatNumber(permissions.length)}
+          value={formatNumber(permissions.page.total)}
           hint="Account-level allowlist"
           tone="info"
         />
         <StatCard
           label="Equity snapshots"
-          value={formatNumber(equity.length)}
+          value={formatNumber(equity.page.total)}
           hint={formatDateTime(account.latestEquityAt)}
           tone="success"
         />
@@ -109,7 +152,7 @@ export default async function AccountDetailPage({
         />
         <StatCard
           label="Access grants"
-          value={formatNumber(access.length)}
+          value={formatNumber(access.page.total)}
           hint="Operators with explicit access"
           tone="highlight"
         />
@@ -120,8 +163,18 @@ export default async function AccountDetailPage({
           title="Permissions"
           description="Being a sync target is not enough; the account must also permit the instrument."
           actions={<TableRefreshButton />}
+          footer={
+            <Pagination
+              page={permissions.page}
+              itemsCount={permissions.items.length}
+              pathname={`/accounts/${account.id}`}
+              searchParams={queryParams}
+              itemLabel="permissions"
+              names={{ offset: 'permissionsOffset' }}
+            />
+          }
         >
-          {permissions.length === 0 ? (
+          {permissions.items.length === 0 ? (
             <EmptyState
               title="No permissions"
               description="Seed or add account-instrument permissions."
@@ -138,7 +191,7 @@ export default async function AccountDetailPage({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {permissions.slice(0, 30).map((permission) => (
+                {permissions.items.map((permission) => (
                   <TableRow key={permission.id}>
                     <TableCell>
                       <p className="font-medium">{permission.symbol}</p>
@@ -211,8 +264,18 @@ export default async function AccountDetailPage({
             title="Equity snapshots"
             description="Session-open equity is the daily-loss baseline."
             actions={<TableRefreshButton />}
+            footer={
+              <Pagination
+                page={equity.page}
+                itemsCount={equity.items.length}
+                pathname={`/accounts/${account.id}`}
+                searchParams={queryParams}
+                itemLabel="snapshots"
+                names={{ after: 'equityAfter', before: 'equityBefore' }}
+              />
+            }
           >
-            {equity.length === 0 ? (
+            {equity.items.length === 0 ? (
               <EmptyState
                 title="No equity snapshots"
                 description="Broker sync arrives in a later release."
@@ -227,7 +290,7 @@ export default async function AccountDetailPage({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {equity.slice(0, 8).map((snapshot) => (
+                  {equity.items.map((snapshot) => (
                     <TableRow key={snapshot.id}>
                       <TableCell className="text-muted-foreground">
                         {formatDateTime(snapshot.capturedAt)}
@@ -261,12 +324,25 @@ export default async function AccountDetailPage({
             )}
           </SectionCard>
 
-          <SectionCard title="Access" description="Operators with an explicit grant.">
-            {access.length === 0 ? (
+          <SectionCard
+            title="Access"
+            description="Operators with an explicit grant."
+            footer={
+              <Pagination
+                page={access.page}
+                itemsCount={access.items.length}
+                pathname={`/accounts/${account.id}`}
+                searchParams={queryParams}
+                itemLabel="grants"
+                names={{ offset: 'accessOffset' }}
+              />
+            }
+          >
+            {access.items.length === 0 ? (
               <EmptyState title="No access grants" description="Only the seeded operator exists." />
             ) : (
               <div className="space-y-2">
-                {access.map((grant) => (
+                {access.items.map((grant) => (
                   <div
                     key={grant.id}
                     className="border-border/70 bg-background/40 flex items-center justify-between rounded-lg border px-3 py-2"
@@ -289,8 +365,18 @@ export default async function AccountDetailPage({
         title="Trading sessions"
         description="No session is opened while the platform runs in research mode; the table is ready for R5."
         actions={<TableRefreshButton />}
+        footer={
+          <Pagination
+            page={sessions.page}
+            itemsCount={sessions.items.length}
+            pathname={`/accounts/${account.id}`}
+            searchParams={queryParams}
+            itemLabel="sessions"
+            names={{ after: 'sessionsAfter', before: 'sessionsBefore' }}
+          />
+        }
       >
-        {sessions.length === 0 ? (
+        {sessions.items.length === 0 ? (
           <EmptyState
             title="No sessions"
             description="Research mode does not open a trading session."
@@ -307,7 +393,7 @@ export default async function AccountDetailPage({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sessions.map((session) => (
+              {sessions.items.map((session) => (
                 <TableRow key={session.id}>
                   <TableCell>{session.tradingDate}</TableCell>
                   <TableCell>{label(session.mode)}</TableCell>

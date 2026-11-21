@@ -188,9 +188,6 @@ export class InstrumentCoverageDetailDto {
 
   @ApiProperty({ type: [InstrumentCoverageMonthDto] })
   months!: InstrumentCoverageMonthDto[];
-
-  @ApiProperty({ type: [SystemIssueDto] })
-  issues!: SystemIssueDto[];
 }
 
 export class CoverageInstrumentDto {

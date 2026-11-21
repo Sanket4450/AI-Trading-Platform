@@ -13,10 +13,7 @@ import {
   rawProviderPayloads,
   tradingCalendar,
 } from '../schema/index.js';
-import {
-  countInstrumentCriticalIssues,
-  listInstrumentIssues,
-} from './issues.js';
+import { countInstrumentCriticalIssues } from './issues.js';
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -24,7 +21,8 @@ export async function listInstruments(filters: {
   search?: string;
   segment?: string;
   activeOnly?: boolean;
-  limit?: number;
+  limit: number;
+  offset: number;
 }) {
   const conditions = [];
   if (filters.search) {
@@ -38,32 +36,42 @@ export async function listInstruments(filters: {
   if (filters.segment) conditions.push(eq(instruments.segment, filters.segment));
   if (filters.activeOnly !== false) conditions.push(eq(instruments.isActive, true));
 
-  return db
-    .select({
-      id: instruments.id,
-      exchangeId: instruments.exchangeId,
-      exchangeCode: exchanges.code,
-      tradingSymbol: instruments.tradingSymbol,
-      name: instruments.name,
-      shortName: instruments.shortName,
-      isin: instruments.isin,
-      segment: instruments.segment,
-      instrumentType: instruments.instrumentType,
-      tickSize: instruments.tickSize,
-      freezeQuantity: instruments.freezeQuantity,
-      isActive: instruments.isActive,
-      listedOn: instruments.listedOn,
-      delistedOn: instruments.delistedOn,
-      mappingCount: sql<number>`(
-        select count(*)::int from instrument_provider_mappings m
-        where m.instrument_id = "instruments"."id"
-      )`,
-    })
-    .from(instruments)
-    .innerJoin(exchanges, eq(exchanges.id, instruments.exchangeId))
-    .where(conditions.length > 0 ? and(...conditions) : undefined)
-    .orderBy(asc(instruments.tradingSymbol))
-    .limit(filters.limit ?? 200);
+  const [items, totalRows] = await Promise.all([
+    db
+      .select({
+        id: instruments.id,
+        exchangeId: instruments.exchangeId,
+        exchangeCode: exchanges.code,
+        tradingSymbol: instruments.tradingSymbol,
+        name: instruments.name,
+        shortName: instruments.shortName,
+        isin: instruments.isin,
+        segment: instruments.segment,
+        instrumentType: instruments.instrumentType,
+        tickSize: instruments.tickSize,
+        freezeQuantity: instruments.freezeQuantity,
+        isActive: instruments.isActive,
+        listedOn: instruments.listedOn,
+        delistedOn: instruments.delistedOn,
+        mappingCount: sql<number>`(
+          select count(*)::int from instrument_provider_mappings m
+          where m.instrument_id = "instruments"."id"
+        )`,
+      })
+      .from(instruments)
+      .innerJoin(exchanges, eq(exchanges.id, instruments.exchangeId))
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(asc(instruments.tradingSymbol), asc(instruments.id))
+      .limit(filters.limit)
+      .offset(filters.offset),
+    db
+      .select({ total: sql<number>`count(*)::int` })
+      .from(instruments)
+      .innerJoin(exchanges, eq(exchanges.id, instruments.exchangeId))
+      .where(conditions.length > 0 ? and(...conditions) : undefined),
+  ]);
+
+  return { items, total: totalRows[0]?.total ?? 0 };
 }
 
 export async function getInstrument(id: string) {
@@ -91,49 +99,74 @@ export async function getInstrument(id: string) {
   return rows[0] ?? null;
 }
 
-export async function listInstrumentMappings(instrumentId: string) {
-  return db
-    .select({
-      id: instrumentProviderMappings.id,
-      providerId: instrumentProviderMappings.providerId,
-      providerCode: providers.code,
-      providerName: providers.name,
-      externalKey: instrumentProviderMappings.externalKey,
-      exchangeToken: instrumentProviderMappings.exchangeToken,
-      providerSymbol: instrumentProviderMappings.providerSymbol,
-      providerSegment: instrumentProviderMappings.providerSegment,
-      isPrimary: instrumentProviderMappings.isPrimary,
-      validFrom: instrumentProviderMappings.validFrom,
-      validTo: instrumentProviderMappings.validTo,
-    })
-    .from(instrumentProviderMappings)
-    .innerJoin(providers, eq(providers.id, instrumentProviderMappings.providerId))
-    .where(eq(instrumentProviderMappings.instrumentId, instrumentId))
-    .orderBy(desc(instrumentProviderMappings.validFrom));
+export async function listInstrumentMappings(
+  instrumentId: string,
+  page: { limit: number; offset: number },
+) {
+  const [items, totalRows] = await Promise.all([
+    db
+      .select({
+        id: instrumentProviderMappings.id,
+        providerId: instrumentProviderMappings.providerId,
+        providerCode: providers.code,
+        providerName: providers.name,
+        externalKey: instrumentProviderMappings.externalKey,
+        exchangeToken: instrumentProviderMappings.exchangeToken,
+        providerSymbol: instrumentProviderMappings.providerSymbol,
+        providerSegment: instrumentProviderMappings.providerSegment,
+        isPrimary: instrumentProviderMappings.isPrimary,
+        validFrom: instrumentProviderMappings.validFrom,
+        validTo: instrumentProviderMappings.validTo,
+      })
+      .from(instrumentProviderMappings)
+      .innerJoin(providers, eq(providers.id, instrumentProviderMappings.providerId))
+      .where(eq(instrumentProviderMappings.instrumentId, instrumentId))
+      .orderBy(desc(instrumentProviderMappings.validFrom), desc(instrumentProviderMappings.id))
+      .limit(page.limit)
+      .offset(page.offset),
+    db
+      .select({ total: sql<number>`count(*)::int` })
+      .from(instrumentProviderMappings)
+      .where(eq(instrumentProviderMappings.instrumentId, instrumentId)),
+  ]);
+
+  return { items, total: totalRows[0]?.total ?? 0 };
 }
 
-export async function listCorporateActions(instrumentId?: string) {
-  return db
-    .select({
-      id: corporateActions.id,
-      instrumentId: corporateActions.instrumentId,
-      symbol: instruments.tradingSymbol,
-      actionType: corporateActions.actionType,
-      exDate: corporateActions.exDate,
-      ratioNumerator: corporateActions.ratioNumerator,
-      ratioDenominator: corporateActions.ratioDenominator,
-      dividendPerShare: corporateActions.dividendPerShare,
-      priceAdjustmentFactor: corporateActions.priceAdjustmentFactor,
-      volumeAdjustmentFactor: corporateActions.volumeAdjustmentFactor,
-      source: corporateActions.source,
-      status: corporateActions.status,
-      notes: corporateActions.notes,
-    })
-    .from(corporateActions)
-    .innerJoin(instruments, eq(instruments.id, corporateActions.instrumentId))
-    .where(instrumentId ? eq(corporateActions.instrumentId, instrumentId) : undefined)
-    .orderBy(desc(corporateActions.exDate))
-    .limit(200);
+export async function listCorporateActions(
+  instrumentId: string,
+  page: { limit: number; offset: number },
+) {
+  const [items, totalRows] = await Promise.all([
+    db
+      .select({
+        id: corporateActions.id,
+        instrumentId: corporateActions.instrumentId,
+        symbol: instruments.tradingSymbol,
+        actionType: corporateActions.actionType,
+        exDate: corporateActions.exDate,
+        ratioNumerator: corporateActions.ratioNumerator,
+        ratioDenominator: corporateActions.ratioDenominator,
+        dividendPerShare: corporateActions.dividendPerShare,
+        priceAdjustmentFactor: corporateActions.priceAdjustmentFactor,
+        volumeAdjustmentFactor: corporateActions.volumeAdjustmentFactor,
+        source: corporateActions.source,
+        status: corporateActions.status,
+        notes: corporateActions.notes,
+      })
+      .from(corporateActions)
+      .innerJoin(instruments, eq(instruments.id, corporateActions.instrumentId))
+      .where(eq(corporateActions.instrumentId, instrumentId))
+      .orderBy(desc(corporateActions.exDate), desc(corporateActions.id))
+      .limit(page.limit)
+      .offset(page.offset),
+    db
+      .select({ total: sql<number>`count(*)::int` })
+      .from(corporateActions)
+      .where(eq(corporateActions.instrumentId, instrumentId)),
+  ]);
+
+  return { items, total: totalRows[0]?.total ?? 0 };
 }
 
 export async function listTradingCalendar(filters: {
@@ -565,8 +598,8 @@ export async function listInstrumentCatalog(filters: {
   fetchStatus?: string;
   dataStatus?: string;
   search?: string;
-  limit?: number;
-  offset?: number;
+  limit: number;
+  offset: number;
 }) {
   const conditions = [eq(instruments.isSyncTarget, true)];
   if (filters.fetchStatus)
@@ -581,40 +614,49 @@ export async function listInstrumentCatalog(filters: {
     if (searchCondition) conditions.push(searchCondition);
   }
 
-  return db
-    .select({
-      instrumentId: instruments.id,
-      symbol: instruments.tradingSymbol,
-      name: instruments.name,
-      isin: instruments.isin,
-      segment: instruments.segment,
-      instrumentType: instruments.instrumentType,
-      tickSize: instruments.tickSize,
-      isActive: instruments.isActive,
-      listedOn: instruments.listedOn,
-      delistedOn: instruments.delistedOn,
-      targetFrom: instrumentDataStatus.targetFrom,
-      targetTo: instrumentDataStatus.targetTo,
-      fetchStatus: instrumentDataStatus.fetchStatus,
-      dataStatus: instrumentDataStatus.dataStatus,
-      expectedDays: instrumentDataStatus.expectedDays,
-      completeDays: instrumentDataStatus.completeDays,
-      partialDays: instrumentDataStatus.partialDays,
-      missingDays: instrumentDataStatus.missingDays,
-      openCriticalIssues: instrumentDataStatus.openCriticalIssues,
-      lastSuccessAt: instrumentDataStatus.lastSuccessAt,
-      computedAt: instrumentDataStatus.computedAt,
-      mappingCount: sql<number>`(
-        select count(*)::int from instrument_provider_mappings m
-        where m.instrument_id = "instruments"."id" and m.is_primary
-      )`,
-    })
-    .from(instruments)
-    .leftJoin(instrumentDataStatus, eq(instrumentDataStatus.instrumentId, instruments.id))
-    .where(and(...conditions))
-    .orderBy(asc(instruments.tradingSymbol), asc(instruments.id))
-    .limit(Math.min(filters.limit ?? 200, 2000))
-    .offset(filters.offset ?? 0);
+  const [items, totalRows] = await Promise.all([
+    db
+      .select({
+        instrumentId: instruments.id,
+        symbol: instruments.tradingSymbol,
+        name: instruments.name,
+        isin: instruments.isin,
+        segment: instruments.segment,
+        instrumentType: instruments.instrumentType,
+        tickSize: instruments.tickSize,
+        isActive: instruments.isActive,
+        listedOn: instruments.listedOn,
+        delistedOn: instruments.delistedOn,
+        targetFrom: instrumentDataStatus.targetFrom,
+        targetTo: instrumentDataStatus.targetTo,
+        fetchStatus: instrumentDataStatus.fetchStatus,
+        dataStatus: instrumentDataStatus.dataStatus,
+        expectedDays: instrumentDataStatus.expectedDays,
+        completeDays: instrumentDataStatus.completeDays,
+        partialDays: instrumentDataStatus.partialDays,
+        missingDays: instrumentDataStatus.missingDays,
+        openCriticalIssues: instrumentDataStatus.openCriticalIssues,
+        lastSuccessAt: instrumentDataStatus.lastSuccessAt,
+        computedAt: instrumentDataStatus.computedAt,
+        mappingCount: sql<number>`(
+          select count(*)::int from instrument_provider_mappings m
+          where m.instrument_id = "instruments"."id" and m.is_primary
+        )`,
+      })
+      .from(instruments)
+      .leftJoin(instrumentDataStatus, eq(instrumentDataStatus.instrumentId, instruments.id))
+      .where(and(...conditions))
+      .orderBy(asc(instruments.tradingSymbol), asc(instruments.id))
+      .limit(filters.limit)
+      .offset(filters.offset),
+    db
+      .select({ total: sql<number>`count(*)::int` })
+      .from(instruments)
+      .leftJoin(instrumentDataStatus, eq(instrumentDataStatus.instrumentId, instruments.id))
+      .where(and(...conditions)),
+  ]);
+
+  return { items, total: totalRows[0]?.total ?? 0 };
 }
 
 export async function getInstrumentStatusDetail(instrumentId: string) {
@@ -673,9 +715,7 @@ export async function getInstrumentStatusDetail(instrumentId: string) {
     .groupBy(sql`date_trunc('month', ${instrumentDayCoverage.tradingDate})`)
     .orderBy(sql`date_trunc('month', ${instrumentDayCoverage.tradingDate})`);
 
-  const issues = await listInstrumentIssues(instrumentId, 50);
-
-  return { ...status, months, issues };
+  return { ...status, months };
 }
 
 export async function createInstrumentStatusRows(

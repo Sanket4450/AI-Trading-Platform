@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { PaginationMetaDto } from '../../../common/pagination/pagination.dto.js';
 
 export class AuditRowDto {
   @ApiProperty({ format: 'uuid' })
@@ -22,6 +23,17 @@ export class AuditRowDto {
   @ApiProperty({ type: String, format: 'uuid', nullable: true })
   entityId!: string | null;
 
+  @ApiProperty({ type: String, format: 'uuid', nullable: true })
+  requestId!: string | null;
+
+  @ApiProperty({ type: String, nullable: true })
+  ipAddress!: string | null;
+
+  @ApiProperty({ type: String, format: 'date-time' })
+  createdAt!: string;
+}
+
+export class AuditDetailDto extends AuditRowDto {
   @ApiProperty({
     type: Object,
     additionalProperties: true,
@@ -35,13 +47,23 @@ export class AuditRowDto {
     nullable: true,
   })
   afterState!: Record<string, unknown> | null;
+}
 
-  @ApiProperty({ type: String, format: 'uuid', nullable: true })
-  requestId!: string | null;
+export class AuditListResponseDto {
+  @ApiProperty({ type: [AuditRowDto] })
+  items!: AuditRowDto[];
 
-  @ApiProperty({ type: String, nullable: true })
-  ipAddress!: string | null;
+  @ApiProperty({ type: PaginationMetaDto })
+  page!: PaginationMetaDto;
+}
 
-  @ApiProperty({ type: String, format: 'date-time' })
-  createdAt!: string;
+export class AuditSummaryDto {
+  @ApiProperty()
+  total!: number;
+
+  @ApiProperty()
+  actors!: number;
+
+  @ApiProperty()
+  entityTypes!: number;
 }

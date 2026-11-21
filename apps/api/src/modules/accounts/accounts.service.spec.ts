@@ -2,22 +2,24 @@ import { BadRequestException } from '@nestjs/common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const db = vi.hoisted(() => ({
-  listAccounts: vi.fn<() => Promise<unknown[]>>(),
+  getAccountById: vi.fn<() => Promise<unknown>>(),
   findProviderById: vi.fn<() => Promise<{ id: string; kind: string } | null>>(),
   upsertBrokerCredential: vi.fn<() => Promise<unknown>>(),
   recordAudit: vi.fn<() => Promise<void>>(),
 }));
 
 vi.mock('@ai-trading/database', () => ({
-  listAccounts: db.listAccounts,
+  getAccountById: db.getAccountById,
   findProviderById: db.findProviderById,
   upsertBrokerCredential: db.upsertBrokerCredential,
   recordAudit: db.recordAudit,
   listAccountAccessByAccount: vi.fn<() => Promise<unknown>>(),
   listAccountEquitySnapshots: vi.fn<() => Promise<unknown>>(),
   listAccountPermissions: vi.fn<() => Promise<unknown>>(),
+  listAccounts: vi.fn<() => Promise<unknown>>(),
   listBrokerCredentials: vi.fn<() => Promise<unknown>>(),
   listTradingSessions: vi.fn<() => Promise<unknown>>(),
+  getAccountSummary: vi.fn<() => Promise<unknown>>(),
 }));
 
 import type { CredentialEncryptionService } from '../../common/security/credential-encryption.service.js';
@@ -38,8 +40,8 @@ function service() {
   return new AccountsService(encryption);
 }
 
-function store(accounts: unknown[]) {
-  db.listAccounts.mockResolvedValue(accounts);
+function store(account: unknown) {
+  db.getAccountById.mockResolvedValue(account);
   return service().storeCredential(
     '22222222-2222-2222-2222-222222222222',
     body,
@@ -75,7 +77,7 @@ describe('AccountsService credential validation', () => {
       kind: 'both',
     });
 
-    await expect(store([account])).rejects.toBeInstanceOf(BadRequestException);
+    await expect(store(account)).rejects.toBeInstanceOf(BadRequestException);
     expect(db.upsertBrokerCredential).not.toHaveBeenCalled();
   });
 
@@ -85,7 +87,7 @@ describe('AccountsService credential validation', () => {
       kind: 'broker',
     });
 
-    await store([{ ...account, brokerUserRef: 'ABC123' }]);
+    await store({ ...account, brokerUserRef: 'ABC123' });
 
     expect(db.upsertBrokerCredential).toHaveBeenCalledOnce();
   });
@@ -96,8 +98,13 @@ describe('AccountsService credential validation', () => {
       kind: 'internal',
     });
 
-    await store([account]);
+    await store(account);
 
     expect(db.upsertBrokerCredential).toHaveBeenCalledOnce();
+  });
+
+  it('rejects credentials for an unknown account', async () => {
+    await expect(store(null)).rejects.toBeInstanceOf(Error);
+    expect(db.upsertBrokerCredential).not.toHaveBeenCalled();
   });
 });

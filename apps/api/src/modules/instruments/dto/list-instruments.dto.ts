@@ -1,14 +1,11 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
 import {
   IsBooleanString,
   IsIn,
-  IsInt,
   IsOptional,
   IsString,
-  Max,
-  Min,
 } from 'class-validator';
+import { OffsetQueryDto } from '../../../common/pagination/pagination.dto.js';
 
 export const INSTRUMENT_SEGMENTS = [
   'NSE_EQ',
@@ -17,7 +14,7 @@ export const INSTRUMENT_SEGMENTS = [
   'BSE_INDEX',
 ] as const;
 
-export class ListInstrumentsDto {
+export class ListInstrumentsDto extends OffsetQueryDto {
   @ApiPropertyOptional({ description: 'Case-insensitive symbol or name match.' })
   @IsOptional()
   @IsString()
@@ -35,12 +32,4 @@ export class ListInstrumentsDto {
   @IsOptional()
   @IsBooleanString()
   active?: string;
-
-  @ApiPropertyOptional({ type: Number, minimum: 1, maximum: 1000, default: 200 })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(1000)
-  limit?: number;
 }

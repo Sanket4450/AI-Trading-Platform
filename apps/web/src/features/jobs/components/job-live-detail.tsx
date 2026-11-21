@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { isQuantifiedStage, stagesForJob } from '@ai-trading/domain';
-import type { JobDetail, JobEvent, JobStage } from '@/lib/types';
+import { PAGINATION_DEFAULT_LIMIT, isQuantifiedStage } from '@ai-trading/domain';
+import type { JobDetail, JobEvent, JobRun, JobStage, Paginated } from '@/lib/types';
 import { formatDateTime, formatDuration } from '@/lib/format';
 import { label } from '@/lib/labels';
 import { connectJobs } from '@/lib/realtime';
@@ -19,33 +19,37 @@ import { progressFromEvent } from '../progress';
 const TERMINAL = new Set(['succeeded', 'failed', 'partially_failed', 'cancelled']);
 const CLOSED = new Set(['completed', 'failed', 'skipped']);
 
-function deriveStages(detail: JobDetail): JobStage[] {
-  const { run, events } = detail;
+function deriveStage(run: JobRun, key: string, events: JobEvent[]): JobStage | null {
+  const forStage = events.filter((event) => event.stage === key);
+  if (forStage.length === 0) return null;
+
   const terminal = TERMINAL.has(run.status);
+  const entered = forStage.find((event) => event.type === 'entered') ?? null;
+  const closed = [...forStage].reverse().find((event) => CLOSED.has(event.type)) ?? null;
+  const progress = [...forStage].reverse().find((event) => event.type === 'progress') ?? null;
 
-  return stagesForJob(run.jobName).map((key) => {
-    const forStage = events.filter((event) => event.stage === key);
-    const entered = forStage.find((event) => event.type === 'entered') ?? null;
-    const closed = [...forStage].reverse().find((event) => CLOSED.has(event.type)) ?? null;
-    const progress = [...forStage].reverse().find((event) => event.type === 'progress') ?? null;
+  let status = 'pending';
+  if (closed) status = closed.type === 'completed' ? 'succeeded' : closed.type;
+  else if (entered) status = run.status === 'failed' ? 'failed' : terminal ? 'skipped' : 'running';
 
-    let status = 'pending';
-    if (closed) status = closed.type === 'completed' ? 'succeeded' : closed.type;
-    else if (entered) status = run.status === 'failed' ? 'failed' : terminal ? 'skipped' : 'running';
+  return {
+    key,
+    status,
+    quantified: isQuantifiedStage(run.jobName, key),
+    completed: progress && typeof progress.data.index === 'number' ? progress.data.index : null,
+    total: progress && typeof progress.data.total === 'number' ? progress.data.total : null,
+    enteredAt: entered?.occurredAt ?? null,
+    completedAt: closed?.occurredAt ?? null,
+    durationMs:
+      closed && typeof closed.data.durationMs === 'number' ? closed.data.durationMs : null,
+  };
+}
 
-    return {
-      key,
-      status,
-      quantified: isQuantifiedStage(run.jobName, key),
-      completed:
-        progress && typeof progress.data.index === 'number' ? progress.data.index : null,
-      total: progress && typeof progress.data.total === 'number' ? progress.data.total : null,
-      enteredAt: entered?.occurredAt ?? null,
-      completedAt: closed?.occurredAt ?? null,
-      durationMs:
-        closed && typeof closed.data.durationMs === 'number' ? closed.data.durationMs : null,
-    };
-  });
+/** Server stages cover unloaded pages; loaded events refine the stages they touch. */
+function mergeStages(detail: JobDetail): JobStage[] {
+  return detail.stages.map(
+    (stage) => deriveStage(detail.run, stage.key, detail.events) ?? stage,
+  );
 }
 
 function durationOf(detail: JobDetail, now: number | null): number | null {
@@ -58,6 +62,7 @@ export function JobLiveDetail({ initial }: { initial: JobDetail }) {
   const [detail, setDetail] = useState(initial);
   const [now, setNow] = useState<number | null>(null);
   const [cancelling, setCancelling] = useState(false);
+  const [loadingEarlier, setLoadingEarlier] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -99,13 +104,36 @@ export function JobLiveDetail({ initial }: { initial: JobDetail }) {
           progress: progressFromEvent(current.run.jobName, event),
         },
         events: [...current.events, event as JobEvent],
+        eventsPage: {
+          ...current.eventsPage,
+          total: current.eventsPage.total + 1,
+        },
       }));
     });
   }, [initial.run.id]);
 
   const run = detail.run;
   const active = !TERMINAL.has(run.status);
-  const stages = deriveStages(detail);
+  const stages = mergeStages(detail);
+
+  async function loadEarlier() {
+    if (!detail.eventsPage.nextCursor || loadingEarlier) return;
+    setLoadingEarlier(true);
+    try {
+      const response = await apiRequest<Paginated<JobEvent>>(
+        `/jobs/${run.id}/events?limit=${PAGINATION_DEFAULT_LIMIT}&before=${encodeURIComponent(detail.eventsPage.nextCursor)}`,
+      );
+      setDetail((current) => ({
+        ...current,
+        events: [...response.items, ...current.events],
+        eventsPage: response.page,
+      }));
+    } catch {
+      // Leave the loaded page in place; the control stays available for a retry.
+    } finally {
+      setLoadingEarlier(false);
+    }
+  }
 
   async function cancel() {
     setCancelling(true);
@@ -175,6 +203,25 @@ export function JobLiveDetail({ initial }: { initial: JobDetail }) {
         <SectionCard
           title="Timeline"
           description="Stage facts with the figures recorded for each unit of work."
+          footer={
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+              <p className="text-muted-foreground">
+                Showing {detail.events.length} of {detail.eventsPage.total} events
+              </p>
+              {detail.eventsPage.nextCursor ? (
+                <button
+                  type="button"
+                  onClick={loadEarlier}
+                  disabled={loadingEarlier}
+                  className="border-border hover:bg-muted rounded-md border px-3 py-1 text-xs font-medium disabled:opacity-50"
+                >
+                  {loadingEarlier ? 'Loading…' : 'Load earlier events'}
+                </button>
+              ) : (
+                <span className="text-muted-foreground">All events loaded</span>
+              )}
+            </div>
+          }
         >
           <EventTimeline events={detail.events} />
         </SectionCard>

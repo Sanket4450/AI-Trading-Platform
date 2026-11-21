@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import type { Queue } from 'bullmq';
-import { QUEUES } from '@ai-trading/domain';
+import { PAGINATION_DEFAULT_LIMIT, QUEUES } from '@ai-trading/domain';
 import {
   createJobRun,
   deleteJobRun,
@@ -14,8 +14,12 @@ import {
   getCoverageDayDetail,
   getInstrumentStatusDetail,
   listInstrumentCatalog,
+  listInstrumentDayIssues,
+  listInstrumentIssues,
   recordAudit,
 } from '@ai-trading/database';
+import { offsetPage } from '../../common/pagination/page.js';
+import type { OffsetQueryDto } from '../../common/pagination/pagination.dto.js';
 import type { RequestMeta } from '../../common/http/request-meta.js';
 import type {
   InstrumentCoverageQueryDto,
@@ -28,18 +32,25 @@ export class InstrumentCoverageService {
     @InjectQueue(QUEUES.historicalData) private readonly historicalQueue: Queue,
   ) {}
 
-  list(query: InstrumentCoverageQueryDto) {
-    return listInstrumentCatalog({
+  async list(query: InstrumentCoverageQueryDto) {
+    const limit = query.limit ?? PAGINATION_DEFAULT_LIMIT;
+    const offset = query.offset ?? 0;
+    const result = await listInstrumentCatalog({
       fetchStatus: query.fetchStatus,
       dataStatus: query.dataStatus,
       search: query.search,
-      limit: query.limit,
-      offset: query.offset,
+      limit,
+      offset,
     });
+    return offsetPage(result.items, result.total, limit, offset);
   }
 
-  summary() {
-    return getCatalogSummary();
+  summary(query: InstrumentCoverageQueryDto) {
+    return getCatalogSummary({
+      fetchStatus: query.fetchStatus,
+      dataStatus: query.dataStatus,
+      search: query.search,
+    });
   }
 
   async detail(instrumentId: string) {
@@ -48,11 +59,35 @@ export class InstrumentCoverageService {
     return detail;
   }
 
+  async issues(instrumentId: string, query: OffsetQueryDto) {
+    const limit = query.limit ?? PAGINATION_DEFAULT_LIMIT;
+    const offset = query.offset ?? 0;
+    await this.detail(instrumentId);
+    const result = await listInstrumentIssues(instrumentId, { limit, offset });
+    return offsetPage(result.items, result.total, limit, offset);
+  }
+
   coverageDay(instrumentId: string, date: string) {
+    this.assertDate(date);
+    return getCoverageDayDetail(instrumentId, date);
+  }
+
+  async coverageDayIssues(
+    instrumentId: string,
+    date: string,
+    query: OffsetQueryDto,
+  ) {
+    this.assertDate(date);
+    const limit = query.limit ?? PAGINATION_DEFAULT_LIMIT;
+    const offset = query.offset ?? 0;
+    const result = await listInstrumentDayIssues(instrumentId, date, { limit, offset });
+    return offsetPage(result.items, result.total, limit, offset);
+  }
+
+  private assertDate(date: string) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       throw new BadRequestException('date must be YYYY-MM-DD');
     }
-    return getCoverageDayDetail(instrumentId, date);
   }
 
   async recompute(

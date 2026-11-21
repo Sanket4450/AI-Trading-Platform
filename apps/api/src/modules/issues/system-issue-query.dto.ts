@@ -1,8 +1,8 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, IsUUID, Max, Min } from 'class-validator';
+import { IsIn, IsOptional, IsString, IsUUID } from 'class-validator';
+import { CursorQueryDto } from '../../common/pagination/pagination.dto.js';
 
-export class SystemIssueQueryDto {
+export class SystemIssueQueryDto extends CursorQueryDto {
   @ApiPropertyOptional({ example: 'ingestion' })
   @IsOptional()
   @IsString()
@@ -32,19 +32,4 @@ export class SystemIssueQueryDto {
   @IsOptional()
   @IsUUID()
   providerId?: string;
-
-  @ApiPropertyOptional({ type: Number, minimum: 1, maximum: 500, default: 200 })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(500)
-  limit?: number;
-
-  @ApiPropertyOptional({ type: Number, minimum: 0, default: 0 })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(0)
-  offset?: number;
 }

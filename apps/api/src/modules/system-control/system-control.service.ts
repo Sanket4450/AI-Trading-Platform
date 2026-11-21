@@ -16,7 +16,7 @@ import {
   db,
   getDashboardOverview,
   getSystemStatus,
-  listAccounts,
+  listAllAccounts,
   listHealthSnapshots,
   listJobRuns,
   listNotificationEvents,
@@ -56,7 +56,7 @@ export class SystemControlService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleInit(): Promise<void> {
-    const accounts = await listAccounts();
+    const accounts = await listAllAccounts();
     const allowed = new Set(['offline', 'research']);
     const invalid = accounts.filter(
       (account) => account.isActive && !allowed.has(account.mode),
@@ -188,8 +188,12 @@ export class SystemControlService implements OnModuleInit, OnModuleDestroy {
     return listRiskEvents(filters);
   }
 
-  sessions(filters: { accountId?: string; limit?: number }) {
-    return listTradingSessions(filters);
+  async sessions(filters: { accountId?: string; limit?: number }) {
+    const result = await listTradingSessions({
+      accountId: filters.accountId,
+      limit: filters.limit ?? 50,
+    });
+    return result.items;
   }
 
   private async checkDatabase(): Promise<CheckResult> {

@@ -1,9 +1,18 @@
 import { apiFetch } from '@/lib/api';
-import type { CorporateAction, InstrumentCoverageDetail, InstrumentMapping, JobListResponse } from '@/lib/types';
+import type {
+  CorporateAction,
+  InstrumentCoverageDetail,
+  InstrumentMapping,
+  JobListResponse,
+  Paginated,
+  SystemIssue,
+} from '@/lib/types';
+import { PAGINATION_DEFAULT_LIMIT } from '@ai-trading/domain';
+import { readOffset } from '@/lib/pagination';
 import { formatDate, formatNumber } from '@/lib/format';
 import { label } from '@/lib/labels';
 import { displayStatus, statusTone } from '@/lib/status';
-import { backLinkFor, type DetailSearchParams } from '@/lib/navigation';
+import { backLinkFor } from '@/lib/navigation';
 import { PageMeta } from '@/components/shell/page-meta';
 import { StatCard, StatGrid } from '@/components/dashboard/stat-card';
 import { SectionCard } from '@/components/dashboard/section-card';
@@ -30,21 +39,34 @@ import {
 import { InstrumentDetailActions } from '../instrument-actions';
 import { InstrumentJobProgress } from '@/features/jobs/components/instrument-job-progress';
 import { IssueList } from '@/features/issues/components/issue-list';
+import { Pagination } from '@/components/dashboard/pagination';
 
 export default async function InstrumentDetailPage({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: DetailSearchParams;
+  searchParams: Promise<{
+    from?: string | string[];
+    mappingsOffset?: string | string[];
+    actionsOffset?: string | string[];
+    issuesOffset?: string | string[];
+  }>;
 }) {
   const { id } = await params;
-  const { from: fromParam } = await searchParams;
+  const queryParams = await searchParams;
+  const fromParam = queryParams.from;
   const back = backLinkFor(fromParam, '/instruments');
-  const [detail, mappings, actions] = await Promise.all([
+  const mappingsOffset = readOffset(queryParams.mappingsOffset);
+  const actionsOffset = readOffset(queryParams.actionsOffset);
+  const issuesOffset = readOffset(queryParams.issuesOffset);
+  const [detail, mappings, actions, issues] = await Promise.all([
     apiFetch<InstrumentCoverageDetail>(`/instruments/${id}/coverage`),
-    apiFetch<InstrumentMapping[]>(`/instruments/${id}/mappings`),
-    apiFetch<CorporateAction[]>(`/instruments/${id}/corporate-actions`),
+    apiFetch<Paginated<InstrumentMapping>>(`/instruments/${id}/mappings?limit=${PAGINATION_DEFAULT_LIMIT}&offset=${mappingsOffset}`),
+    apiFetch<Paginated<CorporateAction>>(
+      `/instruments/${id}/corporate-actions?limit=${PAGINATION_DEFAULT_LIMIT}&offset=${actionsOffset}`,
+    ),
+    apiFetch<Paginated<SystemIssue>>(`/instruments/${id}/issues?limit=${PAGINATION_DEFAULT_LIMIT}&offset=${issuesOffset}`),
   ]);
   const jobs = await apiFetch<JobListResponse>(`/jobs?instrumentId=${id}&limit=1`);
   const latestJob = jobs.items[0] ?? null;
@@ -152,8 +174,18 @@ export default async function InstrumentDetailPage({
           title="Provider mappings"
           description="Upstox keys live only here; the canonical UUID never changes."
           actions={<TableRefreshButton />}
+          footer={
+            <Pagination
+              page={mappings.page}
+              itemsCount={mappings.items.length}
+              pathname={`/instruments/${id}`}
+              searchParams={queryParams}
+              itemLabel="mappings"
+              names={{ offset: 'mappingsOffset' }}
+            />
+          }
         >
-          {mappings.length === 0 ? (
+          {mappings.items.length === 0 ? (
             <EmptyState title="No mappings" description="Run instrument sync." />
           ) : (
             <Table>
@@ -167,7 +199,7 @@ export default async function InstrumentDetailPage({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {mappings.map((mapping) => (
+                {mappings.items.map((mapping) => (
                   <TableRow key={mapping.id}>
                     <TableCell>{label(mapping.providerCode)}</TableCell>
                     <TableCell className="font-mono text-xs">{mapping.externalKey}</TableCell>
@@ -219,9 +251,19 @@ export default async function InstrumentDetailPage({
         className="mt-4"
         title="Active issues"
         description="One row per active problem; a successful re-fetch removes its row."
+        footer={
+          <Pagination
+            page={issues.page}
+            itemsCount={issues.items.length}
+            pathname={`/instruments/${id}`}
+            searchParams={queryParams}
+            itemLabel="issues"
+            names={{ offset: 'issuesOffset' }}
+          />
+        }
       >
         <IssueList
-          issues={detail.issues}
+          issues={issues.items}
           from={back.href}
           currentInstrumentId={id}
           emptyTitle="No issues"
@@ -234,8 +276,18 @@ export default async function InstrumentDetailPage({
         title="Corporate actions"
         description="Confirmed actions carry adjustment factors; candles stay raw."
         actions={<TableRefreshButton />}
+        footer={
+          <Pagination
+            page={actions.page}
+            itemsCount={actions.items.length}
+            pathname={`/instruments/${id}`}
+            searchParams={queryParams}
+            itemLabel="corporate actions"
+            names={{ offset: 'actionsOffset' }}
+          />
+        }
       >
-        {actions.length === 0 ? (
+        {actions.items.length === 0 ? (
           <EmptyState
             title="No corporate actions"
             description="Corporate actions are imported through the reference-data API and audited."
@@ -254,7 +306,7 @@ export default async function InstrumentDetailPage({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {actions.map((action) => (
+                {actions.items.map((action) => (
                   <TableRow key={action.id}>
                     <TableCell>{label(action.actionType)}</TableCell>
                     <TableCell>{action.exDate}</TableCell>

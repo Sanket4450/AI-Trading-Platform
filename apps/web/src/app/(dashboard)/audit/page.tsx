@@ -1,19 +1,16 @@
 import { apiFetch } from '@/lib/api';
-import type { AuditRow } from '@/lib/types';
+import type { AuditRow, AuditSummary, Paginated } from '@/lib/types';
 import { formatDateTime, formatNumber } from '@/lib/format';
 import { formatAction, label } from '@/lib/labels';
+import { readLimit } from '@/lib/pagination';
 import { TableCard } from '@/components/dashboard/table-card';
 import { TableSummary } from '@/components/dashboard/table-summary';
 import { EmptyState } from '@/components/dashboard/empty-state';
-import { JsonBlock } from '@/components/dashboard/json-block';
-import { DetailDialog } from '@/components/dashboard/detail-dialog';
-import { KeyValueGrid } from '@/components/dashboard/key-value-grid';
-import {
-  TableActionButton,
-  TableActions,
-  TableRefreshButton,
-} from '@/components/dashboard/table-actions';
+import { TableActions, TableRefreshButton } from '@/components/dashboard/table-actions';
+import { PageSizeSelect } from '@/components/dashboard/page-size-select';
+import { Pagination } from '@/components/dashboard/pagination';
 import { DateRangeFilter, SearchFilter, TableFilters } from '@/components/dashboard/table-filters';
+import { AuditDialog } from '@/features/audit/components/audit-dialog';
 import { Badge } from '@/components/ui/badge';
 import {
   Table,
@@ -41,24 +38,29 @@ export default async function AuditPage({
     search?: string;
     from?: string;
     to?: string;
+    limit?: string | string[];
   }>;
 }) {
   const params = await searchParams;
-  const query = new URLSearchParams();
-  if (params.search) query.set('search', params.search);
+  const limit = readLimit(params.limit);
+  const filters = new URLSearchParams();
+  if (params.search) filters.set('search', params.search);
   if (params.from) {
     const from = startOfUtcDay(params.from);
-    if (from) query.set('from', from);
+    if (from) filters.set('from', from);
   }
   if (params.to) {
     const to = endOfUtcDay(params.to);
-    if (to) query.set('to', to);
+    if (to) filters.set('to', to);
   }
-  query.set('limit', '300');
+  const query = new URLSearchParams(filters);
+  query.set('limit', String(limit));
 
-  const rows = await apiFetch<AuditRow[]>(`/audit?${query.toString()}`);
-  const uniqueActors = new Set(rows.map((row) => row.actorEmail ?? 'system')).size;
-  const uniqueEntities = new Set(rows.map((row) => row.entityType)).size;
+  const [data, summary] = await Promise.all([
+    apiFetch<Paginated<AuditRow>>(`/audit?${query.toString()}`),
+    apiFetch<AuditSummary>(`/audit/summary?${filters.toString()}`),
+  ]);
+  const rows = data.items;
   const hasFilters = Boolean(params.search || params.from || params.to);
 
   return (
@@ -69,19 +71,19 @@ export default async function AuditPage({
             items={[
               {
                 label: 'Rows',
-                value: formatNumber(rows.length),
+                value: formatNumber(summary.total),
                 hint: 'Filtered result',
                 tone: 'success',
               },
               {
                 label: 'Actors',
-                value: formatNumber(uniqueActors),
+                value: formatNumber(summary.actors),
                 hint: 'Operators and system jobs',
                 tone: 'info',
               },
               {
                 label: 'Entity types',
-                value: formatNumber(uniqueEntities),
+                value: formatNumber(summary.entityTypes),
                 hint: 'Distinct domains touched',
                 tone: 'highlight',
               },
@@ -104,6 +106,16 @@ export default async function AuditPage({
           </TableFilters>
         }
         actions={<TableRefreshButton />}
+        footer={
+          <Pagination
+            pageSizeControl={<PageSizeSelect value={limit} />}
+            page={data.page}
+            itemsCount={rows.length}
+            pathname="/audit"
+            searchParams={params}
+            itemLabel="audit rows"
+          />
+        }
       >
         {rows.length === 0 ? (
           <div className="p-4">
@@ -156,54 +168,7 @@ export default async function AuditPage({
                     {row.ipAddress ?? '—'}
                   </TableCell>
                   <TableActions>
-                    <DetailDialog
-                      title={formatAction(row.action)}
-                      description={formatDateTime(row.createdAt)}
-                      trigger={<TableActionButton label="View audit entry" />}
-                    >
-                      <KeyValueGrid
-                        columns={2}
-                        items={[
-                          { label: 'Actor', value: row.actorEmail ?? 'System' },
-                          {
-                            label: 'Actor user ID',
-                            value: (
-                              <span className="break-all font-mono text-xs">
-                                {row.actorUserId ?? '—'}
-                              </span>
-                            ),
-                          },
-                          { label: 'Action', value: row.action },
-                          { label: 'Entity', value: label(row.entityType) },
-                          {
-                            label: 'Entity ID',
-                            value: (
-                              <span className="break-all font-mono text-xs">
-                                {row.entityId ?? '—'}
-                              </span>
-                            ),
-                          },
-                          { label: 'IP address', value: row.ipAddress ?? '—' },
-                          {
-                            label: 'Request ID',
-                            value: (
-                              <span className="break-all font-mono text-xs">
-                                {row.requestId ?? '—'}
-                              </span>
-                            ),
-                          },
-                          { label: 'Recorded', value: formatDateTime(row.createdAt) },
-                        ]}
-                      />
-                      <div>
-                        <p className="text-muted-foreground mb-1 text-xs font-medium">Before</p>
-                        <JsonBlock value={row.beforeState} />
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground mb-1 text-xs font-medium">After</p>
-                        <JsonBlock value={row.afterState} />
-                      </div>
-                    </DetailDialog>
+                    <AuditDialog row={row} />
                   </TableActions>
                 </TableRow>
               ))}

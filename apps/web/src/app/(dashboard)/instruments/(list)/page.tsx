@@ -1,14 +1,17 @@
 import { apiFetch } from '@/lib/api';
-import type { InstrumentCoverageRow } from '@/lib/types';
+import type { InstrumentCoverageRow, Paginated } from '@/lib/types';
 import { formatDateTime, formatNumber } from '@/lib/format';
 import { label } from '@/lib/labels';
 import { displayStatus, statusTone } from '@/lib/status';
+import { readLimit, readOffset } from '@/lib/pagination';
 import { TableCard } from '@/components/dashboard/table-card';
 import { TableSummary } from '@/components/dashboard/table-summary';
 import { StatusBadge } from '@/components/dashboard/status-badge';
 import { EmptyState } from '@/components/dashboard/empty-state';
 import { AutoRefresh } from '@/components/dashboard/auto-refresh';
 import { TableRefreshButton } from '@/components/dashboard/table-actions';
+import { PageSizeSelect } from '@/components/dashboard/page-size-select';
+import { Pagination } from '@/components/dashboard/pagination';
 import { InstrumentRowActions } from '../instrument-actions';
 import { FilterSelect, SearchFilter, TableFilters } from '@/components/dashboard/table-filters';
 import { detailHref, originHref } from '@/lib/navigation';
@@ -25,6 +28,8 @@ import {
 type SearchParams = Promise<{
   dataStatus?: string;
   search?: string;
+  limit?: string | string[];
+  offset?: string | string[];
 }>;
 
 const dataStatuses = [
@@ -39,14 +44,26 @@ const dataStatuses = [
 export default async function InstrumentsPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams;
   const from = originHref('/instruments', params);
-  const query = new URLSearchParams({ limit: '200' });
-  if (params.dataStatus) query.set('dataStatus', params.dataStatus);
-  if (params.search) query.set('search', params.search);
+  const limit = readLimit(params.limit);
+  const offset = readOffset(params.offset);
+  const query = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+  const summaryQuery = new URLSearchParams();
+  if (params.dataStatus) {
+    query.set('dataStatus', params.dataStatus);
+    summaryQuery.set('dataStatus', params.dataStatus);
+  }
+  if (params.search) {
+    query.set('search', params.search);
+    summaryQuery.set('search', params.search);
+  }
 
-  const [rows, summary] = await Promise.all([
-    apiFetch<InstrumentCoverageRow[]>(`/instruments/status?${query.toString()}`),
-    apiFetch<Record<string, number>>('/instruments/status/summary'),
+  const [data, summary] = await Promise.all([
+    apiFetch<Paginated<InstrumentCoverageRow>>(`/instruments/status?${query.toString()}`),
+    apiFetch<Record<string, number>>(
+      `/instruments/status/summary?${summaryQuery.toString()}`,
+    ),
   ]);
+  const rows = data.items;
 
   const active = rows.some(
     (row) =>
@@ -66,7 +83,7 @@ export default async function InstrumentsPage({ searchParams }: { searchParams: 
             items={[
               {
                 label: 'Catalog rows',
-                value: formatNumber(summary?.total ?? rows.length),
+                value: formatNumber(summary?.total ?? data.page.total),
                 hint: 'Sync targets',
                 tone: 'info',
               },
@@ -107,6 +124,16 @@ export default async function InstrumentsPage({ searchParams }: { searchParams: 
           </TableFilters>
         }
         actions={<TableRefreshButton />}
+        footer={
+          <Pagination
+            pageSizeControl={<PageSizeSelect value={limit} />}
+            page={data.page}
+            itemsCount={rows.length}
+            pathname="/instruments"
+            searchParams={params}
+            itemLabel="instruments"
+          />
+        }
       >
         {rows.length === 0 ? (
           <div className="p-4">

@@ -8,7 +8,7 @@ import {
   type ChangeEvent,
   type ReactNode,
 } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { CalendarIcon, ChevronDownIcon, ListFilterIcon, SearchIcon, XIcon } from 'lucide-react';
 import type { DateRange } from 'react-day-picker';
 import { Button } from '@/components/ui/button';
@@ -36,6 +36,7 @@ export function TableFilters({ children, className }: { children: ReactNode; cla
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pathname = usePathname();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [, startTransition] = useTransition();
 
   useEffect(() => {
@@ -54,6 +55,10 @@ export function TableFilters({ children, className }: { children: ReactNode; cla
       if (next.has(key)) next.append(key, value);
       else next.set(key, value);
     }
+
+    // Page size is not a filter control; keep it while the filter set changes.
+    const limit = searchParams.get('limit');
+    if (limit && !next.has('limit')) next.set('limit', limit);
 
     const query = next.toString();
     startTransition(() => {

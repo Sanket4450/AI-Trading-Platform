@@ -1,16 +1,19 @@
 import { apiFetch } from '@/lib/api';
-import type { Account } from '@/lib/types';
+import type { Account, AccountSummary, Paginated } from '@/lib/types';
 import { formatDateTime, formatNumber } from '@/lib/format';
+import { readLimit, readOffset } from '@/lib/pagination';
 import { TableCard } from '@/components/dashboard/table-card';
 import { TableSummary } from '@/components/dashboard/table-summary';
 import { StatusBadge } from '@/components/dashboard/status-badge';
 import { EmptyState } from '@/components/dashboard/empty-state';
 import { SearchFilter, TableFilters } from '@/components/dashboard/table-filters';
+import { TableRefreshButton } from '@/components/dashboard/table-actions';
+import { PageSizeSelect } from '@/components/dashboard/page-size-select';
+import { Pagination } from '@/components/dashboard/pagination';
 import { detailHref, originHref } from '@/lib/navigation';
 import {
   TableActionLink,
   TableActions,
-  TableRefreshButton,
 } from '@/components/dashboard/table-actions';
 import {
   Table,
@@ -24,19 +27,24 @@ import {
 export default async function AccountsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ search?: string }>;
+  searchParams: Promise<{
+    search?: string;
+    limit?: string | string[];
+    offset?: string | string[];
+  }>;
 }) {
   const params = await searchParams;
   const from = originHref('/accounts', params);
-  const query = new URLSearchParams();
+  const limit = readLimit(params.limit);
+  const offset = readOffset(params.offset);
+  const query = new URLSearchParams({ limit: String(limit), offset: String(offset) });
   if (params.search) query.set('search', params.search);
-  const queryString = query.toString();
 
-  const accounts = await apiFetch<Account[]>(`/accounts${queryString ? `?${queryString}` : ''}`);
-
-  const activeAccounts = accounts.filter((account) => account.isActive).length;
-  const permissionTotal = accounts.reduce((total, account) => total + account.permissionCount, 0);
-  const credentialsTracked = accounts.filter((account) => account.credentialExpiry).length;
+  const [data, summary] = await Promise.all([
+    apiFetch<Paginated<Account>>(`/accounts?${query.toString()}`),
+    apiFetch<AccountSummary>(`/accounts/summary?${query.toString()}`),
+  ]);
+  const accounts = data.items;
   const hasFilters = Boolean(params.search);
 
   return (
@@ -47,25 +55,25 @@ export default async function AccountsPage({
             items={[
               {
                 label: 'Accounts',
-                value: formatNumber(accounts.length),
+                value: formatNumber(summary.total),
                 hint: 'Active broker accounts',
                 tone: 'success',
               },
               {
                 label: 'Enabled',
-                value: formatNumber(activeAccounts),
+                value: formatNumber(summary.active),
                 hint: 'Available to strategies',
                 tone: 'info',
               },
               {
                 label: 'Tradable instruments',
-                value: formatNumber(permissionTotal),
+                value: formatNumber(summary.permissionTotal),
                 hint: 'Account-level allowlists',
                 tone: 'highlight',
               },
               {
                 label: 'Credentials tracked',
-                value: formatNumber(credentialsTracked),
+                value: formatNumber(summary.credentialsTracked),
                 hint: 'Expiry recorded',
                 tone: 'warning',
               },
@@ -78,6 +86,16 @@ export default async function AccountsPage({
           </TableFilters>
         }
         actions={<TableRefreshButton />}
+        footer={
+          <Pagination
+            pageSizeControl={<PageSizeSelect value={limit} />}
+            page={data.page}
+            itemsCount={accounts.length}
+            pathname="/accounts"
+            searchParams={params}
+            itemLabel="accounts"
+          />
+        }
       >
         {accounts.length === 0 ? (
           <div className="p-4">

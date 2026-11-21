@@ -16,6 +16,7 @@ import { ErrorResponseDto } from '../../common/dto/error-response.dto.js';
 import { SystemIssueDto } from '../../common/dto/system-issue.dto.js';
 import { ApiSessionAuth } from '../../common/swagger/api-session-auth.decorator.js';
 import { IssuesService } from './issues.service.js';
+import { IssueSummaryDto, SystemIssueListResponseDto } from './dto/issue-response.dto.js';
 import { SystemIssueQueryDto } from './system-issue-query.dto.js';
 
 @ApiTags('issues')
@@ -26,9 +27,16 @@ export class IssuesController {
 
   @Get()
   @ApiOperation({ summary: 'List active issues across every mechanism' })
-  @ApiOkResponse({ type: SystemIssueDto, isArray: true })
+  @ApiOkResponse({ type: SystemIssueListResponseDto })
   list(@Query() query: SystemIssueQueryDto) {
     return this.issues.list(query);
+  }
+
+  @Get('summary')
+  @ApiOperation({ summary: 'Summarise the filtered active issue set' })
+  @ApiOkResponse({ type: IssueSummaryDto })
+  summary(@Query() query: SystemIssueQueryDto) {
+    return this.issues.summary(query);
   }
 
   @Get(':issueId')

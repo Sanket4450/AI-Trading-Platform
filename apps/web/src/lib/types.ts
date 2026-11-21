@@ -1,3 +1,7 @@
+import type { Paginated, PaginationMeta } from '@ai-trading/domain';
+
+export type { Paginated, PaginationMeta };
+
 export interface SessionUser {
   id: string;
   email: string;
@@ -219,11 +223,46 @@ export interface AuditRow {
   action: string;
   entityType: string;
   entityId: string | null;
-  beforeState: Record<string, unknown> | null;
-  afterState: Record<string, unknown> | null;
   requestId: string | null;
   ipAddress: string | null;
   createdAt: string;
+}
+
+export interface AuditDetail extends AuditRow {
+  beforeState: Record<string, unknown> | null;
+  afterState: Record<string, unknown> | null;
+}
+
+export interface AuditSummary {
+  total: number;
+  actors: number;
+  entityTypes: number;
+}
+
+export interface IssueSummary {
+  total: number;
+  critical: number;
+  instrumentScoped: number;
+  providerScoped: number;
+}
+
+export interface StrategySummary {
+  total: number;
+  versions: number;
+  activeActivations: number;
+}
+
+export interface AccountSummary {
+  total: number;
+  active: number;
+  permissionTotal: number;
+  credentialsTracked: number;
+}
+
+export interface ConfigurationSummary {
+  total: number;
+  configTypes: number;
+  scopeKeys: number;
 }
 
 export interface SystemSetting {
@@ -287,10 +326,7 @@ export interface JobRun {
   finishedAt: string | null;
 }
 
-export interface JobListResponse {
-  summary: JobStats;
-  items: JobRun[];
-}
+export type JobListResponse = Paginated<JobRun>;
 
 export interface JobStage {
   key: string;
@@ -307,6 +343,7 @@ export interface JobDetail {
   run: JobRun;
   stages: JobStage[];
   events: JobEvent[];
+  eventsPage: PaginationMeta;
   progress: JobProgress | null;
 }
 
@@ -387,7 +424,6 @@ export interface InstrumentCoverageMonth {
 
 export interface InstrumentCoverageDetail extends InstrumentCoverageRow {
   months: InstrumentCoverageMonth[];
-  issues: SystemIssue[];
 }
 
 export interface ProviderStatus {

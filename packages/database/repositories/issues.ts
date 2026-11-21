@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
 import { uuidv7 } from 'uuidv7';
 import { db } from '../client.js';
 import { instruments, providers, systemIssues } from '../schema/index.js';
@@ -75,15 +75,13 @@ export async function upsertSystemIssue(values: {
   return row;
 }
 
-export async function listSystemIssues(filters: {
+function issueConditions(filters: {
   source?: string;
   kind?: string;
   severity?: string;
   instrumentId?: string;
   providerId?: string;
   scope?: 'instrument' | 'provider' | 'system';
-  limit?: number;
-  offset?: number;
 }) {
   const conditions = [];
   if (filters.source) conditions.push(eq(systemIssues.source, filters.source));
@@ -97,16 +95,83 @@ export async function listSystemIssues(filters: {
     conditions.push(isNull(systemIssues.instrumentId), isNotNull(systemIssues.providerId));
   if (filters.scope === 'system')
     conditions.push(isNull(systemIssues.instrumentId), isNull(systemIssues.providerId));
+  return conditions;
+}
 
-  return db
-    .select(issueColumns)
+/**
+ * Newest-seen-first issue page. `last_seen_at` is mutable, so a row bumped during a traversal
+ * moves ahead of the cursor and is skipped until the next refresh; it is never duplicated.
+ */
+export async function listSystemIssues(filters: {
+  source?: string;
+  kind?: string;
+  severity?: string;
+  instrumentId?: string;
+  providerId?: string;
+  scope?: 'instrument' | 'provider' | 'system';
+  limit: number;
+  after?: { lastSeenAt: Date; id: string };
+  before?: { lastSeenAt: Date; id: string };
+}) {
+  const conditions = issueConditions(filters);
+  const backward = Boolean(filters.before);
+  const cursor = filters.before ?? filters.after;
+  const pageConditions = cursor
+    ? [
+        ...conditions,
+        backward
+          ? sql`(${systemIssues.lastSeenAt}, ${systemIssues.id}) > (${cursor.lastSeenAt.toISOString()}::timestamptz, ${cursor.id}::uuid)`
+          : sql`(${systemIssues.lastSeenAt}, ${systemIssues.id}) < (${cursor.lastSeenAt.toISOString()}::timestamptz, ${cursor.id}::uuid)`,
+      ]
+    : conditions;
+
+  const [rows, totalRows] = await Promise.all([
+    db
+      .select(issueColumns)
+      .from(systemIssues)
+      .leftJoin(providers, eq(providers.id, systemIssues.providerId))
+      .leftJoin(instruments, eq(instruments.id, systemIssues.instrumentId))
+      .where(pageConditions.length > 0 ? and(...pageConditions) : undefined)
+      .orderBy(
+        backward ? asc(systemIssues.lastSeenAt) : desc(systemIssues.lastSeenAt),
+        backward ? asc(systemIssues.id) : desc(systemIssues.id),
+      )
+      .limit(filters.limit + 1),
+    db
+      .select({ total: sql<number>`count(*)::int` })
+      .from(systemIssues)
+      .where(conditions.length > 0 ? and(...conditions) : undefined),
+  ]);
+
+  return {
+    items: rows.slice(0, filters.limit),
+    total: totalRows[0]?.total ?? 0,
+    hasExtra: rows.length > filters.limit,
+  };
+}
+
+export async function getIssueSummary(filters: {
+  source?: string;
+  kind?: string;
+  severity?: string;
+  instrumentId?: string;
+  providerId?: string;
+  scope?: 'instrument' | 'provider' | 'system';
+}) {
+  const conditions = issueConditions(filters);
+  const [row] = await db
+    .select({
+      total: sql<number>`count(*)::int`,
+      critical: sql<number>`count(*) filter (where ${systemIssues.severity} = 'critical')::int`,
+      instrumentScoped: sql<number>`count(*) filter (where ${systemIssues.instrumentId} is not null)::int`,
+      providerScoped: sql<number>`count(*) filter (where ${systemIssues.instrumentId} is null and ${systemIssues.providerId} is not null)::int`,
+    })
     .from(systemIssues)
-    .leftJoin(providers, eq(providers.id, systemIssues.providerId))
-    .leftJoin(instruments, eq(instruments.id, systemIssues.instrumentId))
-    .where(conditions.length > 0 ? and(...conditions) : undefined)
-    .orderBy(desc(systemIssues.lastSeenAt))
-    .limit(filters.limit ?? 200)
-    .offset(filters.offset ?? 0);
+    .where(conditions.length > 0 ? and(...conditions) : undefined);
+
+  return (
+    row ?? { total: 0, critical: 0, instrumentScoped: 0, providerScoped: 0 }
+  );
 }
 
 export async function getSystemIssue(id: string) {
@@ -120,31 +185,56 @@ export async function getSystemIssue(id: string) {
   return rows[0] ?? null;
 }
 
-export async function listInstrumentIssues(instrumentId: string, limit = 50) {
-  return db
-    .select(issueColumns)
-    .from(systemIssues)
-    .leftJoin(providers, eq(providers.id, systemIssues.providerId))
-    .leftJoin(instruments, eq(instruments.id, systemIssues.instrumentId))
-    .where(eq(systemIssues.instrumentId, instrumentId))
-    .orderBy(desc(systemIssues.lastSeenAt))
-    .limit(limit);
+export async function listInstrumentIssues(
+  instrumentId: string,
+  page: { limit: number; offset: number },
+) {
+  const [items, totalRows] = await Promise.all([
+    db
+      .select(issueColumns)
+      .from(systemIssues)
+      .leftJoin(providers, eq(providers.id, systemIssues.providerId))
+      .leftJoin(instruments, eq(instruments.id, systemIssues.instrumentId))
+      .where(eq(systemIssues.instrumentId, instrumentId))
+      .orderBy(desc(systemIssues.lastSeenAt), desc(systemIssues.id))
+      .limit(page.limit)
+      .offset(page.offset),
+    db
+      .select({ total: sql<number>`count(*)::int` })
+      .from(systemIssues)
+      .where(eq(systemIssues.instrumentId, instrumentId)),
+  ]);
+
+  return { items, total: totalRows[0]?.total ?? 0 };
 }
 
-export async function listInstrumentDayIssues(instrumentId: string, date: string) {
-  return db
-    .select(issueColumns)
-    .from(systemIssues)
-    .leftJoin(providers, eq(providers.id, systemIssues.providerId))
-    .leftJoin(instruments, eq(instruments.id, systemIssues.instrumentId))
-    .where(
-      and(
-        eq(systemIssues.instrumentId, instrumentId),
-        sql`${systemIssues.payload}->>'tradingDate' = ${date}`,
-      ),
-    )
-    .orderBy(desc(systemIssues.lastSeenAt))
-    .limit(50);
+export async function listInstrumentDayIssues(
+  instrumentId: string,
+  date: string,
+  page: { limit: number; offset: number },
+) {
+  const conditions = [
+    eq(systemIssues.instrumentId, instrumentId),
+    sql`${systemIssues.payload}->>'tradingDate' = ${date}`,
+  ];
+
+  const [items, totalRows] = await Promise.all([
+    db
+      .select(issueColumns)
+      .from(systemIssues)
+      .leftJoin(providers, eq(providers.id, systemIssues.providerId))
+      .leftJoin(instruments, eq(instruments.id, systemIssues.instrumentId))
+      .where(and(...conditions))
+      .orderBy(desc(systemIssues.lastSeenAt), desc(systemIssues.id))
+      .limit(page.limit)
+      .offset(page.offset),
+    db
+      .select({ total: sql<number>`count(*)::int` })
+      .from(systemIssues)
+      .where(and(...conditions)),
+  ]);
+
+  return { items, total: totalRows[0]?.total ?? 0 };
 }
 
 export async function listRecentIssues(limit = 6) {

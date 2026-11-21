@@ -22,7 +22,7 @@ import {
   type AuthenticatedUser,
 } from '../../common/auth/current-user.decorator.js';
 import { ErrorResponseDto } from '../../common/dto/error-response.dto.js';
-import { SearchQueryDto } from '../../common/dto/search-query.dto.js';
+import { SearchOffsetQueryDto } from '../../common/pagination/search-offset-query.dto.js';
 import { requestMeta } from '../../common/http/request-meta.js';
 import { ApiSessionAuth } from '../../common/swagger/api-session-auth.decorator.js';
 import { CreateStrategyVersionDto } from './dto/create-strategy-version.dto.js';
@@ -30,7 +30,8 @@ import { EffectiveConfigQueryDto } from './dto/effective-config-query.dto.js';
 import {
   EffectiveConfigurationDto,
   StrategyDetailDto,
-  StrategyDto,
+  StrategyListResponseDto,
+  StrategySummaryDto,
   StrategyVersionDto,
 } from './dto/strategy-response.dto.js';
 import { StrategiesService } from './strategies.service.js';
@@ -45,9 +46,16 @@ export class StrategiesController {
   @ApiOperation({
     summary: 'List strategies with version and activation counts',
   })
-  @ApiOkResponse({ type: StrategyDto, isArray: true })
-  list(@Query() query: SearchQueryDto) {
-    return this.strategies.list(query.search);
+  @ApiOkResponse({ type: StrategyListResponseDto })
+  list(@Query() query: SearchOffsetQueryDto) {
+    return this.strategies.list(query);
+  }
+
+  @Get('summary')
+  @ApiOperation({ summary: 'Summarise strategies, versions and activations' })
+  @ApiOkResponse({ type: StrategySummaryDto })
+  summary(@Query() query: SearchOffsetQueryDto) {
+    return this.strategies.summary(query);
   }
 
   @Get(':id')

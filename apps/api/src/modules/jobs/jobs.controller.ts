@@ -22,9 +22,15 @@ import {
 } from '../../common/auth/current-user.decorator.js';
 import { ErrorResponseDto } from '../../common/dto/error-response.dto.js';
 import { JobRunDto } from '../../common/dto/job-run.dto.js';
+import { CursorQueryDto } from '../../common/pagination/pagination.dto.js';
 import { requestMeta } from '../../common/http/request-meta.js';
 import { ApiSessionAuth } from '../../common/swagger/api-session-auth.decorator.js';
-import { JobDetailResponseDto, JobListResponseDto } from './dto/job-response.dto.js';
+import {
+  JobDetailResponseDto,
+  JobEventListResponseDto,
+  JobListResponseDto,
+  JobSummaryDto,
+} from './dto/job-response.dto.js';
 import { JobQueryDto } from './dto/job-query.dto.js';
 import { JobsService } from './jobs.service.js';
 
@@ -35,10 +41,17 @@ export class JobsController {
   constructor(private readonly jobs: JobsService) {}
 
   @Get()
-  @ApiOperation({ summary: 'List background job runs with a 24-hour summary' })
+  @ApiOperation({ summary: 'List background job runs, newest first' })
   @ApiOkResponse({ type: JobListResponseDto })
   list(@Query() query: JobQueryDto) {
     return this.jobs.list(query);
+  }
+
+  @Get('summary')
+  @ApiOperation({ summary: 'Return the 24-hour job summary' })
+  @ApiOkResponse({ type: JobSummaryDto })
+  summary() {
+    return this.jobs.summary();
   }
 
   @Post(':id/cancel')
@@ -52,6 +65,18 @@ export class JobsController {
     @Req() request: Request,
   ) {
     return this.jobs.cancel(id, user.id, requestMeta(request));
+  }
+
+  @Get(':id/events')
+  @ApiOperation({ summary: 'List older events for one job run' })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiOkResponse({ type: JobEventListResponseDto })
+  @ApiNotFoundResponse({ type: ErrorResponseDto, description: 'Job not found' })
+  events(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: CursorQueryDto,
+  ) {
+    return this.jobs.listEvents(id, query);
   }
 
   @Get(':id')

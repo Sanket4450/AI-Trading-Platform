@@ -33,6 +33,8 @@ import {
 import {
   ConfigurationCreatedDto,
   ConfigurationDiffDto,
+  ConfigurationListResponseDto,
+  ConfigurationSummaryDto,
   ConfigurationVersionDto,
   StrategyConfigBindingDto,
 } from './dto/configuration-response.dto.js';
@@ -46,9 +48,16 @@ export class ConfigurationController {
 
   @Get()
   @ApiOperation({ summary: 'List configuration versions' })
-  @ApiOkResponse({ type: ConfigurationVersionDto, isArray: true })
+  @ApiOkResponse({ type: ConfigurationListResponseDto })
   list(@Query() query: ListConfigurationDto) {
     return this.configuration.list(query);
+  }
+
+  @Get('summary')
+  @ApiOperation({ summary: 'Summarise the filtered configuration versions' })
+  @ApiOkResponse({ type: ConfigurationSummaryDto })
+  summary(@Query() query: ListConfigurationDto) {
+    return this.configuration.summary(query);
   }
 
   @Get(':id')

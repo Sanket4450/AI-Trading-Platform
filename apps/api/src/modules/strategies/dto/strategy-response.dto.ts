@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { PaginationMetaDto } from '../../../common/pagination/pagination.dto.js';
 
 export class StrategyBindingDto {
   @ApiProperty({ format: 'uuid' })
@@ -173,4 +174,23 @@ export class EffectiveConfigurationDto {
 
   @ApiProperty({ enum: ['parameters', 'risk', 'execution'] })
   role!: string;
+}
+
+export class StrategyListResponseDto {
+  @ApiProperty({ type: [StrategyDto] })
+  items!: StrategyDto[];
+
+  @ApiProperty({ type: PaginationMetaDto })
+  page!: PaginationMetaDto;
+}
+
+export class StrategySummaryDto {
+  @ApiProperty()
+  total!: number;
+
+  @ApiProperty()
+  versions!: number;
+
+  @ApiProperty()
+  activeActivations!: number;
 }

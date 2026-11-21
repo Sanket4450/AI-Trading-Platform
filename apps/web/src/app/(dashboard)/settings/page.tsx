@@ -2,10 +2,13 @@ import Link from 'next/link';
 import { SlidersHorizontal } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import type {
+  ConfigurationSummary,
   ConfigurationVersion,
+  Paginated,
   ProviderStatus,
   SystemSetting,
 } from '@/lib/types';
+import { readLimit, readOffset } from '@/lib/pagination';
 import { configurationTypes } from '@/lib/configuration';
 import { formatDate, formatDateTime, formatNumber } from '@/lib/format';
 import { formatSettingKey, label } from '@/lib/labels';
@@ -14,6 +17,8 @@ import { EmptyState } from '@/components/dashboard/empty-state';
 import { KeyValueGrid } from '@/components/dashboard/key-value-grid';
 import { FilterSelect, SearchFilter, TableFilters } from '@/components/dashboard/table-filters';
 import { TableActions, TableRefreshButton } from '@/components/dashboard/table-actions';
+import { PageSizeSelect } from '@/components/dashboard/page-size-select';
+import { Pagination } from '@/components/dashboard/pagination';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -35,33 +40,39 @@ export default async function SettingsPage({
     configType?: string;
     scopeKey?: string;
     version?: string;
+    limit?: string | string[];
+    offset?: string | string[];
   }>;
 }) {
   const params = await searchParams;
+  const limit = readLimit(params.limit);
+  const offset = readOffset(params.offset);
 
   const configQuery = new URLSearchParams();
   if (params.configType) configQuery.set('configType', params.configType);
   if (params.scopeKey) configQuery.set('scopeKey', params.scopeKey);
-  configQuery.set('limit', '100');
+  configQuery.set('limit', String(limit));
+  configQuery.set('offset', String(offset));
 
   const selectedVersion = params.version
     ? apiFetch<ConfigurationVersion>(`/configuration/${params.version}`).catch(() => null)
     : Promise.resolve(null);
 
-  const [settings, provider, versions, versionDetail] = await Promise.all([
+  const [settings, provider, versionsPage, summary, versionDetail] = await Promise.all([
     apiFetch<SystemSetting[]>('/settings'),
     apiFetch<ProviderStatus>('/settings/provider'),
-    apiFetch<ConfigurationVersion[]>(`/configuration?${configQuery.toString()}`),
+    apiFetch<Paginated<ConfigurationVersion>>(`/configuration?${configQuery.toString()}`),
+    apiFetch<ConfigurationSummary>(`/configuration/summary?${configQuery.toString()}`),
     selectedVersion,
   ]);
-
-  const distinctTypes = new Set(versions.map((version) => version.configType)).size;
-  const distinctScopes = new Set(versions.map((version) => version.scopeKey)).size;
+  const versions = versionsPage.items;
 
   function versionHref(id: string) {
     const query = new URLSearchParams();
     if (params.configType) query.set('configType', params.configType);
     if (params.scopeKey) query.set('scopeKey', params.scopeKey);
+    query.set('limit', String(limit));
+    query.set('offset', String(offset));
     query.set('version', id);
     return `/settings?${query.toString()}`;
   }
@@ -145,7 +156,7 @@ export default async function SettingsPage({
       <SectionCard
         className="mt-4"
         title="Configuration versions"
-        description={`${formatNumber(versions.length)} rows · ${formatNumber(distinctTypes)} types · ${formatNumber(distinctScopes)} scopes · immutable snapshots.`}
+        description={`${formatNumber(summary.total)} rows · ${formatNumber(summary.configTypes)} types · ${formatNumber(summary.scopeKeys)} scopes · immutable snapshots.`}
         toolbar={
           <TableFilters>
             <SearchFilter
@@ -170,6 +181,16 @@ export default async function SettingsPage({
             <TableRefreshButton />
             {createForm}
           </>
+        }
+        footer={
+          <Pagination
+            pageSizeControl={<PageSizeSelect value={limit} />}
+            page={versionsPage.page}
+            itemsCount={versions.length}
+            pathname="/settings"
+            searchParams={params}
+            itemLabel="configuration versions"
+          />
         }
       >
         {versions.length === 0 ? (

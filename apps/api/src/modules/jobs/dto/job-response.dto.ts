@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { PaginationMetaDto } from '../../../common/pagination/pagination.dto.js';
 import { JobEventDto, JobProgressDto, JobRunDto } from '../../../common/dto/job-run.dto.js';
 
 export class JobSummaryDto {
@@ -16,11 +17,19 @@ export class JobSummaryDto {
 }
 
 export class JobListResponseDto {
-  @ApiProperty({ type: JobSummaryDto })
-  summary!: JobSummaryDto;
-
   @ApiProperty({ type: [JobRunDto] })
   items!: JobRunDto[];
+
+  @ApiProperty({ type: PaginationMetaDto })
+  page!: PaginationMetaDto;
+}
+
+export class JobEventListResponseDto {
+  @ApiProperty({ type: [JobEventDto] })
+  items!: JobEventDto[];
+
+  @ApiProperty({ type: PaginationMetaDto })
+  page!: PaginationMetaDto;
 }
 
 export class JobStageDto {
@@ -58,8 +67,11 @@ export class JobDetailResponseDto {
   @ApiProperty({ type: [JobStageDto] })
   stages!: JobStageDto[];
 
-  @ApiProperty({ type: [JobEventDto] })
+  @ApiProperty({ type: [JobEventDto], description: 'Newest page, chronological order.' })
   events!: JobEventDto[];
+
+  @ApiProperty({ type: PaginationMetaDto })
+  eventsPage!: PaginationMetaDto;
 
   @ApiProperty({ type: JobProgressDto, nullable: true })
   progress!: JobProgressDto | null;

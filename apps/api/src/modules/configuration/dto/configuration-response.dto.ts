@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { PaginationMetaDto } from '../../../common/pagination/pagination.dto.js';
 
 export class ConfigurationBindingDto {
   @ApiProperty({ format: 'uuid' })
@@ -128,4 +129,23 @@ export class StrategyConfigBindingDto {
 
   @ApiProperty({ type: String, format: 'uuid', nullable: true })
   boundBy!: string | null;
+}
+
+export class ConfigurationListResponseDto {
+  @ApiProperty({ type: [ConfigurationVersionDto] })
+  items!: ConfigurationVersionDto[];
+
+  @ApiProperty({ type: PaginationMetaDto })
+  page!: PaginationMetaDto;
+}
+
+export class ConfigurationSummaryDto {
+  @ApiProperty()
+  total!: number;
+
+  @ApiProperty()
+  configTypes!: number;
+
+  @ApiProperty()
+  scopeKeys!: number;
 }

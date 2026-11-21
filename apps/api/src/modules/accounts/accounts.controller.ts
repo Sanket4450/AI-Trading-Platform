@@ -22,17 +22,20 @@ import {
   type AuthenticatedUser,
 } from '../../common/auth/current-user.decorator.js';
 import { ErrorResponseDto } from '../../common/dto/error-response.dto.js';
-import { SearchQueryDto } from '../../common/dto/search-query.dto.js';
+import { CursorQueryDto, OffsetQueryDto } from '../../common/pagination/pagination.dto.js';
+import { SearchOffsetQueryDto } from '../../common/pagination/search-offset-query.dto.js';
 import { requestMeta } from '../../common/http/request-meta.js';
 import { ApiSessionAuth } from '../../common/swagger/api-session-auth.decorator.js';
 import { AccountsService } from './accounts.service.js';
 import {
-  AccountAccessDto,
+  AccountAccessListResponseDto,
   AccountDto,
-  AccountPermissionDto,
+  AccountListResponseDto,
+  AccountPermissionListResponseDto,
+  AccountSummaryDto,
   BrokerCredentialDto,
-  EquitySnapshotDto,
-  TradingSessionDto,
+  EquitySnapshotListResponseDto,
+  TradingSessionListResponseDto,
 } from './dto/account-response.dto.js';
 import { CreateCredentialDto } from './dto/create-credential.dto.js';
 
@@ -46,9 +49,16 @@ export class AccountsController {
   @ApiOperation({
     summary: 'List broker accounts with current equity and permission counts',
   })
-  @ApiOkResponse({ type: AccountDto, isArray: true })
-  list(@Query() query: SearchQueryDto) {
-    return this.accounts.list(query.search);
+  @ApiOkResponse({ type: AccountListResponseDto })
+  list(@Query() query: SearchOffsetQueryDto) {
+    return this.accounts.list(query);
+  }
+
+  @Get('summary')
+  @ApiOperation({ summary: 'Summarise the account registry' })
+  @ApiOkResponse({ type: AccountSummaryDto })
+  summary(@Query() query: SearchOffsetQueryDto) {
+    return this.accounts.summary(query);
   }
 
   @Get(':id/permissions')
@@ -56,13 +66,16 @@ export class AccountsController {
     summary: 'List tradable instrument permissions for an account',
   })
   @ApiParam({ name: 'id', format: 'uuid' })
-  @ApiOkResponse({ type: AccountPermissionDto, isArray: true })
+  @ApiOkResponse({ type: AccountPermissionListResponseDto })
   @ApiNotFoundResponse({
     type: ErrorResponseDto,
     description: 'Account not found',
   })
-  permissions(@Param('id', ParseUUIDPipe) id: string) {
-    return this.accounts.permissions(id);
+  permissions(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: OffsetQueryDto,
+  ) {
+    return this.accounts.permissions(id, query);
   }
 
   @Get(':id/credentials')
@@ -78,25 +91,43 @@ export class AccountsController {
   @Get(':id/access')
   @ApiOperation({ summary: 'List operator access grants for an account' })
   @ApiParam({ name: 'id', format: 'uuid' })
-  @ApiOkResponse({ type: AccountAccessDto, isArray: true })
-  access(@Param('id', ParseUUIDPipe) id: string) {
-    return this.accounts.access(id);
+  @ApiOkResponse({ type: AccountAccessListResponseDto })
+  access(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: OffsetQueryDto,
+  ) {
+    return this.accounts.access(id, query);
   }
 
   @Get(':id/equity')
   @ApiOperation({ summary: 'List recent equity snapshots for an account' })
   @ApiParam({ name: 'id', format: 'uuid' })
-  @ApiOkResponse({ type: EquitySnapshotDto, isArray: true })
-  equity(@Param('id', ParseUUIDPipe) id: string) {
-    return this.accounts.equity(id);
+  @ApiOkResponse({ type: EquitySnapshotListResponseDto })
+  equity(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: CursorQueryDto,
+  ) {
+    return this.accounts.equity(id, query);
   }
 
   @Get(':id/sessions')
   @ApiOperation({ summary: 'List trading sessions for an account' })
   @ApiParam({ name: 'id', format: 'uuid' })
-  @ApiOkResponse({ type: TradingSessionDto, isArray: true })
-  sessions(@Param('id', ParseUUIDPipe) id: string) {
-    return this.accounts.sessions(id);
+  @ApiOkResponse({ type: TradingSessionListResponseDto })
+  sessions(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: CursorQueryDto,
+  ) {
+    return this.accounts.sessions(id, query);
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Return one broker account' })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiOkResponse({ type: AccountDto })
+  @ApiNotFoundResponse({ type: ErrorResponseDto, description: 'Account not found' })
+  detail(@Param('id', ParseUUIDPipe) id: string) {
+    return this.accounts.detail(id);
   }
 
   @Post(':id/credentials')

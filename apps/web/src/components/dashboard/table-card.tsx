@@ -9,12 +9,14 @@ export function TableCard({
   summary,
   filters,
   actions,
+  footer,
   children,
   className,
 }: {
   summary: React.ReactNode;
   filters?: React.ReactNode;
   actions?: React.ReactNode;
+  footer?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
 }) {
@@ -28,6 +30,9 @@ export function TableCard({
         </div>
       </div>
       <CardContent className="min-h-0 flex-1 overflow-hidden p-0">{children}</CardContent>
+      {footer ? (
+        <div className="border-border/70 shrink-0 border-t px-3 py-2">{footer}</div>
+      ) : null}
     </Card>
   );
 }

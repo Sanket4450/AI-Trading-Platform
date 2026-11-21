@@ -1,17 +1,20 @@
 import { apiFetch } from '@/lib/api';
-import type { Strategy } from '@/lib/types';
+import type { Paginated, Strategy, StrategySummary } from '@/lib/types';
 import { formatNumber } from '@/lib/format';
 import { label } from '@/lib/labels';
+import { readLimit, readOffset } from '@/lib/pagination';
 import { TableCard } from '@/components/dashboard/table-card';
 import { TableSummary } from '@/components/dashboard/table-summary';
 import { StatusBadge } from '@/components/dashboard/status-badge';
 import { EmptyState } from '@/components/dashboard/empty-state';
 import { SearchFilter, TableFilters } from '@/components/dashboard/table-filters';
+import { TableRefreshButton } from '@/components/dashboard/table-actions';
+import { PageSizeSelect } from '@/components/dashboard/page-size-select';
+import { Pagination } from '@/components/dashboard/pagination';
 import { detailHref, originHref } from '@/lib/navigation';
 import {
   TableActionLink,
   TableActions,
-  TableRefreshButton,
 } from '@/components/dashboard/table-actions';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -26,23 +29,24 @@ import {
 export default async function StrategiesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ search?: string }>;
+  searchParams: Promise<{
+    search?: string;
+    limit?: string | string[];
+    offset?: string | string[];
+  }>;
 }) {
   const params = await searchParams;
   const from = originHref('/strategies', params);
-  const query = new URLSearchParams();
+  const limit = readLimit(params.limit);
+  const offset = readOffset(params.offset);
+  const query = new URLSearchParams({ limit: String(limit), offset: String(offset) });
   if (params.search) query.set('search', params.search);
-  const queryString = query.toString();
 
-  const strategies = await apiFetch<Strategy[]>(
-    `/strategies${queryString ? `?${queryString}` : ''}`,
-  );
-
-  const versionTotal = strategies.reduce((total, strategy) => total + strategy.versionCount, 0);
-  const activationTotal = strategies.reduce(
-    (total, strategy) => total + strategy.activeActivations,
-    0,
-  );
+  const [data, summary] = await Promise.all([
+    apiFetch<Paginated<Strategy>>(`/strategies?${query.toString()}`),
+    apiFetch<StrategySummary>(`/strategies/summary?${query.toString()}`),
+  ]);
+  const strategies = data.items;
   const hasFilters = Boolean(params.search);
 
   return (
@@ -53,19 +57,19 @@ export default async function StrategiesPage({
             items={[
               {
                 label: 'Strategies',
-                value: formatNumber(strategies.length),
+                value: formatNumber(summary.total),
                 hint: 'Logical registry',
                 tone: 'success',
               },
               {
                 label: 'Versions',
-                value: formatNumber(versionTotal),
+                value: formatNumber(summary.versions),
                 hint: 'Immutable code releases',
                 tone: 'info',
               },
               {
                 label: 'Active activations',
-                value: formatNumber(activationTotal),
+                value: formatNumber(summary.activeActivations),
                 hint: 'None while research-only',
                 tone: 'warning',
               },
@@ -78,6 +82,16 @@ export default async function StrategiesPage({
           </TableFilters>
         }
         actions={<TableRefreshButton />}
+        footer={
+          <Pagination
+            pageSizeControl={<PageSizeSelect value={limit} />}
+            page={data.page}
+            itemsCount={strategies.length}
+            pathname="/strategies"
+            searchParams={params}
+            itemLabel="strategies"
+          />
+        }
       >
         {strategies.length === 0 ? (
           <div className="p-4">

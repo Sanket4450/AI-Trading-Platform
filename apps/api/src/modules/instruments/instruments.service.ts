@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { PAGINATION_DEFAULT_LIMIT } from '@ai-trading/domain';
 import {
   getInstrument,
   listCandles,
@@ -10,17 +11,23 @@ import {
   listInstrumentMappings,
   listInstruments,
 } from '@ai-trading/database';
+import { offsetPage } from '../../common/pagination/page.js';
+import type { OffsetQueryDto } from '../../common/pagination/pagination.dto.js';
 import type { ListInstrumentsDto } from './dto/list-instruments.dto.js';
 
 @Injectable()
 export class InstrumentsService {
-  list(query: ListInstrumentsDto) {
-    return listInstruments({
+  async list(query: ListInstrumentsDto) {
+    const limit = query.limit ?? PAGINATION_DEFAULT_LIMIT;
+    const offset = query.offset ?? 0;
+    const result = await listInstruments({
       search: query.search,
       segment: query.segment,
       activeOnly: query.active === undefined ? true : query.active === 'true',
-      limit: query.limit,
+      limit,
+      offset,
     });
+    return offsetPage(result.items, result.total, limit, offset);
   }
 
   async detail(id: string) {
@@ -29,14 +36,20 @@ export class InstrumentsService {
     return instrument;
   }
 
-  async mappings(id: string) {
+  async mappings(id: string, query: OffsetQueryDto) {
     await this.detail(id);
-    return listInstrumentMappings(id);
+    const limit = query.limit ?? PAGINATION_DEFAULT_LIMIT;
+    const offset = query.offset ?? 0;
+    const result = await listInstrumentMappings(id, { limit, offset });
+    return offsetPage(result.items, result.total, limit, offset);
   }
 
-  async corporateActions(id: string) {
+  async corporateActions(id: string, query: OffsetQueryDto) {
     await this.detail(id);
-    return listCorporateActions(id);
+    const limit = query.limit ?? PAGINATION_DEFAULT_LIMIT;
+    const offset = query.offset ?? 0;
+    const result = await listCorporateActions(id, { limit, offset });
+    return offsetPage(result.items, result.total, limit, offset);
   }
 
   async candles(id: string, from?: string, to?: string) {

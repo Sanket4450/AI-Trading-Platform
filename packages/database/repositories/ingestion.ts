@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, inArray, isNotNull, lte, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, ilike, inArray, isNotNull, lte, or, sql } from 'drizzle-orm';
 import type { InferInsertModel } from 'drizzle-orm';
 import { db } from '../client.js';
 import {
@@ -278,11 +278,11 @@ export async function getCoverageDayDetail(instrumentId: string, date: string) {
     .from(instruments)
     .where(eq(instruments.id, instrumentId))
     .limit(1);
-  const issues = await listInstrumentDayIssues(instrumentId, date);
+  const issues = await listInstrumentDayIssues(instrumentId, date, { limit: 50, offset: 0 });
   return {
     instrument: instrument[0] ?? null,
     coverage: coverage[0] ?? null,
-    issues,
+    issues: issues.items,
   };
 }
 
@@ -314,7 +314,27 @@ export async function getProviderStatus() {
   return { ...runs, ...payloads };
 }
 
-export async function getCatalogSummary() {
+export async function getCatalogSummary(filters: {
+  fetchStatus?: string;
+  dataStatus?: string;
+  search?: string;
+} = {}) {
+  const conditions = [eq(instruments.isSyncTarget, true)];
+  if (filters.fetchStatus) {
+    conditions.push(eq(instrumentDataStatus.fetchStatus, filters.fetchStatus));
+  }
+  if (filters.dataStatus) {
+    conditions.push(eq(instrumentDataStatus.dataStatus, filters.dataStatus));
+  }
+  if (filters.search) {
+    const term = `%${filters.search.trim()}%`;
+    const searchCondition = or(
+      ilike(instruments.tradingSymbol, term),
+      ilike(instruments.name, term),
+    );
+    if (searchCondition) conditions.push(searchCondition);
+  }
+
   const [row] = await db
     .select({
       total: sql<number>`count(*)::int`,
@@ -334,7 +354,7 @@ export async function getCatalogSummary() {
       instrumentDataStatus,
       eq(instrumentDataStatus.instrumentId, instruments.id),
     )
-    .where(eq(instruments.isSyncTarget, true));
+    .where(and(...conditions));
   return row ?? null;
 }
 
