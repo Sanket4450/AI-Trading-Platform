@@ -51,7 +51,9 @@ function TableRow({ className, ...props }: React.ComponentProps<'tr'>) {
     <tr
       data-slot="table-row"
       className={cn(
-        'hover:bg-muted/50 has-aria-expanded:bg-muted/50 data-[state=selected]:bg-muted border-b transition-colors',
+        // Rows have no padding of their own, so the edge cells add one unit to their
+        // 2-unit inset and every row ends up with the same 3-unit table edge.
+        'hover:bg-muted/50 has-aria-expanded:bg-muted/50 data-[state=selected]:bg-muted border-b transition-colors [&>*:first-child]:pl-3 [&>*:last-child]:pr-3',
         className,
       )}
       {...props}
