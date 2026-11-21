@@ -37,15 +37,13 @@ export async function createJobRun(values: {
   if (!isJobName(values.jobName)) {
     throw new Error(`Unknown job name: ${values.jobName}`);
   }
-  const queueName = queueNameOf(values.jobName);
-  if (!queueName) throw new Error(`Job ${values.jobName} has no queue`);
+  if (!queueNameOf(values.jobName)) throw new Error(`Job ${values.jobName} has no queue`);
 
   const [created] = await db
     .insert(jobRuns)
     .values({
       id: uuidv7(),
       jobName: values.jobName,
-      queueName,
       status: values.status ?? 'queued',
       groupId: values.groupId ?? null,
       instrumentId: values.instrumentId ?? null,
@@ -266,8 +264,6 @@ export async function createNotificationEvent(values: {
       relatedEntityType: values.relatedEntityType ?? null,
       relatedEntityId: values.relatedEntityId ?? null,
       status: 'pending',
-      sentAt: null,
-      readAt: null,
     })
     .returning();
   return created;
@@ -291,8 +287,6 @@ export async function createReportRun(values: {
       periodStart: values.periodStart,
       periodEnd: values.periodEnd,
       status: 'queued',
-      generatedAt: null,
-      fileRef: null,
       parameters: values.parameters,
     })
     .returning();

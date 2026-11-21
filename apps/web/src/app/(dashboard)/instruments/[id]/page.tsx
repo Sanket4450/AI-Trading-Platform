@@ -273,7 +273,6 @@ export default async function InstrumentDetailPage({
                           items={[
                             { label: 'Type', value: label(action.actionType) },
                             { label: 'Ex-date', value: action.exDate },
-                            { label: 'Record date', value: action.recordDate ?? '—' },
                             { label: 'Status', value: label(action.status) },
                             { label: 'Ratio numerator', value: action.ratioNumerator ?? '—' },
                             { label: 'Ratio denominator', value: action.ratioDenominator ?? '—' },

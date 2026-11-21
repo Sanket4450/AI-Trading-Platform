@@ -135,7 +135,6 @@ export const strategyActivations = pgTable(
     id: uuid('id').primaryKey().defaultRandom(),
     strategyVersionId: uuid('strategy_version_id').notNull(),
     accountId: uuid('account_id').notNull(),
-    configurationVersionId: uuid('configuration_version_id').notNull(),
     mode: varchar('mode', { length: 20 }).notNull(),
     status: varchar('status', { length: 20 }).notNull(),
     activatedAt: timestamp('activated_at', { withTimezone: true }).notNull(),
@@ -171,11 +170,9 @@ export const tradingSessions = pgTable(
     status: varchar('status', { length: 20 }).notNull(),
     startedAt: timestamp('started_at', { withTimezone: true }),
     endedAt: timestamp('ended_at', { withTimezone: true }),
-    configurationVersionId: uuid('configuration_version_id'),
     openingEquity: numeric('opening_equity', { precision: 20, scale: 2 }),
     closingEquity: numeric('closing_equity', { precision: 20, scale: 2 }),
     killSwitchEngaged: boolean('kill_switch_engaged').default(false).notNull(),
-    notes: text('notes'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
@@ -218,7 +215,6 @@ export const riskEvents = pgTable(
       .notNull(),
     occurredAt: timestamp('occurred_at', { withTimezone: true }).defaultNow().notNull(),
     resolvedAt: timestamp('resolved_at', { withTimezone: true }),
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     index('idx_risk_events_trading_session_id').on(table.tradingSessionId),

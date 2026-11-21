@@ -140,7 +140,6 @@ export async function listTrackedJobRuns(filters: {
     .select({
       id: jobRuns.id,
       jobName: jobRuns.jobName,
-      queueName: jobRuns.queueName,
       status: jobRuns.status,
       groupId: jobRuns.groupId,
       instrumentId: jobRuns.instrumentId,

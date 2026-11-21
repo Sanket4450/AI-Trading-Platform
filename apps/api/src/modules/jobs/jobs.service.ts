@@ -1,7 +1,7 @@
 import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { Queue } from 'bullmq';
-import { isQuantifiedStage, jobTypeOf, QUEUES, stagesForJob } from '@ai-trading/domain';
+import { isQuantifiedStage, jobTypeOf, QUEUES, queueNameOf, stagesForJob } from '@ai-trading/domain';
 import {
   getJobRun,
   getJobRunEvents,
@@ -74,7 +74,7 @@ function mapRun(
   return {
     id: row.id,
     jobName: row.jobName,
-    queueName: row.queueName,
+    queueName: queueNameOf(row.jobName) ?? 'unknown',
     jobType: jobTypeOf(row.jobName) ?? 'ingestion',
     status: row.status,
     groupId: row.groupId,
@@ -109,7 +109,7 @@ function mapListRun(row: ListRow) {
   return {
     id: row.id,
     jobName: row.jobName,
-    queueName: row.queueName,
+    queueName: queueNameOf(row.jobName) ?? 'unknown',
     jobType: jobTypeOf(row.jobName) ?? 'ingestion',
     status: row.status,
     groupId: row.groupId,
@@ -132,7 +132,7 @@ function broadcastOf(row: RunRow): JobRunBroadcast {
   return {
     id: row.id,
     jobName: row.jobName,
-    queueName: row.queueName,
+    queueName: queueNameOf(row.jobName) ?? 'unknown',
     status: row.status,
     groupId: row.groupId,
     instrumentId: row.instrumentId,
@@ -241,7 +241,9 @@ export class JobsService {
     }
 
     const queue =
-      run.queueName === QUEUES.maintenance ? this.maintenanceQueue : this.historicalQueue;
+      queueNameOf(run.jobName) === QUEUES.maintenance
+        ? this.maintenanceQueue
+        : this.historicalQueue;
     await queue.remove(id).catch(() => undefined);
 
     await recordAudit({

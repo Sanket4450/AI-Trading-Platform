@@ -1,6 +1,6 @@
 import { apiFetch } from '@/lib/api';
 import type { Account } from '@/lib/types';
-import { formatDateTime, formatMoney, formatNumber } from '@/lib/format';
+import { formatDateTime, formatNumber } from '@/lib/format';
 import { TableCard } from '@/components/dashboard/table-card';
 import { TableSummary } from '@/components/dashboard/table-summary';
 import { StatusBadge } from '@/components/dashboard/status-badge';
@@ -97,7 +97,6 @@ export default async function AccountsPage({
                 <TableHead>Code</TableHead>
                 <TableHead>Mode</TableHead>
                 <TableHead>Currency</TableHead>
-                <TableHead>Equity</TableHead>
                 <TableHead>Permissions</TableHead>
                 <TableHead>Credential expiry</TableHead>
                 <TableHead />
@@ -114,9 +113,6 @@ export default async function AccountsPage({
                     <StatusBadge status={account.mode} />
                   </TableCell>
                   <TableCell>{account.baseCurrency}</TableCell>
-                  <TableCell>
-                    {formatMoney(account.latestNetEquity, account.baseCurrency)}
-                  </TableCell>
                   <TableCell>{formatNumber(account.permissionCount)}</TableCell>
                   <TableCell className="text-muted-foreground">
                     {formatDateTime(account.credentialExpiry)}

@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import type {
-  JobBroadcast,
-  JobEventBroadcast,
-  JobRunBroadcast,
+import {
+  queueNameOf,
+  type JobBroadcast,
+  type JobEventBroadcast,
+  type JobRunBroadcast,
 } from '@ai-trading/domain';
 import {
   appendJobRunEvents,
@@ -15,7 +16,6 @@ import { JobEventsPublisher } from './job-events.publisher.js';
 function runBroadcast(row: {
   id: string;
   jobName: string;
-  queueName: string;
   status: string;
   groupId: string | null;
   instrumentId: string | null;
@@ -30,7 +30,7 @@ function runBroadcast(row: {
   return {
     id: row.id,
     jobName: row.jobName,
-    queueName: row.queueName,
+    queueName: queueNameOf(row.jobName) ?? 'unknown',
     status: row.status,
     groupId: row.groupId,
     instrumentId: row.instrumentId,

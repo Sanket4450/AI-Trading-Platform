@@ -235,9 +235,6 @@ export class HealthSnapshotDto {
 
   @ApiProperty({ type: Object, additionalProperties: true })
   details!: Record<string, unknown>;
-
-  @ApiProperty({ type: String, format: 'date-time' })
-  createdAt!: string;
 }
 
 export class NotificationEventDto {
@@ -268,12 +265,6 @@ export class NotificationEventDto {
   @ApiProperty({ enum: ['pending', 'sent', 'failed', 'read'] })
   status!: string;
 
-  @ApiProperty({ type: String, format: 'date-time', nullable: true })
-  sentAt!: string | null;
-
-  @ApiProperty({ type: String, format: 'date-time', nullable: true })
-  readAt!: string | null;
-
   @ApiProperty({ type: String, format: 'date-time' })
   createdAt!: string;
 }
@@ -295,12 +286,6 @@ export class ReportRunDto {
 
   @ApiProperty({ enum: ['queued', 'running', 'completed', 'failed'] })
   status!: string;
-
-  @ApiProperty({ type: String, format: 'date-time', nullable: true })
-  generatedAt!: string | null;
-
-  @ApiProperty({ type: String, nullable: true })
-  fileRef!: string | null;
 
   @ApiProperty({ type: Object, additionalProperties: true })
   parameters!: Record<string, unknown>;
@@ -327,18 +312,6 @@ export class TradingCalendarDto {
 
   @ApiProperty({ type: String, format: 'date-time', nullable: true })
   sessionClose!: string | null;
-
-  @ApiProperty({ type: String, format: 'date-time', nullable: true })
-  preOpenStart!: string | null;
-
-  @ApiProperty({ type: String, format: 'date-time', nullable: true })
-  closingAuctionStart!: string | null;
-
-  @ApiProperty({ type: String, format: 'date-time', nullable: true })
-  closingAuctionEnd!: string | null;
-
-  @ApiProperty({ type: String, format: 'date', nullable: true })
-  settlementDate!: string | null;
 
   @ApiProperty({ type: String, nullable: true })
   description!: string | null;

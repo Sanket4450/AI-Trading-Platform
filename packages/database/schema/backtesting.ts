@@ -105,10 +105,8 @@ export const backtestTrades = pgTable(
     exitPrice: numeric('exit_price', { precision: 20, scale: 4 }).notNull(),
     grossPnl: numeric('gross_pnl', { precision: 20, scale: 2 }).notNull(),
     costsTotal: numeric('costs_total', { precision: 20, scale: 2 }).default('0').notNull(),
-    netPnl: numeric('net_pnl', { precision: 20, scale: 2 }).notNull(),
     initialStop: numeric('initial_stop', { precision: 20, scale: 4 }),
     target: numeric('target', { precision: 20, scale: 4 }),
-    rMultiple: numeric('r_multiple', { precision: 20, scale: 6 }),
     exitReason: varchar('exit_reason', { length: 30 }).notNull(),
     signalSnapshot: jsonb('signal_snapshot')
       .default(sql`'{}'::jsonb`)

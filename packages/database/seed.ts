@@ -56,13 +56,12 @@ async function getProvider(tx: Transaction, code: string, name: string, kind: st
       name,
       kind,
       capabilities: code === 'upstox' ? { historical: true, quotes: true, orders: true } : {},
-      isActive: true,
     })
     .returning();
   return created;
 }
 
-async function getExchange(tx: Transaction, code: string, mic: string, name: string) {
+async function getExchange(tx: Transaction, code: string) {
   const existing = await tx
     .select()
     .from(schema.exchanges)
@@ -74,11 +73,6 @@ async function getExchange(tx: Transaction, code: string, mic: string, name: str
     .values({
       id: uuidv7(),
       code,
-      mic,
-      name,
-      timezone: 'Asia/Kolkata',
-      currency: 'INR',
-      isActive: true,
     })
     .returning();
   return created;
@@ -136,7 +130,6 @@ async function getInstrument(
       isin: values.isin,
       segment: values.segment,
       instrumentType: values.instrumentType,
-      lotSize: 1,
       tickSize,
       isActive: true,
       isSyncTarget: true,
@@ -258,8 +251,8 @@ export async function seedDatabase(options: SeedOptions) {
     await getProvider(tx, 'simulated', 'Simulated Broker', 'internal');
     await getProvider(tx, 'csv', 'CSV Import', 'market_data');
 
-    const nse = await getExchange(tx, 'NSE', 'XNSE', 'National Stock Exchange of India');
-    const bse = await getExchange(tx, 'BSE', 'XBOM', 'BSE Limited');
+    const nse = await getExchange(tx, 'NSE');
+    const bse = await getExchange(tx, 'BSE');
 
     let user = (
       await tx
@@ -279,7 +272,6 @@ export async function seedDatabase(options: SeedOptions) {
           passwordHash,
           role: 'admin',
           status: 'active',
-          failedLoginCount: 0,
         })
         .returning();
     } else if (options.forcePasswordReset) {
@@ -305,7 +297,6 @@ export async function seedDatabase(options: SeedOptions) {
           brokerUserRef,
           baseCurrency: 'INR',
           mode: tradingMode,
-          timezone: 'Asia/Kolkata',
           isActive: true,
           openedAt: today,
         })
@@ -363,10 +354,6 @@ export async function seedDatabase(options: SeedOptions) {
             isTradingDay,
             sessionOpen: isTradingDay ? istInstant(date, open) : null,
             sessionClose: isTradingDay ? istInstant(date, close) : null,
-            preOpenStart: isTradingDay && !special ? istInstant(date, '09:00:00') : null,
-            closingAuctionStart: isTradingDay && !special ? istInstant(date, close) : null,
-            closingAuctionEnd: isTradingDay && !special ? istInstant(date, '15:40:00') : null,
-            settlementDate: null,
             description: special?.description ?? holiday ?? (isTradingDay ? null : 'Weekend'),
             sourceProviderId: upstox.id,
           });
@@ -383,9 +370,6 @@ export async function seedDatabase(options: SeedOptions) {
           isTradingDay: sql`excluded.is_trading_day`,
           sessionOpen: sql`excluded.session_open`,
           sessionClose: sql`excluded.session_close`,
-          preOpenStart: sql`excluded.pre_open_start`,
-          closingAuctionStart: sql`excluded.closing_auction_start`,
-          closingAuctionEnd: sql`excluded.closing_auction_end`,
           description: sql`excluded.description`,
           sourceProviderId: sql`excluded.source_provider_id`,
           updatedAt: new Date(),
@@ -652,9 +636,6 @@ export async function seedDatabase(options: SeedOptions) {
           instrumentId: instrument.id,
           isTradable: true,
           productAllowlist: ['intraday'],
-          maxQuantity: null,
-          maxOpenQuantity: null,
-          reason: 'R1 seed: ORB candidate permissions',
           effectiveFrom: today,
           effectiveTo: null,
           createdBy: user.id,

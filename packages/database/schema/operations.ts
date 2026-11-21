@@ -34,13 +34,10 @@ export const dailyPerformance = pgTable(
     closingEquity: numeric('closing_equity', { precision: 20, scale: 2 }),
     grossPnl: numeric('gross_pnl', { precision: 20, scale: 2 }).notNull(),
     costs: numeric('costs', { precision: 20, scale: 2 }).notNull(),
-    netPnl: numeric('net_pnl', { precision: 20, scale: 2 }).notNull(),
-    returnPct: numeric('return_pct', { precision: 10, scale: 6 }),
     maxDrawdownPct: numeric('max_drawdown_pct', { precision: 10, scale: 6 }),
     tradesCount: integer('trades_count').default(0).notNull(),
     winningTrades: integer('winning_trades').default(0).notNull(),
     losingTrades: integer('losing_trades').default(0).notNull(),
-    winRate: numeric('win_rate', { precision: 10, scale: 6 }),
     riskLimitBreaches: integer('risk_limit_breaches').default(0).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
@@ -52,7 +49,6 @@ export const dailyPerformance = pgTable(
     check('chk_daily_performance_trades_count_2', sql`${table.tradesCount} >= 0`),
     check('chk_daily_performance_winning_trades_3', sql`${table.winningTrades} >= 0`),
     check('chk_daily_performance_losing_trades_4', sql`${table.losingTrades} >= 0`),
-    check('chk_daily_performance_win_rate_5', sql`${table.winRate} >= 0 and ${table.winRate} <= 1`),
     check('chk_daily_performance_risk_limit_breaches_6', sql`${table.riskLimitBreaches} >= 0`),
   ],
 );
@@ -66,12 +62,9 @@ export const strategyPerformanceDaily = pgTable(
     tradingDate: date('trading_date').notNull(),
     grossPnl: numeric('gross_pnl', { precision: 20, scale: 2 }).notNull(),
     costs: numeric('costs', { precision: 20, scale: 2 }).notNull(),
-    netPnl: numeric('net_pnl', { precision: 20, scale: 2 }).notNull(),
     tradesCount: integer('trades_count').default(0).notNull(),
     winningTrades: integer('winning_trades').default(0).notNull(),
     losingTrades: integer('losing_trades').default(0).notNull(),
-    winRate: numeric('win_rate', { precision: 10, scale: 6 }),
-    expectancy: numeric('expectancy', { precision: 20, scale: 6 }),
     profitFactor: numeric('profit_factor', { precision: 20, scale: 6 }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
@@ -86,10 +79,6 @@ export const strategyPerformanceDaily = pgTable(
     check('chk_strategy_performance_daily_trades_count_1', sql`${table.tradesCount} >= 0`),
     check('chk_strategy_performance_daily_winning_trades_2', sql`${table.winningTrades} >= 0`),
     check('chk_strategy_performance_daily_losing_trades_3', sql`${table.losingTrades} >= 0`),
-    check(
-      'chk_strategy_performance_daily_win_rate_4',
-      sql`${table.winRate} >= 0 and ${table.winRate} <= 1`,
-    ),
     check('chk_strategy_performance_daily_profit_factor_5', sql`${table.profitFactor} >= 0`),
   ],
 );
@@ -99,7 +88,6 @@ export const jobRuns = pgTable(
   {
     id: uuid('id').primaryKey(),
     jobName: varchar('job_name', { length: 80 }).notNull(),
-    queueName: varchar('queue_name', { length: 40 }).notNull(),
     status: varchar('status', { length: 20 }).notNull(),
     groupId: uuid('group_id'),
     instrumentId: uuid('instrument_id'),
@@ -172,7 +160,6 @@ export const systemHealthSnapshots = pgTable(
     details: jsonb('details')
       .default(sql`'{}'::jsonb`)
       .notNull(),
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     check(
@@ -199,8 +186,6 @@ export const notificationEvents = pgTable(
     relatedEntityType: varchar('related_entity_type', { length: 80 }),
     relatedEntityId: uuid('related_entity_id'),
     status: varchar('status', { length: 20 }).notNull(),
-    sentAt: timestamp('sent_at', { withTimezone: true }),
-    readAt: timestamp('read_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
@@ -227,8 +212,6 @@ export const reportRuns = pgTable(
     periodStart: date('period_start').notNull(),
     periodEnd: date('period_end').notNull(),
     status: varchar('status', { length: 20 }).notNull(),
-    generatedAt: timestamp('generated_at', { withTimezone: true }),
-    fileRef: varchar('file_ref', { length: 240 }),
     parameters: jsonb('parameters')
       .default(sql`'{}'::jsonb`)
       .notNull(),

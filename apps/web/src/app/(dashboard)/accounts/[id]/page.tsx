@@ -96,8 +96,8 @@ export default async function AccountDetailPage({
           tone="info"
         />
         <StatCard
-          label="Latest equity"
-          value={formatMoney(account.latestNetEquity, account.baseCurrency)}
+          label="Equity snapshots"
+          value={formatNumber(equity.length)}
           hint={formatDateTime(account.latestEquityAt)}
           tone="success"
         />
@@ -223,7 +223,6 @@ export default async function AccountDetailPage({
                   <TableRow>
                     <TableHead>Captured</TableHead>
                     <TableHead>Type</TableHead>
-                    <TableHead>Net equity</TableHead>
                     <TableHead />
                   </TableRow>
                 </TableHeader>
@@ -234,7 +233,6 @@ export default async function AccountDetailPage({
                         {formatDateTime(snapshot.capturedAt)}
                       </TableCell>
                       <TableCell>{label(snapshot.snapshotType)}</TableCell>
-                      <TableCell>{formatMoney(snapshot.netEquity, account.baseCurrency)}</TableCell>
                       <TableActions>
                         <DetailDialog
                           title={`Equity snapshot · ${snapshot.tradingDate}`}
@@ -251,16 +249,6 @@ export default async function AccountDetailPage({
                               {
                                 label: 'Available cash',
                                 value: formatMoney(snapshot.availableCash, account.baseCurrency),
-                              },
-                              {
-                                label: 'Net equity',
-                                value: formatMoney(snapshot.netEquity, account.baseCurrency),
-                              },
-                              {
-                                label: 'Drawdown',
-                                value: snapshot.drawdownPct
-                                  ? `${(Number(snapshot.drawdownPct) * 100).toFixed(2)}%`
-                                  : '—',
                               },
                             ]}
                           />

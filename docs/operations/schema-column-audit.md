@@ -7,7 +7,11 @@
 quality services, the seed, the API DTOs and the web types. A column is called *dead* when no code writes or
 reads it, and *duplicate* when another column in the same row always carries the same value.
 
-This is an analysis only: no schema or code was changed.
+> **Update — 2026-11-21.** `0015_system_issues.sql` replaced `data_quality_issues` with
+> `system_issues`, so the `data_quality_issues.created_at` item below no longer exists; `system_issues`
+> has no redundant column. The remaining list is prepared for removal in
+> `0016_drop_redundant_columns.sql`, including the previously flagged future-use and audit-snapshot
+> columns, per the explicit decision to remove all of them.
 
 ## How to read this
 
@@ -277,9 +281,63 @@ Legend: **—** = no removal recommended.
    - `pnpm lint`, plus `pnpm nx run-many -t typecheck test -p database api worker web tests`.
    - No browser verification by policy.
 
-## 6. Decisions needed
+## 6. Derived columns (same-row computations)
 
-1. Approve the 18 definitive removals, or keep any of the write-only audit columns as well?
-2. Should the derived columns in §2 be dropped now, or at the release that introduces the owning feature?
-3. Is the plan to delete the empty reserved tables (notifications, reports, health snapshots, domain events),
-   or keep them as the R3–R6 contract?
+| #  | Table.column                                    | Derived from                                                      |
+| -- | ----------------------------------------------- | ----------------------------------------------------------------- |
+| 1  | `fills.gross_amount`                            | `quantity × price`                                                |
+| 2  | `trade_costs.total`                             | sum of brokerage, STT, exchange, SEBI, stamp, GST, other charges  |
+| 3  | `positions.market_value`                        | `quantity × last_price`                                           |
+| 4  | `positions.unrealized_pnl`                      | `(last_price − average_price) × quantity`                         |
+| 5  | `positions.status`                              | open while quantity is non-zero; closed when `closed_at` is set   |
+| 6  | `round_trip_trades.net_pnl`                     | `gross_pnl − costs_total`                                        |
+| 7  | `round_trip_trades.r_multiple`                  | `net_pnl ÷ (entry_price − initial_stop) × quantity` (long)        |
+| 8  | `round_trip_trades.status`                      | open while `exit_at` is `NULL`                                    |
+| 9  | `backtest_trades.net_pnl`                       | `gross_pnl − costs_total`                                        |
+| 10 | `backtest_trades.r_multiple`                    | `net_pnl ÷ (entry_price − initial_stop) × quantity` (long)        |
+| 11 | `daily_performance.net_pnl`                     | `gross_pnl − costs`                                               |
+| 12 | `daily_performance.return_pct`                  | `net_pnl ÷ opening_equity`                                        |
+| 13 | `daily_performance.win_rate`                    | `winning_trades ÷ trades_count`                                   |
+| 14 | `strategy_performance_daily.net_pnl`            | `gross_pnl − costs`                                               |
+| 15 | `strategy_performance_daily.win_rate`           | `winning_trades ÷ trades_count`                                   |
+| 16 | `strategy_performance_daily.expectancy`         | `net_pnl ÷ trades_count`                                          |
+| 17 | `risk_decisions.risk_amount`                    | `account_equity × risk_percent`                                   |
+| 18 | `risk_decisions.stop_distance`                  | `abs(entry_price − stop_price)` from the signal                   |
+| 19 | `reconciliations.mismatches_count`              | `count(*)` of `reconciliation_issues` for the reconciliation      |
+| 20 | `account_equity_snapshots.net_equity`           | available cash + collateral + position value + unsettled profit   |
+| 21 | `account_equity_snapshots.drawdown_pct`         | `(peak_equity − net_equity) ÷ peak_equity`                       |
+| 22 | `market_quote_snapshots.net_change`             | `last_price − close` (same row)                                   |
+
+`round_trip_trades.gross_pnl` and `backtest_trades.gross_pnl` are also mathematically derivable from
+entry/exit/quantity/direction; they are kept as the stored trade result and are not listed as removable.
+
+## 7. Dead fields with no future use case
+
+These are not waiting for R3–R6. They are constant for the planned NSE/BSE cash-equity, INR, IST product
+and/or have no consumer in any release:
+
+| # | Table.column                                   | Why there is no future use                                                                                     |
+| - | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| 1 | `accounts.timezone`                            | The business timezone is `Asia/Kolkata` for the whole system (`ui.timezone`, exchange timezone). No per-account timezone logic exists or is planned. |
+| 2 | `exchanges.timezone`                           | NSE and BSE are both IST; market timezone is a system constant.                                                |
+| 3 | `exchanges.currency`                           | NSE/BSE settlement is INR; there is no FX or multi-currency P&L.                                               |
+| 4 | `trade_costs.currency`                         | Cost model is INR-only; the column is always `INR`.                                                            |
+| 5 | `instruments.lot_size`                         | Cash equities and indices always trade in units of 1; derivatives are explicitly out of scope. It is exposed but used in no calculation. |
+| 6 | `broker_position_snapshots.multiplier`         | Always 1 for cash equities; it only matters for derivatives.                                                   |
+| 7 | `orders.status_message`                        | Merge into `orders.status_message_raw`; the normalized text can be derived from the raw RMS message.           |
+| 8 | `users.failed_login_count`                     | Incremented on failure but never read, and no lockout policy sets `users.status = 'locked'`. Remove unless account lockout is committed. |
+| 9 | `raw_provider_payloads.content_encoding`       | The payload is stored already decoded as `jsonb`, so the original content encoding is never needed for replay or retention. |
+| 10| `providers.is_active`                          | No provider retirement flow reads or writes it. Keep only if provider deactivation is planned.                  |
+| 11| `exchanges.is_active`                          | No exchange retirement flow reads or writes it. Keep only if venue deactivation is planned.                     |
+
+**Conditional but probably permanent:** `exchanges.mic`, `exchanges.name`. Both are unread today. They are
+standard reference labels, so keep them if the exchange master will ever be shown or exported; otherwise
+they are also removable.
+
+## 8. Decision taken
+
+The operator chose to remove every column in the definitive, derived and no-future-use lists, plus the
+previously flagged future-use and audit-snapshot columns. That scope is implemented in
+`0016_drop_redundant_columns.sql` and the matching schema/repository/API/web/worker changes.
+
+The empty reserved tables themselves are retained; only their redundant columns are dropped.

@@ -10,10 +10,8 @@ import {
   createSession,
   findSessionByTokenHash,
   findUserByEmail,
-  markLoginFailure,
   markLoginSuccess,
   revokeSession,
-  touchSession,
 } from '@ai-trading/database';
 import { sha256Hex } from '@ai-trading/domain';
 import { SESSION_COOKIE } from '../../common/auth/auth.constants.js';
@@ -73,7 +71,6 @@ export class AuthService {
 
     const valid = await verify(user.passwordHash, password);
     if (!valid) {
-      await markLoginFailure(user.id);
       throw new UnauthorizedException('Invalid email or password');
     }
 
@@ -110,8 +107,6 @@ export class AuthService {
     if (!row.session.expiresAt || row.session.expiresAt.getTime() <= Date.now())
       return null;
     if (row.user.status !== 'active') return null;
-
-    await touchSession(row.session.id);
 
     return {
       session: {

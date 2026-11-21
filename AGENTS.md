@@ -1,4 +1,4 @@
-# AGENTS.md — AI Trading System
+deleteAllCoverage# AGENTS.md — AI Trading System
 
 Modular monolith for NSE cash-equity research, backtesting and (later) controlled live execution.
 Current release is **R2**: research data platform. It cannot place orders.

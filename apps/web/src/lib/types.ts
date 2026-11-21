@@ -14,11 +14,9 @@ export interface Account {
   brokerUserRef: string | null;
   baseCurrency: string;
   mode: string;
-  timezone: string;
   isActive: boolean;
   openedAt: string | null;
   latestEquityAt: string | null;
-  latestNetEquity: string | null;
   permissionCount: number;
   credentialExpiry: string | null;
   openSessionCount: number;
@@ -52,8 +50,6 @@ export interface EquitySnapshot {
   tradingDate: string;
   snapshotType: string;
   availableCash: string | null;
-  netEquity: string | null;
-  drawdownPct: string | null;
   source: string;
 }
 
@@ -67,7 +63,6 @@ export interface Instrument {
   isin: string | null;
   segment: string;
   instrumentType: string;
-  lotSize: number;
   tickSize: string;
   freezeQuantity: string | null;
   isActive: boolean;
@@ -96,7 +91,6 @@ export interface CorporateAction {
   symbol: string;
   actionType: string;
   exDate: string;
-  recordDate: string | null;
   ratioNumerator: string | null;
   ratioDenominator: string | null;
   dividendPerShare: string | null;

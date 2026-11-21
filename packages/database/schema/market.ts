@@ -78,10 +78,8 @@ export const marketQuoteSnapshots = pgTable(
     totalSellQuantity: numeric('total_sell_quantity', { precision: 20, scale: 4 }),
     lowerCircuitLimit: numeric('lower_circuit_limit', { precision: 20, scale: 4 }),
     upperCircuitLimit: numeric('upper_circuit_limit', { precision: 20, scale: 4 }),
-    netChange: numeric('net_change', { precision: 20, scale: 4 }),
     sourceProviderId: uuid('source_provider_id'),
     rawPayloadId: uuid('raw_payload_id'),
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     primaryKey({ columns: [table.instrumentId, table.capturedAt] }),

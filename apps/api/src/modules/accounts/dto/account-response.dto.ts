@@ -24,8 +24,6 @@ export class AccountDto {
   })
   mode!: string;
 
-  @ApiProperty({ example: 'Asia/Kolkata' })
-  timezone!: string;
 
   @ApiProperty()
   isActive!: boolean;
@@ -35,9 +33,6 @@ export class AccountDto {
 
   @ApiProperty({ type: String, format: 'date-time', nullable: true })
   latestEquityAt!: string | null;
-
-  @ApiProperty({ type: String, nullable: true })
-  latestNetEquity!: string | null;
 
   @ApiProperty({ example: 50 })
   permissionCount!: number;
@@ -152,12 +147,6 @@ export class EquitySnapshotDto {
 
   @ApiProperty({ type: String, nullable: true })
   availableCash!: string | null;
-
-  @ApiProperty({ type: String, nullable: true })
-  netEquity!: string | null;
-
-  @ApiProperty({ type: String, nullable: true })
-  drawdownPct!: string | null;
 
   @ApiProperty({ enum: ['broker', 'computed'] })
   source!: string;

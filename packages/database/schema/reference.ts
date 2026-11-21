@@ -35,7 +35,6 @@ export const providers = pgTable(
     capabilities: jsonb('capabilities')
       .default(sql`'{}'::jsonb`)
       .notNull(),
-    isActive: boolean('is_active').default(true).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
@@ -53,18 +52,10 @@ export const exchanges = pgTable(
   {
     id: uuid('id').primaryKey().defaultRandom(),
     code: varchar('code', { length: 10 }).notNull(),
-    mic: char('mic', { length: 4 }),
-    name: varchar('name', { length: 120 }).notNull(),
-    timezone: varchar('timezone', { length: 50 }).default('Asia/Kolkata').notNull(),
-    currency: char('currency', { length: 3 }).default('INR').notNull(),
-    isActive: boolean('is_active').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
-  (table) => [
-    uniqueIndex('uq_exchanges_code').on(table.code),
-    uniqueIndex('uq_exchanges_mic').on(table.mic),
-  ],
+  (table) => [uniqueIndex('uq_exchanges_code').on(table.code)],
 );
 
 export const instruments = pgTable(
@@ -78,7 +69,6 @@ export const instruments = pgTable(
     isin: char('isin', { length: 12 }),
     segment: varchar('segment', { length: 20 }).notNull(),
     instrumentType: varchar('instrument_type', { length: 20 }).notNull(),
-    lotSize: integer('lot_size').default(1).notNull(),
     tickSize: numeric('tick_size', { precision: 10, scale: 4 }).default('0.05').notNull(),
     freezeQuantity: numeric('freeze_quantity', { precision: 20, scale: 4 }),
     isActive: boolean('is_active').default(true).notNull(),
@@ -94,7 +84,6 @@ export const instruments = pgTable(
     index('idx_instruments_trading_symbol').on(table.tradingSymbol),
     index('idx_instruments_is_active').on(table.isActive),
     index('idx_instruments_is_sync_target').on(table.isSyncTarget),
-    check('chk_instruments_lot_size_1', sql`${table.lotSize} > 0`),
     check('chk_instruments_tick_size_2', sql`${table.tickSize} > 0`),
     check('chk_instruments_freeze_quantity_3', sql`${table.freezeQuantity} > 0`),
     check(
@@ -117,7 +106,6 @@ export const instrumentProviderMappings = pgTable(
     isPrimary: boolean('is_primary').default(false).notNull(),
     validFrom: timestamp('valid_from', { withTimezone: true }).notNull(),
     validTo: timestamp('valid_to', { withTimezone: true }),
-    rawPayloadId: uuid('raw_payload_id'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
@@ -140,10 +128,6 @@ export const tradingCalendar = pgTable(
     isTradingDay: boolean('is_trading_day').default(true).notNull(),
     sessionOpen: timestamp('session_open', { withTimezone: true }),
     sessionClose: timestamp('session_close', { withTimezone: true }),
-    preOpenStart: timestamp('pre_open_start', { withTimezone: true }),
-    closingAuctionStart: timestamp('closing_auction_start', { withTimezone: true }),
-    closingAuctionEnd: timestamp('closing_auction_end', { withTimezone: true }),
-    settlementDate: date('settlement_date'),
     description: varchar('description', { length: 200 }),
     sourceProviderId: uuid('source_provider_id'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
@@ -163,7 +147,6 @@ export const corporateActions = pgTable(
     instrumentId: uuid('instrument_id').notNull(),
     actionType: varchar('action_type', { length: 30 }).notNull(),
     exDate: date('ex_date').notNull(),
-    recordDate: date('record_date'),
     ratioNumerator: numeric('ratio_numerator', { precision: 20, scale: 6 }),
     ratioDenominator: numeric('ratio_denominator', { precision: 20, scale: 6 }),
     dividendPerShare: numeric('dividend_per_share', { precision: 20, scale: 4 }),
@@ -220,7 +203,6 @@ export const rawProviderPayloads = pgTable(
     requestFingerprint: char('request_fingerprint', { length: 64 }).notNull(),
     requestParams: jsonb('request_params'),
     httpStatus: smallint('http_status').notNull(),
-    contentEncoding: varchar('content_encoding', { length: 20 }),
     payload: jsonb('payload').notNull(),
     payloadBytes: integer('payload_bytes').notNull(),
     payloadSha256: char('payload_sha256', { length: 64 }).notNull(),

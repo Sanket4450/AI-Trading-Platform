@@ -81,10 +81,8 @@ export const riskDecisions = pgTable(
     outcome: varchar('outcome', { length: 20 }).notNull(),
     approvedQuantity: numeric('approved_quantity', { precision: 20, scale: 4 }),
     riskPercent: numeric('risk_percent', { precision: 10, scale: 6 }).notNull(),
-    riskAmount: numeric('risk_amount', { precision: 20, scale: 2 }),
     accountEquity: numeric('account_equity', { precision: 20, scale: 2 }),
     availableCash: numeric('available_cash', { precision: 20, scale: 2 }),
-    stopDistance: numeric('stop_distance', { precision: 20, scale: 4 }),
     reasons: jsonb('reasons')
       .default(sql`'[]'::jsonb`)
       .notNull(),
@@ -99,8 +97,6 @@ export const riskDecisions = pgTable(
     ),
     check('chk_risk_decisions_approved_quantity_2', sql`${table.approvedQuantity} >= 0`),
     check('chk_risk_decisions_risk_percent_3', sql`${table.riskPercent} > 0`),
-    check('chk_risk_decisions_risk_amount_4', sql`${table.riskAmount} >= 0`),
-    check('chk_risk_decisions_stop_distance_5', sql`${table.stopDistance} > 0`),
   ],
 );
 
@@ -140,7 +136,6 @@ export const orders = pgTable(
     tag: varchar('tag', { length: 40 }).notNull(),
     placedAt: timestamp('placed_at', { withTimezone: true }).notNull(),
     brokerUpdatedAt: timestamp('broker_updated_at', { withTimezone: true }).notNull(),
-    statusMessage: text('status_message'),
     statusMessageRaw: text('status_message_raw'),
     rawPayloadId: uuid('raw_payload_id'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
@@ -214,9 +209,7 @@ export const fills = pgTable(
     side: varchar('side', { length: 10 }).notNull(),
     quantity: numeric('quantity', { precision: 20, scale: 4 }).notNull(),
     price: numeric('price', { precision: 20, scale: 4 }).notNull(),
-    grossAmount: numeric('gross_amount', { precision: 20, scale: 2 }).notNull(),
     executedAt: timestamp('executed_at', { withTimezone: true }).notNull(),
-    exchangeTimestamp: timestamp('exchange_timestamp', { withTimezone: true }).notNull(),
     rawPayloadId: uuid('raw_payload_id'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
@@ -227,7 +220,6 @@ export const fills = pgTable(
     check('chk_fills_side_1', sql`${table.side} in ('buy', 'sell')`),
     check('chk_fills_quantity_2', sql`${table.quantity} > 0`),
     check('chk_fills_price_3', sql`${table.price} > 0`),
-    check('chk_fills_gross_amount_4', sql`${table.grossAmount} >= 0`),
   ],
 );
 
@@ -243,11 +235,8 @@ export const tradeCosts = pgTable(
     stampDuty: numeric('stamp_duty', { precision: 20, scale: 4 }).notNull(),
     gst: numeric('gst', { precision: 20, scale: 4 }).notNull(),
     otherCharges: numeric('other_charges', { precision: 20, scale: 4 }).notNull(),
-    total: numeric('total', { precision: 20, scale: 4 }).notNull(),
-    currency: char('currency', { length: 3 }).notNull(),
     costModelVersion: varchar('cost_model_version', { length: 30 }).notNull(),
     computedAt: timestamp('computed_at', { withTimezone: true }).defaultNow().notNull(),
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     uniqueIndex('uq_trade_costs_fill').on(table.fillId),
@@ -258,7 +247,6 @@ export const tradeCosts = pgTable(
     check('chk_trade_costs_stamp_duty_5', sql`${table.stampDuty} >= 0`),
     check('chk_trade_costs_gst_6', sql`${table.gst} >= 0`),
     check('chk_trade_costs_other_charges_7', sql`${table.otherCharges} >= 0`),
-    check('chk_trade_costs_total_8', sql`${table.total} >= 0`),
   ],
 );
 
@@ -277,14 +265,11 @@ export const positions = pgTable(
       .notNull(),
     averagePrice: numeric('average_price', { precision: 20, scale: 4 }),
     lastPrice: numeric('last_price', { precision: 20, scale: 4 }),
-    marketValue: numeric('market_value', { precision: 20, scale: 2 }),
     realizedPnl: numeric('realized_pnl', { precision: 20, scale: 2 }).default('0').notNull(),
-    unrealizedPnl: numeric('unrealized_pnl', { precision: 20, scale: 2 }).default('0').notNull(),
     stopPrice: numeric('stop_price', { precision: 20, scale: 4 }),
     targetPrice: numeric('target_price', { precision: 20, scale: 4 }),
     openedAt: timestamp('opened_at', { withTimezone: true }),
     closedAt: timestamp('closed_at', { withTimezone: true }),
-    status: varchar('status', { length: 20 }).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
@@ -296,7 +281,6 @@ export const positions = pgTable(
       'chk_positions_product_1',
       sql`${table.product} in ('intraday', 'delivery', 'co', 'mtf')`,
     ),
-    check('chk_positions_quantity_2', sql`${table.status} <> 'open' or ${table.quantity} <> 0`),
     check('chk_positions_average_price_3', sql`${table.averagePrice} > 0`),
     check('chk_positions_last_price_4', sql`${table.lastPrice} > 0`),
     check('chk_positions_stop_price_5', sql`${table.stopPrice} > 0`),
@@ -305,7 +289,6 @@ export const positions = pgTable(
       'chk_positions_opened_at_7',
       sql`${table.closedAt} is null or ${table.closedAt} > ${table.openedAt}`,
     ),
-    check('chk_positions_status_8', sql`${table.status} in ('open', 'closed')`),
   ],
 );
 
@@ -325,7 +308,6 @@ export const positionEvents = pgTable(
       .default(sql`'{}'::jsonb`)
       .notNull(),
     occurredAt: timestamp('occurred_at', { withTimezone: true }).defaultNow().notNull(),
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     index('idx_position_events_position_id').on(table.positionId),
@@ -358,9 +340,7 @@ export const brokerPositionSnapshots = pgTable(
     daySellQuantity: numeric('day_sell_quantity', { precision: 20, scale: 4 })
       .default('0')
       .notNull(),
-    multiplier: numeric('multiplier', { precision: 20, scale: 4 }).default('1').notNull(),
     rawPayloadId: uuid('raw_payload_id'),
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     index('idx_broker_position_snapshots_account_id').on(table.accountId),
@@ -397,7 +377,6 @@ export const holdingsSnapshots = pgTable(
     dayChangePct: numeric('day_change_pct', { precision: 20, scale: 4 }),
     haircut: numeric('haircut', { precision: 10, scale: 6 }),
     rawPayloadId: uuid('raw_payload_id'),
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     index('idx_holdings_snapshots_account_id').on(table.accountId),
@@ -426,11 +405,8 @@ export const accountEquitySnapshots = pgTable(
     utilizedMargin: numeric('utilized_margin', { precision: 20, scale: 2 }),
     realizedPnl: numeric('realized_pnl', { precision: 20, scale: 2 }).notNull(),
     unrealizedPnl: numeric('unrealized_pnl', { precision: 20, scale: 2 }).notNull(),
-    netEquity: numeric('net_equity', { precision: 20, scale: 2 }),
-    drawdownPct: numeric('drawdown_pct', { precision: 10, scale: 6 }),
     source: varchar('source', { length: 20 }).notNull(),
     rawPayloadId: uuid('raw_payload_id'),
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     index('idx_account_equity_snapshots_account_id').on(table.accountId),
@@ -445,7 +421,6 @@ export const accountEquitySnapshots = pgTable(
     ),
     check('chk_account_equity_snapshots_collateral_value_3', sql`${table.collateralValue} >= 0`),
     check('chk_account_equity_snapshots_utilized_margin_4', sql`${table.utilizedMargin} >= 0`),
-    check('chk_account_equity_snapshots_drawdown_pct_5', sql`${table.drawdownPct} >= 0`),
     check('chk_account_equity_snapshots_source_6', sql`${table.source} in ('broker', 'computed')`),
   ],
 );
@@ -469,12 +444,9 @@ export const roundTripTrades = pgTable(
     exitPrice: numeric('exit_price', { precision: 20, scale: 4 }).notNull(),
     grossPnl: numeric('gross_pnl', { precision: 20, scale: 2 }).notNull(),
     costsTotal: numeric('costs_total', { precision: 20, scale: 2 }).default('0').notNull(),
-    netPnl: numeric('net_pnl', { precision: 20, scale: 2 }).notNull(),
     initialStop: numeric('initial_stop', { precision: 20, scale: 4 }),
     target: numeric('target', { precision: 20, scale: 4 }),
-    rMultiple: numeric('r_multiple', { precision: 20, scale: 6 }),
     exitReason: varchar('exit_reason', { length: 30 }).notNull(),
-    status: varchar('status', { length: 20 }).notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
@@ -496,7 +468,6 @@ export const roundTripTrades = pgTable(
       'chk_round_trip_trades_exit_reason_8',
       sql`${table.exitReason} in ('target', 'stop', 'eod', 'manual', 'risk', 'reconciliation', 'strategy_exit')`,
     ),
-    check('chk_round_trip_trades_status_9', sql`${table.status} in ('open', 'closed')`),
   ],
 );
 
@@ -511,7 +482,6 @@ export const reconciliations = pgTable(
     status: varchar('status', { length: 20 }).notNull(),
     ordersChecked: integer('orders_checked').default(0).notNull(),
     positionsChecked: integer('positions_checked').default(0).notNull(),
-    mismatchesCount: integer('mismatches_count').default(0).notNull(),
     rawPayloadId: uuid('raw_payload_id'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
@@ -528,7 +498,6 @@ export const reconciliations = pgTable(
     ),
     check('chk_reconciliations_orders_checked_3', sql`${table.ordersChecked} >= 0`),
     check('chk_reconciliations_positions_checked_4', sql`${table.positionsChecked} >= 0`),
-    check('chk_reconciliations_mismatches_count_5', sql`${table.mismatchesCount} >= 0`),
   ],
 );
 

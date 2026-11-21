@@ -93,7 +93,6 @@ export async function upsertQuoteSnapshots(rows: (typeof marketQuoteSnapshots.$i
         totalSellQuantity: sql`excluded.total_sell_quantity`,
         lowerCircuitLimit: sql`excluded.lower_circuit_limit`,
         upperCircuitLimit: sql`excluded.upper_circuit_limit`,
-        netChange: sql`excluded.net_change`,
         sourceProviderId: sql`excluded.source_provider_id`,
         rawPayloadId: sql`excluded.raw_payload_id`,
       },

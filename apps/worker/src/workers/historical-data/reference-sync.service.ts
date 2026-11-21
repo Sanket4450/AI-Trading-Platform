@@ -80,7 +80,6 @@ export class ReferenceSyncService {
         requestFingerprint: sha256Hex('instrument-master|NSE'),
         requestParams: { exchange: 'NSE' },
         httpStatus: 200,
-        contentEncoding: 'gzip',
         payload: master,
         payloadBytes: Buffer.byteLength(serialized, 'utf8'),
         payloadSha256: sha256Hex(serialized),
@@ -119,7 +118,6 @@ export class ReferenceSyncService {
             isin: instrument.isin ? instrument.isin.toUpperCase() : null,
             segment,
             instrumentType,
-            lotSize: instrument.lot_size ?? 1,
             tickSize:
               instrumentType === 'INDEX'
                 ? '0.1000'
@@ -254,7 +252,6 @@ export class ReferenceSyncService {
           requestFingerprint: sha256Hex('market-holidays|current-year'),
           requestParams: null,
           httpStatus: 200,
-          contentEncoding: null,
           payload: holidays,
           payloadBytes: Buffer.byteLength(serialized, 'utf8'),
           payloadSha256: sha256Hex(serialized),

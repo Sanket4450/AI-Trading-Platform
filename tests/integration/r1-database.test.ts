@@ -144,13 +144,13 @@ describe('R2 database lifecycle', () => {
       select id from instruments where instrument_type = 'EQ' limit 1
     `;
     await sql`
-      insert into positions (account_id, instrument_id, product, quantity, status)
-      values (${account.id}, ${instrument.id}, 'intraday', 1, 'open')
+      insert into positions (account_id, instrument_id, product, quantity)
+      values (${account.id}, ${instrument.id}, 'intraday', 1)
     `;
     await expect(
       sql`
-        insert into positions (account_id, instrument_id, product, quantity, status)
-        values (${account.id}, ${instrument.id}, 'intraday', 1, 'open')
+        insert into positions (account_id, instrument_id, product, quantity)
+        values (${account.id}, ${instrument.id}, 'intraday', 1)
       `,
     ).rejects.toThrow(/uq_positions_open|duplicate key/i);
   });
@@ -290,15 +290,15 @@ describe('R2 database lifecycle', () => {
       select id from instruments where trading_symbol = 'RELIANCE' limit 1
     `;
     await sql`
-      insert into job_runs (id, job_name, queue_name, status, instrument_id, payload)
-      values (gen_random_uuid(), 'historical-backfill', 'historical-data', 'queued',
+      insert into job_runs (id, job_name, status, instrument_id, payload)
+      values (gen_random_uuid(), 'historical-backfill', 'queued',
               ${instrument.id},
               ${sql.json({ from: '2022-01-01', to: '2022-01-31' })})
     `;
     await expect(
       sql`
-        insert into job_runs (id, job_name, queue_name, status, instrument_id, payload)
-        values (gen_random_uuid(), 'historical-backfill', 'historical-data', 'queued',
+        insert into job_runs (id, job_name, status, instrument_id, payload)
+        values (gen_random_uuid(), 'historical-backfill', 'queued',
                 ${instrument.id},
                 ${sql.json({ from: '2022-02-01', to: '2022-02-28' })})
       `,

@@ -222,6 +222,10 @@ R1 lifecycle tables.
 - `0015_system_issues.sql` drops `data_quality_issues` and creates `system_issues`, a current-state
   ledger with `source`, `kind`, `severity`, provider/instrument scope, a unique `dedupe_key`,
   occurrence counters and a mechanism-owned `payload`. Resolved rows are deleted, not stored.
+- `0016_drop_redundant_columns.sql` removes the columns listed in
+  `docs/operations/schema-column-audit.md`: duplicate timestamps, cash/INR/IST constants,
+  same-row calculations and unused reserved-feature fields. The `positions` open-position guard
+  moves from the derived `status` to `closed_at IS NULL`. No logical table is dropped.
 - `pnpm db:verify` asserts 55 tables, the R2 tables and indexes, 51 sync targets, 51 status rows,
   51 primary mappings, valid tick sizes, calendar coverage and zero orders.
 

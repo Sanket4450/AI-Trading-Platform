@@ -30,9 +30,6 @@ export class InstrumentDto {
   @ApiProperty({ example: 'EQ' })
   instrumentType!: string;
 
-  @ApiProperty({ example: 1 })
-  lotSize!: number;
-
   @ApiProperty({ example: '0.05' })
   tickSize!: string;
 
@@ -86,13 +83,6 @@ export class InstrumentMappingDto {
   @ApiProperty({ type: String, format: 'date-time', nullable: true })
   validTo!: string | null;
 
-  @ApiProperty({
-    type: String,
-    format: 'uuid',
-    nullable: true,
-    required: false,
-  })
-  rawPayloadId?: string | null;
 }
 
 export class CorporateActionDto {
@@ -120,9 +110,6 @@ export class CorporateActionDto {
 
   @ApiProperty({ type: String, format: 'date' })
   exDate!: string;
-
-  @ApiProperty({ type: String, format: 'date', nullable: true })
-  recordDate!: string | null;
 
   @ApiProperty({ type: String, nullable: true })
   ratioNumerator!: string | null;

@@ -30,17 +30,7 @@ export async function findUserById(id: string) {
 export async function markLoginSuccess(userId: string) {
   await db
     .update(users)
-    .set({ lastLoginAt: new Date(), failedLoginCount: 0, updatedAt: new Date() })
-    .where(eq(users.id, userId));
-}
-
-export async function markLoginFailure(userId: string) {
-  await db
-    .update(users)
-    .set({
-      failedLoginCount: sql`${users.failedLoginCount} + 1`,
-      updatedAt: new Date(),
-    })
+    .set({ lastLoginAt: new Date(), updatedAt: new Date() })
     .where(eq(users.id, userId));
 }
 
@@ -82,13 +72,6 @@ export async function revokeSession(tokenHash: string) {
     .where(eq(userSessions.tokenHash, tokenHash));
 }
 
-export async function touchSession(sessionId: string) {
-  await db
-    .update(userSessions)
-    .set({ lastSeenAt: new Date() })
-    .where(eq(userSessions.id, sessionId));
-}
-
 export async function listAccounts(search?: string) {
   const term = search ? `%${search}%` : null;
   const conditions = term
@@ -104,16 +87,10 @@ export async function listAccounts(search?: string) {
       brokerUserRef: accounts.brokerUserRef,
       baseCurrency: accounts.baseCurrency,
       mode: accounts.mode,
-      timezone: accounts.timezone,
       isActive: accounts.isActive,
       openedAt: accounts.openedAt,
       latestEquityAt: sql<string | null>`(
         select s.captured_at::text from account_equity_snapshots s
-        where s.account_id = "accounts"."id"
-        order by s.captured_at desc limit 1
-      )`,
-      latestNetEquity: sql<string | null>`(
-        select s.net_equity::text from account_equity_snapshots s
         where s.account_id = "accounts"."id"
         order by s.captured_at desc limit 1
       )`,

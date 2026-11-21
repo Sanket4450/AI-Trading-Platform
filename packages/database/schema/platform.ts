@@ -16,7 +16,6 @@ import {
   index,
   inet,
   jsonb,
-  numeric,
   pgTable,
   smallint,
   text,
@@ -35,7 +34,6 @@ export const users = pgTable(
     passwordHash: text('password_hash').notNull(),
     role: varchar('role', { length: 30 }).notNull(),
     status: varchar('status', { length: 20 }).notNull(),
-    failedLoginCount: smallint('failed_login_count').default(0).notNull(),
     lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
@@ -57,7 +55,6 @@ export const userSessions = pgTable(
     issuedAt: timestamp('issued_at', { withTimezone: true }).defaultNow().notNull(),
     expiresAt: timestamp('expires_at', { withTimezone: true }),
     revokedAt: timestamp('revoked_at', { withTimezone: true }),
-    lastSeenAt: timestamp('last_seen_at', { withTimezone: true }),
   },
   (table) => [
     uniqueIndex('uq_user_sessions_token_hash').on(table.tokenHash),
@@ -76,7 +73,6 @@ export const accounts = pgTable(
     brokerUserRef: varchar('broker_user_ref', { length: 80 }),
     baseCurrency: char('base_currency', { length: 3 }).notNull(),
     mode: varchar('mode', { length: 20 }).notNull(),
-    timezone: varchar('timezone', { length: 50 }).default('Asia/Kolkata').notNull(),
     isActive: boolean('is_active').default(true).notNull(),
     openedAt: date('opened_at'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
@@ -186,9 +182,6 @@ export const accountInstrumentPermissions = pgTable(
     instrumentId: uuid('instrument_id').notNull(),
     isTradable: boolean('is_tradable').default(true).notNull(),
     productAllowlist: text('product_allowlist').array().notNull(),
-    maxQuantity: numeric('max_quantity', { precision: 20, scale: 4 }),
-    maxOpenQuantity: numeric('max_open_quantity', { precision: 20, scale: 4 }),
-    reason: text('reason'),
     effectiveFrom: date('effective_from')
       .default(sql`current_date`)
       .notNull(),
@@ -203,11 +196,6 @@ export const accountInstrumentPermissions = pgTable(
     check(
       'chk_account_instrument_permissions_product_allowlist_1',
       sql`${table.productAllowlist} <@ array['intraday','delivery','co','mtf']::text[]`,
-    ),
-    check('chk_account_instrument_permissions_max_quantity_2', sql`${table.maxQuantity} > 0`),
-    check(
-      'chk_account_instrument_permissions_max_open_quantity_3',
-      sql`${table.maxOpenQuantity} > 0`,
     ),
     check(
       'chk_account_instrument_permissions_effective_to_4',

@@ -49,7 +49,6 @@ export async function listInstruments(filters: {
       isin: instruments.isin,
       segment: instruments.segment,
       instrumentType: instruments.instrumentType,
-      lotSize: instruments.lotSize,
       tickSize: instruments.tickSize,
       freezeQuantity: instruments.freezeQuantity,
       isActive: instruments.isActive,
@@ -79,7 +78,6 @@ export async function getInstrument(id: string) {
       isin: instruments.isin,
       segment: instruments.segment,
       instrumentType: instruments.instrumentType,
-      lotSize: instruments.lotSize,
       tickSize: instruments.tickSize,
       freezeQuantity: instruments.freezeQuantity,
       isActive: instruments.isActive,
@@ -107,7 +105,6 @@ export async function listInstrumentMappings(instrumentId: string) {
       isPrimary: instrumentProviderMappings.isPrimary,
       validFrom: instrumentProviderMappings.validFrom,
       validTo: instrumentProviderMappings.validTo,
-      rawPayloadId: instrumentProviderMappings.rawPayloadId,
     })
     .from(instrumentProviderMappings)
     .innerJoin(providers, eq(providers.id, instrumentProviderMappings.providerId))
@@ -123,7 +120,6 @@ export async function listCorporateActions(instrumentId?: string) {
       symbol: instruments.tradingSymbol,
       actionType: corporateActions.actionType,
       exDate: corporateActions.exDate,
-      recordDate: corporateActions.recordDate,
       ratioNumerator: corporateActions.ratioNumerator,
       ratioDenominator: corporateActions.ratioDenominator,
       dividendPerShare: corporateActions.dividendPerShare,
@@ -158,10 +154,6 @@ export async function listTradingCalendar(filters: {
       isTradingDay: tradingCalendar.isTradingDay,
       sessionOpen: tradingCalendar.sessionOpen,
       sessionClose: tradingCalendar.sessionClose,
-      preOpenStart: tradingCalendar.preOpenStart,
-      closingAuctionStart: tradingCalendar.closingAuctionStart,
-      closingAuctionEnd: tradingCalendar.closingAuctionEnd,
-      settlementDate: tradingCalendar.settlementDate,
       description: tradingCalendar.description,
     })
     .from(tradingCalendar)
@@ -208,7 +200,6 @@ export async function createRawProviderPayload(values: {
   requestFingerprint: string;
   requestParams: Record<string, unknown> | null;
   httpStatus: number;
-  contentEncoding: string | null;
   payload: unknown;
   payloadBytes: number;
   payloadSha256: string;
@@ -225,7 +216,6 @@ export async function createRawProviderPayload(values: {
       requestFingerprint: values.requestFingerprint,
       requestParams: values.requestParams,
       httpStatus: values.httpStatus,
-      contentEncoding: values.contentEncoding,
       payload: values.payload as Record<string, unknown> | unknown[],
       payloadBytes: values.payloadBytes,
       payloadSha256: values.payloadSha256,
@@ -261,7 +251,6 @@ export interface InstrumentMasterRow {
   isin: string | null;
   segment: string;
   instrumentType: string;
-  lotSize: number;
   tickSize: string;
   freezeQuantity: string | null;
   exchangeToken: string | null;
@@ -370,7 +359,6 @@ async function resolveInstrument(
       isin: row.isin,
       segment: row.segment,
       instrumentType: row.instrumentType,
-      lotSize: row.lotSize,
       tickSize: row.tickSize,
       freezeQuantity: row.freezeQuantity,
       isActive: true,
@@ -441,7 +429,6 @@ export async function upsertInstrumentMasterRows(
           isin: row.isin,
           segment: row.segment,
           instrumentType: row.instrumentType,
-          lotSize: row.lotSize,
           tickSize,
           freezeQuantity: row.freezeQuantity,
           updatedAt: new Date(),
@@ -544,10 +531,6 @@ export async function syncTradingCalendarFixture(
           isTradingDay,
           sessionOpen: isTradingDay ? new Date(`${date}T${open}+05:30`) : null,
           sessionClose: isTradingDay ? new Date(`${date}T${close}+05:30`) : null,
-          preOpenStart: isTradingDay && !special ? new Date(`${date}T09:00:00+05:30`) : null,
-          closingAuctionStart: isTradingDay && !special ? new Date(`${date}T${close}+05:30`) : null,
-          closingAuctionEnd: isTradingDay && !special ? new Date(`${date}T15:40:00+05:30`) : null,
-          settlementDate: null,
           description: special?.description ?? holiday ?? (isTradingDay ? null : 'Weekend'),
           sourceProviderId: providerId,
         });
@@ -565,9 +548,6 @@ export async function syncTradingCalendarFixture(
           isTradingDay: sql`excluded.is_trading_day`,
           sessionOpen: sql`excluded.session_open`,
           sessionClose: sql`excluded.session_close`,
-          preOpenStart: sql`excluded.pre_open_start`,
-          closingAuctionStart: sql`excluded.closing_auction_start`,
-          closingAuctionEnd: sql`excluded.closing_auction_end`,
           description: sql`excluded.description`,
           sourceProviderId: sql`excluded.source_provider_id`,
           updatedAt: new Date(),
@@ -886,7 +866,6 @@ export async function importCorporateActions(input: {
         instrumentId: row.instrumentId,
         actionType: row.actionType,
         exDate: row.exDate,
-        recordDate: null,
         ratioNumerator: row.ratioNumerator ?? null,
         ratioDenominator: row.ratioDenominator ?? null,
         dividendPerShare: row.dividendPerShare ?? null,
