@@ -201,8 +201,8 @@ R1 lifecycle tables.
 ### Database
 
 - **60 logical tables at the end of 0008.** `0008_r2_ingestion_quality.sql` adds gap fields to
-  `market_data_coverage`, dedupe and lifecycle fields to `data_quality_issues`, a unique raw-payload key and
-  `instrument_data_status`.
+  `market_data_coverage`, dedupe and lifecycle fields to `data_quality_issues` (replaced by
+  `system_issues` in 0015), a unique raw-payload key and `instrument_data_status`.
 - The migration is additive. It preflights duplicate raw payloads before creating the unique index and
   preserves legacy resolved/ignored issues with an explicit migration note.
 - The seed flags the 51 reference instruments as `is_sync_target`, creates one status row per target,
@@ -219,6 +219,9 @@ R1 lifecycle tables.
   BullMQ job, typed `instrument_id`/`group_id`, structured `error`, six event columns (`stage`, `type`,
   `occurred_at`, `data`) and a `latest_event_id` pointer. The old ledger is discarded by design.
   The database ends at 55 logical tables.
+- `0015_system_issues.sql` drops `data_quality_issues` and creates `system_issues`, a current-state
+  ledger with `source`, `kind`, `severity`, provider/instrument scope, a unique `dedupe_key`,
+  occurrence counters and a mechanism-owned `payload`. Resolved rows are deleted, not stored.
 - `pnpm db:verify` asserts 55 tables, the R2 tables and indexes, 51 sync targets, 51 status rows,
   51 primary mappings, valid tick sizes, calendar coverage and zero orders.
 

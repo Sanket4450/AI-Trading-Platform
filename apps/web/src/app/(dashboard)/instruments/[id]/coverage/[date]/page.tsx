@@ -1,6 +1,5 @@
-import Link from 'next/link';
 import { apiFetch } from '@/lib/api';
-import type { CoverageRow, QualityIssue } from '@/lib/types';
+import type { CoverageRow, SystemIssue } from '@/lib/types';
 import { formatNumber } from '@/lib/format';
 import { label } from '@/lib/labels';
 import { backLinkFor, detailHref, type DetailSearchParams } from '@/lib/navigation';
@@ -9,11 +8,12 @@ import { StatCard, StatGrid } from '@/components/dashboard/stat-card';
 import { SectionCard } from '@/components/dashboard/section-card';
 import { DetailHeader } from '@/components/dashboard/detail-header';
 import { StatusBadge } from '@/components/dashboard/status-badge';
+import { IssueList } from '@/features/issues/components/issue-list';
 
 interface DayDetail {
   instrument: { id: string; symbol: string; name: string; segment?: string; tickSize: string } | null;
   coverage: CoverageRow | null;
-  issues: QualityIssue[];
+  issues: SystemIssue[];
 }
 
 export default async function InstrumentCoverageDayPage({
@@ -74,29 +74,14 @@ export default async function InstrumentCoverageDayPage({
       <SectionCard
         className="mt-4"
         title="Issues for this day"
-        description="Findings raised by the quality rules."
+        description="Active findings anchored to this instrument-day."
       >
-        {detail.issues.length === 0 ? (
-          <p className="text-muted-foreground text-sm">No issues recorded.</p>
-        ) : (
-          <div className="space-y-2">
-            {detail.issues.map((issue) => (
-              <Link
-                key={issue.id}
-                href={detailHref(`/instruments/issues/${issue.id}`, back.href)}
-                className="border-border/70 bg-background/40 block rounded-lg border p-3 text-sm"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="font-medium">{label(issue.issueType)}</span>
-                  <StatusBadge status={issue.severity} />
-                </div>
-                <p className="text-muted-foreground mt-1 text-xs">
-                  {issue.ruleId ?? 'No rule'} · {label(issue.status)} · seen {issue.occurrenceCount}×
-                </p>
-              </Link>
-            ))}
-          </div>
-        )}
+        <IssueList
+          issues={detail.issues}
+          from={back.href}
+          emptyTitle="No issues recorded"
+          emptyDescription="No active finding for this instrument-day."
+        />
       </SectionCard>
     </div>
   );

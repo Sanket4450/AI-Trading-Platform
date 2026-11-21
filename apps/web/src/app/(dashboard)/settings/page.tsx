@@ -4,15 +4,12 @@ import { apiFetch } from '@/lib/api';
 import type {
   ConfigurationVersion,
   ProviderStatus,
-  QualityIssue,
   SystemSetting,
 } from '@/lib/types';
 import { configurationTypes } from '@/lib/configuration';
 import { formatDate, formatDateTime, formatNumber } from '@/lib/format';
 import { formatSettingKey, label } from '@/lib/labels';
-import { detailHref } from '@/lib/navigation';
 import { SectionCard } from '@/components/dashboard/section-card';
-import { StatusBadge } from '@/components/dashboard/status-badge';
 import { EmptyState } from '@/components/dashboard/empty-state';
 import { KeyValueGrid } from '@/components/dashboard/key-value-grid';
 import { FilterSelect, SearchFilter, TableFilters } from '@/components/dashboard/table-filters';
@@ -51,10 +48,9 @@ export default async function SettingsPage({
     ? apiFetch<ConfigurationVersion>(`/configuration/${params.version}`).catch(() => null)
     : Promise.resolve(null);
 
-  const [settings, provider, providerIssues, versions, versionDetail] = await Promise.all([
+  const [settings, provider, versions, versionDetail] = await Promise.all([
     apiFetch<SystemSetting[]>('/settings'),
     apiFetch<ProviderStatus>('/settings/provider'),
-    apiFetch<QualityIssue[]>('/settings/issues?limit=20'),
     apiFetch<ConfigurationVersion[]>(`/configuration?${configQuery.toString()}`),
     selectedVersion,
   ]);
@@ -144,41 +140,6 @@ export default async function SettingsPage({
             },
           ]}
         />
-      </SectionCard>
-
-      <SectionCard
-        className="mt-4"
-        title="Provider issues"
-        description="Findings with no single instrument: provider, trading calendar and market-wide checks."
-      >
-        {providerIssues.length === 0 ? (
-          <EmptyState
-            title="No provider issues"
-            description="Provider-wide validation has not raised anything."
-          />
-        ) : (
-          <div className="space-y-2">
-            {providerIssues.map((issue) => (
-              <Link
-                key={issue.id}
-                href={detailHref(`/settings/issues/${issue.id}`, '/settings')}
-                className="border-border/70 bg-background/40 block rounded-lg border p-3 text-sm"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="font-medium">{label(issue.issueType)}</span>
-                  <div className="flex gap-1">
-                    <StatusBadge status={issue.severity} />
-                    <StatusBadge status={issue.status} />
-                  </div>
-                </div>
-                <p className="text-muted-foreground mt-1 text-xs">
-                  {issue.ruleId ?? 'No rule'} · {issue.tradingDate ?? 'No date'} · seen{' '}
-                  {issue.occurrenceCount}× · last {formatDateTime(issue.lastSeenAt)}
-                </p>
-              </Link>
-            ))}
-          </div>
-        )}
       </SectionCard>
 
       <SectionCard

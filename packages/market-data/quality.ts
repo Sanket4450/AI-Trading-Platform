@@ -1,5 +1,5 @@
 import { sha256Hex } from '@ai-trading/domain';
-import type { QualityFinding, QualityRule } from './types.js';
+import type { SystemIssueFinding, QualityRule } from './types.js';
 
 export const QUALITY_RULES: readonly QualityRule[] = [
   {
@@ -107,14 +107,6 @@ export const QUALITY_RULES: readonly QualityRule[] = [
     blocksPreflightWhenCritical: true,
   },
   {
-    ruleId: 'DQ-018',
-    issueType: 'instrument_missing',
-    dimension: 'reference',
-    defaultSeverity: 'critical',
-    description: 'The provider or master omits an expected instrument.',
-    blocksPreflightWhenCritical: true,
-  },
-  {
     ruleId: 'DQ-019',
     issueType: 'unsupported_instrument',
     dimension: 'reference',
@@ -140,16 +132,8 @@ export const QUALITY_RULES: readonly QualityRule[] = [
     blocksPreflightWhenCritical: false,
   },
   {
-    ruleId: 'DQ-022',
-    issueType: 'rate_limit_exhausted',
-    dimension: 'timeliness',
-    defaultSeverity: 'warning',
-    description: 'A run exhausted its retry budget on provider throttling.',
-    blocksPreflightWhenCritical: false,
-  },
-  {
     ruleId: 'DQ-023',
-    issueType: 'stale_ingestion',
+    issueType: 'stale_job',
     dimension: 'timeliness',
     defaultSeverity: 'warning',
     description: 'A running chunk exceeded the heartbeat window and was recovered.',
@@ -157,7 +141,7 @@ export const QUALITY_RULES: readonly QualityRule[] = [
   },
   {
     ruleId: 'DQ-024',
-    issueType: 'coverage_shortfall',
+    issueType: 'stale_coverage',
     dimension: 'timeliness',
     defaultSeverity: 'info',
     description: 'A coverage verdict is older than the latest candle for the same instrument-day.',
@@ -173,7 +157,7 @@ export const QUALITY_RULES: readonly QualityRule[] = [
   },
   {
     ruleId: 'DQ-026',
-    issueType: 'provider_fetch_failed',
+    issueType: 'candle_fetch_failed',
     dimension: 'completeness',
     defaultSeverity: 'warning',
     description: 'A provider fetch failed; the window remains uncovered until it is retried.',
@@ -194,34 +178,48 @@ export function isCriticalSeverity(severity: string): boolean {
 }
 
 /**
- * Stable key: rule, provider, instrument, date and window. Re-running a scan
- * increments the same issue instead of creating a duplicate.
+ * Stable key over the writer's own identity fields. Object keys are sorted so
+ * the hash does not depend on insertion order.
  */
-export function qualityDedupeKey(input: {
-  ruleId: string;
+export function issueDedupeKey(input: {
+  source: string;
+  kind: string;
   providerId: string | null;
   instrumentId: string | null;
-  tradingDate: string | null;
-  windowStart: Date | null;
-  windowEnd: Date | null;
+  scope: Record<string, unknown>;
 }): string {
   return sha256Hex(
     [
-      input.ruleId,
+      input.source,
+      input.kind,
       input.providerId ?? '',
       input.instrumentId ?? '',
-      input.tradingDate ?? '',
-      input.windowStart?.toISOString() ?? '',
-      input.windowEnd?.toISOString() ?? '',
+      stableStringify(input.scope),
     ].join('|'),
   );
 }
 
-export function qualityFinding(input: Omit<QualityFinding, 'dedupeKey'>): QualityFinding {
-  return {
-    ...input,
-    dedupeKey: qualityDedupeKey(input),
-  };
+function sortedValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(sortedValue);
+  if (value !== null && typeof value === 'object') {
+    return Object.keys(value as Record<string, unknown>)
+      .sort()
+      .reduce<Record<string, unknown>>((result, key) => {
+        result[key] = sortedValue((value as Record<string, unknown>)[key]);
+        return result;
+      }, {});
+  }
+  return value;
+}
+
+export function stableStringify(value: unknown): string {
+  return JSON.stringify(sortedValue(value)) ?? 'null';
+}
+
+export function systemIssue(
+  input: Omit<SystemIssueFinding, 'dedupeKey'>,
+): SystemIssueFinding {
+  return { ...input, dedupeKey: issueDedupeKey(input) };
 }
 
 /** The opening range, entry cutoff and exit window are stricter than the day. */

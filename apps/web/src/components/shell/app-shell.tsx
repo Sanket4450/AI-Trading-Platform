@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   Activity,
+  CircleAlert,
   FlaskConical,
   LayoutDashboard,
   LineChart,
@@ -27,6 +28,7 @@ const navigation = [
   { href: '/', label: 'Overview', icon: LayoutDashboard },
   { href: '/accounts', label: 'Accounts', icon: Wallet },
   { href: '/instruments', label: 'Instruments', icon: LineChart },
+  { href: '/issues', label: 'Issues', icon: CircleAlert },
   { href: '/strategies', label: 'Strategies', icon: FlaskConical },
   { href: '/jobs', label: 'Jobs', icon: Activity },
   { href: '/audit', label: 'Audit', icon: ScrollText },

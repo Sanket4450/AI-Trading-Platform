@@ -18,6 +18,11 @@ const routes: Record<string, RouteMeta> = {
     description:
       'Browse the instruments marked for data sync and download missing history.',
   },
+  '/issues': {
+    title: 'Issues',
+    description:
+      'Active data and ingestion problems, the window they cover and the evidence behind them.',
+  },
   '/strategies': {
     title: 'Strategies',
     description:
@@ -54,10 +59,10 @@ const detailRoutes: Array<{ prefix: string; meta: RouteMeta }> = [
     },
   },
   {
-    prefix: '/instruments/issues/',
+    prefix: '/issues/',
     meta: {
-      title: 'Data issue',
-      description: 'What was detected, the affected dates and the resolution history.',
+      title: 'Issue',
+      description: 'What was detected, the state that could not be determined and the payload.',
     },
   },
   {
@@ -84,10 +89,10 @@ const detailRoutes: Array<{ prefix: string; meta: RouteMeta }> = [
     },
   },
   {
-    prefix: '/settings/issues/',
+    prefix: '/settings/',
     meta: {
-      title: 'Provider issue',
-      description: 'What was detected, the affected window and the resolution history.',
+      title: 'Settings',
+      description: 'Provider state, configuration history and system preferences.',
     },
   },
 ];

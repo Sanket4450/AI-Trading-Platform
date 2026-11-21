@@ -310,27 +310,27 @@ describe('R2 database lifecycle', () => {
     `;
   });
 
-  it('deduplicates quality issues', async () => {
+  it('deduplicates system issues', async () => {
     const [instrument] = await sql<{ id: string }[]>`
       select id from instruments where trading_symbol = 'RELIANCE' limit 1
     `;
     const dedupe = 'a'.repeat(64);
     await sql`
-      insert into data_quality_issues
-        (provider_id, instrument_id, issue_type, severity, status, detected_by,
-         rule_id, dedupe_key)
-      values ((select id from providers where code = 'upstox'), ${instrument.id},
-              'missing_bar', 'warning', 'open', 'validation', 'DQ-001', ${dedupe})
+      insert into system_issues
+        (source, kind, severity, provider_id, instrument_id, dedupe_key)
+      values ('ingestion', 'candle_fetch_failed', 'warning',
+              (select id from providers where code = 'upstox'), ${instrument.id},
+              ${dedupe})
     `;
     await expect(
       sql`
-        insert into data_quality_issues
-          (provider_id, instrument_id, issue_type, severity, status, detected_by,
-           rule_id, dedupe_key)
-        values ((select id from providers where code = 'upstox'), ${instrument.id},
-                'missing_bar', 'warning', 'open', 'validation', 'DQ-001', ${dedupe})
+        insert into system_issues
+          (source, kind, severity, provider_id, instrument_id, dedupe_key)
+        values ('ingestion', 'candle_fetch_failed', 'warning',
+                (select id from providers where code = 'upstox'), ${instrument.id},
+                ${dedupe})
       `,
-    ).rejects.toThrow(/uq_quality_open_dedupe|duplicate key/i);
+    ).rejects.toThrow(/uq_system_issues_dedupe|duplicate key/i);
   });
 
   it('upserts coverage idempotently in a batch', async () => {

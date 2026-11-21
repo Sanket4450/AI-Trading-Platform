@@ -141,15 +141,13 @@ export interface QualityRule {
   blocksPreflightWhenCritical: boolean;
 }
 
-export interface QualityFinding {
-  ruleId: string;
-  issueType: string;
+export interface SystemIssueFinding {
+  source: string;
+  kind: string;
   severity: 'info' | 'warning' | 'critical';
-  instrumentId: string | null;
   providerId: string | null;
-  tradingDate: string | null;
-  windowStart: Date | null;
-  windowEnd: Date | null;
-  details: Record<string, unknown>;
+  instrumentId: string | null;
+  scope: Record<string, unknown>;
+  payload: Record<string, unknown>;
   dedupeKey: string;
 }

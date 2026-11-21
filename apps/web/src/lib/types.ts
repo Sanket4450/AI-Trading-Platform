@@ -200,29 +200,21 @@ export interface CoverageRow {
   checkedAt: string;
 }
 
-export interface QualityIssue {
+export interface SystemIssue {
   id: string;
+  source: string;
+  kind: string;
+  severity: string;
+  providerId: string | null;
   providerCode: string | null;
   instrumentId: string | null;
   symbol: string | null;
-  issueType: string;
-  severity: string;
-  tradingDate: string | null;
-  windowStart: string | null;
-  windowEnd: string | null;
-  details: Record<string, unknown>;
-  status: string;
-  detectedBy: string;
-  detectedAt: string;
-  resolvedAt: string | null;
-  ruleId: string | null;
-  dedupeKey: string | null;
+  scope: 'instrument' | 'provider' | 'system';
+  dedupeKey: string;
   occurrenceCount: number;
+  firstSeenAt: string;
   lastSeenAt: string;
-  acknowledgedBy: string | null;
-  acknowledgedAt: string | null;
-  resolvedBy: string | null;
-  resolutionNote: string | null;
+  payload: Record<string, unknown>;
 }
 
 export interface AuditRow {
@@ -357,7 +349,12 @@ export interface SystemStatus {
 export interface Overview {
   counts: Record<string, number | string | null>;
   recentJobs: JobRunSummary[];
-  openIssues: QualityIssue[];
+  openIssues: Array<
+    Pick<
+      SystemIssue,
+      'id' | 'instrumentId' | 'source' | 'kind' | 'severity' | 'symbol' | 'lastSeenAt' | 'payload'
+    >
+  >;
   latestCoverageDate: string | null;
   coverageByStatus: { status: string; count: number }[];
 }
@@ -396,7 +393,7 @@ export interface InstrumentCoverageMonth {
 
 export interface InstrumentCoverageDetail extends InstrumentCoverageRow {
   months: InstrumentCoverageMonth[];
-  issues: QualityIssue[];
+  issues: SystemIssue[];
 }
 
 export interface ProviderStatus {

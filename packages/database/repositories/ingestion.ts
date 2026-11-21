@@ -1,9 +1,7 @@
-import { and, asc, desc, eq, gte, inArray, isNotNull, lte, ne, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, isNotNull, lte, sql } from 'drizzle-orm';
 import type { InferInsertModel } from 'drizzle-orm';
-import { uuidv7 } from 'uuidv7';
 import { db } from '../client.js';
 import {
-  dataQualityIssues,
   exchanges,
   instrumentDataStatus,
   instrumentDayCoverage,
@@ -11,9 +9,9 @@ import {
   instruments,
   jobRuns,
   marketCandles1m,
-  providers,
   rawProviderPayloads,
 } from '../schema/index.js';
+import { listInstrumentDayIssues } from './issues.js';
 
 type CandleInsert = InferInsertModel<typeof marketCandles1m>;
 
@@ -280,154 +278,12 @@ export async function getCoverageDayDetail(instrumentId: string, date: string) {
     .from(instruments)
     .where(eq(instruments.id, instrumentId))
     .limit(1);
-  const issues = await db
-    .select()
-    .from(dataQualityIssues)
-    .where(
-      and(
-        eq(dataQualityIssues.instrumentId, instrumentId),
-        eq(dataQualityIssues.tradingDate, date),
-      ),
-    )
-    .orderBy(desc(dataQualityIssues.lastSeenAt))
-    .limit(25);
+  const issues = await listInstrumentDayIssues(instrumentId, date);
   return {
     instrument: instrument[0] ?? null,
     coverage: coverage[0] ?? null,
     issues,
   };
-}
-
-export async function getQualityIssue(id: string) {
-  const rows = await db
-    .select({
-      id: dataQualityIssues.id,
-      providerId: dataQualityIssues.providerId,
-      providerCode: providers.code,
-      instrumentId: dataQualityIssues.instrumentId,
-      symbol: instruments.tradingSymbol,
-      issueType: dataQualityIssues.issueType,
-      severity: dataQualityIssues.severity,
-      tradingDate: dataQualityIssues.tradingDate,
-      windowStart: dataQualityIssues.windowStart,
-      windowEnd: dataQualityIssues.windowEnd,
-      details: dataQualityIssues.details,
-      status: dataQualityIssues.status,
-      detectedBy: dataQualityIssues.detectedBy,
-      detectedAt: dataQualityIssues.detectedAt,
-      resolvedAt: dataQualityIssues.resolvedAt,
-      ruleId: dataQualityIssues.ruleId,
-      dedupeKey: dataQualityIssues.dedupeKey,
-      occurrenceCount: dataQualityIssues.occurrenceCount,
-      lastSeenAt: dataQualityIssues.lastSeenAt,
-      acknowledgedBy: dataQualityIssues.acknowledgedBy,
-      acknowledgedAt: dataQualityIssues.acknowledgedAt,
-      resolvedBy: dataQualityIssues.resolvedBy,
-      resolutionNote: dataQualityIssues.resolutionNote,
-    })
-    .from(dataQualityIssues)
-    .leftJoin(providers, eq(providers.id, dataQualityIssues.providerId))
-    .leftJoin(instruments, eq(instruments.id, dataQualityIssues.instrumentId))
-    .where(eq(dataQualityIssues.id, id))
-    .limit(1);
-  return rows[0] ?? null;
-}
-
-export async function upsertQualityIssue(values: {
-  providerId: string | null;
-  instrumentId: string | null;
-  issueType: string;
-  severity: string;
-  tradingDate: string | null;
-  windowStart: Date | null;
-  windowEnd: Date | null;
-  details: Record<string, unknown>;
-  detectedBy: string;
-  ruleId: string;
-  dedupeKey: string;
-}) {
-  const [row] = await db
-    .insert(dataQualityIssues)
-    .values({
-      id: uuidv7(),
-      providerId: values.providerId,
-      instrumentId: values.instrumentId,
-      issueType: values.issueType,
-      severity: values.severity,
-      tradingDate: values.tradingDate,
-      windowStart: values.windowStart,
-      windowEnd: values.windowEnd,
-      details: values.details,
-      status: 'open',
-      detectedBy: values.detectedBy,
-      ruleId: values.ruleId,
-      dedupeKey: values.dedupeKey,
-      occurrenceCount: 1,
-      lastSeenAt: new Date(),
-    })
-    .onConflictDoUpdate({
-      target: dataQualityIssues.dedupeKey,
-      targetWhere: sql`${dataQualityIssues.status} in ('open','acknowledged') and ${dataQualityIssues.dedupeKey} is not null`,
-      set: {
-        occurrenceCount: sql`${dataQualityIssues.occurrenceCount} + 1`,
-        lastSeenAt: new Date(),
-        severity: sql`excluded.severity`,
-        details: sql`${dataQualityIssues.details} || excluded.details`,
-        ruleId: sql`excluded.rule_id`,
-      },
-    })
-    .returning();
-  return row;
-}
-
-export async function transitionQualityIssue(values: {
-  id: string;
-  status: 'acknowledged' | 'resolved' | 'ignored';
-  note?: string | null;
-  actorUserId: string | null;
-}) {
-  if ((values.status === 'resolved' || values.status === 'ignored') && !values.note?.trim()) {
-    throw new Error('A resolution note is required for resolved or ignored issues');
-  }
-  const now = new Date();
-  const set: Record<string, unknown> = {
-    status: values.status,
-    resolvedAt: values.status === 'resolved' || values.status === 'ignored' ? now : null,
-  };
-  if (values.status === 'acknowledged') {
-    set.acknowledgedBy = values.actorUserId;
-    set.acknowledgedAt = now;
-  }
-  if (values.status === 'resolved' || values.status === 'ignored') {
-    set.resolvedBy = values.actorUserId;
-  }
-  if (values.note) set.resolutionNote = values.note;
-  const [row] = await db
-    .update(dataQualityIssues)
-    .set(set)
-    .where(eq(dataQualityIssues.id, values.id))
-    .returning();
-  return row;
-}
-
-export async function autoResolveStaleIssues(olderThanHours: number) {
-  const rows = await db
-    .update(dataQualityIssues)
-    .set({
-      status: 'resolved',
-      resolvedAt: new Date(),
-      resolvedBy: null,
-      resolutionNote: `Auto-resolved after ${olderThanHours}h without a repeat finding`,
-    })
-    .where(
-      and(
-        eq(dataQualityIssues.status, 'open'),
-        ne(dataQualityIssues.severity, 'critical'),
-        sql`${dataQualityIssues.lastSeenAt} < now() - (${olderThanHours} || ' hours')::interval`,
-      ),
-    )
-    .returning({ id: dataQualityIssues.id });
-  return rows.length;
 }
 
 export async function getProviderStatus() {
@@ -531,19 +387,6 @@ export async function getLatestCoverageDate() {
     .select({ date: sql<string | null>`max(${instrumentDayCoverage.tradingDate})::text` })
     .from(instrumentDayCoverage);
   return row?.date ?? null;
-}
-
-export async function getOpenCriticalIssueCount() {
-  const [row] = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(dataQualityIssues)
-    .where(
-      and(
-        eq(dataQualityIssues.severity, 'critical'),
-        inArray(dataQualityIssues.status, ['open', 'acknowledged']),
-      ),
-    );
-  return row?.count ?? 0;
 }
 
 export async function countCandlesForInstrument(instrumentId: string) {

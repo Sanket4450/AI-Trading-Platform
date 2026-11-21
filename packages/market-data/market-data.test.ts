@@ -7,7 +7,7 @@ import {
   monthChunks,
   normalizeCandle,
   parseCandleTimestamp,
-  qualityDedupeKey,
+  issueDedupeKey,
   targetWindow,
 } from './index.js';
 import type { NormalizedCandle, SessionWindow } from './types.js';
@@ -170,15 +170,18 @@ describe('catalog and quality', () => {
 
   it('builds a stable dedupe key', () => {
     const input = {
-      ruleId: 'DQ-001',
+      source: 'validation',
+      kind: 'missing_bar',
       providerId: 'p',
       instrumentId: 'i',
-      tradingDate: '2026-09-01',
-      windowStart: new Date('2026-09-01T03:45:00Z'),
-      windowEnd: new Date('2026-09-01T03:46:00Z'),
+      scope: { ruleId: 'DQ-001', tradingDate: '2026-09-01' },
     };
-    expect(qualityDedupeKey(input)).toBe(qualityDedupeKey({ ...input }));
-    expect(qualityDedupeKey(input)).not.toBe(qualityDedupeKey({ ...input, ruleId: 'DQ-002' }));
+    expect(issueDedupeKey(input)).toBe(
+      issueDedupeKey({ ...input, scope: { tradingDate: '2026-09-01', ruleId: 'DQ-001' } }),
+    );
+    expect(issueDedupeKey(input)).not.toBe(
+      issueDedupeKey({ ...input, scope: { ...input.scope, ruleId: 'DQ-002' } }),
+    );
   });
 });
 

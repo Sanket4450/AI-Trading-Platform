@@ -6,6 +6,7 @@ import type { HealthResponse, Overview } from '@/lib/types';
 import { formatDateTime, formatNumber } from '@/lib/format';
 import { label } from '@/lib/labels';
 import { detailHref } from '@/lib/navigation';
+import { issueWindow } from '@/features/issues/issue-format';
 import { PageMeta } from '@/components/shell/page-meta';
 import { StatCard, StatGrid } from '@/components/dashboard/stat-card';
 import { SectionCard } from '@/components/dashboard/section-card';
@@ -73,7 +74,7 @@ export default async function OverviewPage() {
           tone="highlight"
         />
         <StatCard
-          label="Open data issues"
+          label="Active issues"
           value={formatNumber(counts.openIssues)}
           hint={`${formatNumber(counts.criticalIssues)} critical`}
           tone={Number(counts.criticalIssues ?? 0) > 0 ? 'danger' : 'warning'}
@@ -161,34 +162,35 @@ export default async function OverviewPage() {
         </SectionCard>
 
         <SectionCard
-          title="Open quality issues"
-          description="Gaps, invalid bars and mapping problems that need review."
+          title="Active issues"
+          description="Fetch failures, gaps and invalid bars that need review."
+          toolbar={
+            <Link href="/issues" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+              View all issues
+              <ArrowUpRight className="size-4" />
+            </Link>
+          }
         >
           {overview.openIssues.length === 0 ? (
             <EmptyState
-              title="No open issues"
-              description="The validation layer has not raised anything."
+              title="No issues"
+              description="No active problem is recorded."
             />
           ) : (
             <div className="space-y-3">
               {overview.openIssues.map((issue) => (
                 <Link
                   key={issue.id}
-                  href={detailHref(
-                    issue.instrumentId
-                      ? `/instruments/issues/${issue.id}`
-                      : `/settings/issues/${issue.id}`,
-                    '/',
-                  )}
+                  href={detailHref(`/issues/${issue.id}`, '/')}
                   className="border-border/70 bg-background/40 block rounded-lg border p-3"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm font-medium">{label(issue.issueType)}</p>
+                    <p className="text-sm font-medium">{label(issue.kind)}</p>
                     <StatusBadge status={issue.severity} />
                   </div>
                   <p className="text-muted-foreground mt-1 text-xs">
-                    {issue.symbol ?? 'Provider-wide'} · {issue.tradingDate ?? 'No trading date'} ·
-                    detected {formatDateTime(issue.detectedAt)}
+                    {issue.symbol ?? 'System-wide'} · {issueWindow(issue.payload) ?? 'No window'} ·
+                    last seen {formatDateTime(issue.lastSeenAt)}
                   </p>
                 </Link>
               ))}

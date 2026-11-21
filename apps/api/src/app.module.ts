@@ -9,6 +9,7 @@ import { AuditModule } from './modules/audit/audit.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { ConfigurationModule } from './modules/configuration/configuration.module.js';
 import { InstrumentsModule } from './modules/instruments/instruments.module.js';
+import { IssuesModule } from './modules/issues/issues.module.js';
 import { JobsModule } from './modules/jobs/jobs.module.js';
 import { SettingsModule } from './modules/settings/settings.module.js';
 import { StrategiesModule } from './modules/strategies/strategies.module.js';
@@ -40,6 +41,7 @@ import { SystemControlModule } from './modules/system-control/system-control.mod
     AuthModule,
     AccountsModule,
     InstrumentsModule,
+    IssuesModule,
     StrategiesModule,
     ConfigurationModule,
     JobsModule,

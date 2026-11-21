@@ -13,17 +13,18 @@ import {
   HISTORY_START,
   istToday,
   istTradingDate,
+  issueDedupeKey,
   monthChunks,
   normalizeCandle,
   parseCandleTimestamp,
-  qualityFinding,
-  qualityRule,
   validateNormalizedCandle,
   type CalendarSessionRow,
   type NormalizedCandle,
   type SessionWindow,
 } from '@ai-trading/market-data';
 import {
+  clearSystemIssue,
+  clearSystemIssues,
   closeJobRun,
   createRawProviderPayload,
   deleteAllCoverage,
@@ -38,10 +39,10 @@ import {
   isMonthComplete,
   refreshDailyStats,
   updateJobRun,
-  upsertQualityIssue,
   writeCandles,
 } from '@ai-trading/database';
 import { JobTrackingService } from '../../observability/job-tracking.service.js';
+import { recordIssue } from './issue-recorder.js';
 import { QualityService } from './quality.service.js';
 import { RedisRateLimiter } from './rate-limit.service.js';
 
@@ -79,30 +80,28 @@ export class IngestionService {
     });
   }
 
-  private async issue(values: {
+  private issue(values: Parameters<typeof recordIssue>[0]): Promise<void> {
+    return recordIssue(values);
+  }
+
+  /** Deletes the exact issue a previous failed chunk raised. */
+  private clearChunkIssue(input: {
+    providerId: string;
+    instrumentId: string;
+    from: string;
+    to: string;
     ruleId: string;
-    severity: 'info' | 'warning' | 'critical';
-    providerId: string | null;
-    instrumentId: string | null;
-    tradingDate: string | null;
-    windowStart: Date | null;
-    windowEnd: Date | null;
-    details: Record<string, unknown>;
-    detectedBy: 'ingestion' | 'validation' | 'reconciliation' | 'manual';
-  }): Promise<void> {
-    const rule = qualityRule(values.ruleId);
-    const finding = qualityFinding({
-      ruleId: rule.ruleId,
-      issueType: rule.issueType,
-      severity: values.severity,
-      providerId: values.providerId,
-      instrumentId: values.instrumentId,
-      tradingDate: values.tradingDate,
-      windowStart: values.windowStart,
-      windowEnd: values.windowEnd,
-      details: values.details,
-    });
-    await upsertQualityIssue({ ...finding, detectedBy: values.detectedBy });
+    kind: string;
+  }) {
+    return clearSystemIssue(
+      issueDedupeKey({
+        source: 'ingestion',
+        kind: input.kind,
+        providerId: input.providerId,
+        instrumentId: input.instrumentId,
+        scope: { ruleId: input.ruleId, from: input.from, to: input.to },
+      }),
+    );
   }
 
   private async sessions(
@@ -165,11 +164,9 @@ export class IngestionService {
         severity: 'critical',
         providerId: provider.id,
         instrumentId,
-        tradingDate: null,
-        windowStart: null,
-        windowEnd: null,
-        details: { reason: 'No primary Upstox mapping' },
-        detectedBy: 'ingestion',
+        source: 'ingestion',
+        scope: {},
+        payload: { reason: 'No primary Upstox mapping' },
       });
       const result = { skipped: true, reason: 'mapping_missing' };
       this.tracking.completeStage(jobRunId, 'prepare', 'failed', { reason: 'mapping_missing' });
@@ -181,6 +178,12 @@ export class IngestionService {
       });
       return result;
     }
+
+    await clearSystemIssues({
+      sources: ['ingestion'],
+      kinds: ['mapping_missing'],
+      instrumentId,
+    });
 
     const chunks = monthChunks(from, to);
     let fetched = 0;
@@ -202,6 +205,22 @@ export class IngestionService {
         mode === 'missing_only' &&
         (await isMonthComplete(instrumentId, chunk.from, chunk.to))
       ) {
+        await this.clearChunkIssue({
+          providerId: provider.id,
+          instrumentId,
+          from: chunk.from,
+          to: chunk.to,
+          ruleId: 'DQ-026',
+          kind: 'candle_fetch_failed',
+        });
+        await this.clearChunkIssue({
+          providerId: provider.id,
+          instrumentId,
+          from: chunk.from,
+          to: chunk.to,
+          ruleId: 'DQ-008',
+          kind: 'schema_invalid',
+        });
         skippedChunks += 1;
         this.tracking.progress(jobRunId, 'chunks', {
           index: chunk.index + 1,
@@ -243,57 +262,31 @@ export class IngestionService {
       } catch (error) {
         failedChunks += 1;
         const classification = classifyUpstoxError(error);
+        const fatal = ['reference', 'auth', 'permission', 'contract'].includes(
+          classification.kind,
+        );
         await this.issue({
           ruleId: 'DQ-026',
-          severity: 'warning',
+          severity: fatal ? 'critical' : 'warning',
           providerId: provider.id,
           instrumentId,
-          tradingDate: null,
-          windowStart: null,
-          windowEnd: null,
-          details: {
-            chunkIndex: chunk.index,
-            chunkCount: chunks.length,
+          source: 'ingestion',
+          scope: { from: chunk.from, to: chunk.to },
+          payload: {
             from: chunk.from,
             to: chunk.to,
-            kind: classification.kind,
-            message: classification.message,
-            errorCode: classification.errorCode,
+            chunkIndex: chunk.index,
+            chunkCount: chunks.length,
+            error: {
+              kind: classification.kind,
+              code: classification.errorCode,
+              message: classification.message,
+              retryable: classification.retryable,
+              retryAfterSeconds: classification.retryAfterSeconds,
+              attempts: this.config.get<number>('UPSTOX_MAX_ATTEMPTS', 5),
+            },
           },
-          detectedBy: 'ingestion',
         });
-        if (classification.kind === 'throttle') {
-          await this.issue({
-            ruleId: 'DQ-022',
-            severity: 'warning',
-            providerId: provider.id,
-            instrumentId,
-            tradingDate: null,
-            windowStart: null,
-            windowEnd: null,
-            details: {
-              message: classification.message,
-              errorCode: classification.errorCode,
-            },
-            detectedBy: 'ingestion',
-          });
-        }
-        if (classification.kind === 'reference') {
-          await this.issue({
-            ruleId: 'DQ-018',
-            severity: 'critical',
-            providerId: provider.id,
-            instrumentId,
-            tradingDate: null,
-            windowStart: null,
-            windowEnd: null,
-            details: {
-              message: classification.message,
-              externalKey: mapping.externalKey,
-            },
-            detectedBy: 'ingestion',
-          });
-        }
         this.logger.warn(
           `Chunk failed for ${instrumentId} ${chunk.from}..${chunk.to}: ${classification.message}`,
         );
@@ -416,20 +409,34 @@ export class IngestionService {
         severity: 'critical',
         providerId: input.providerId,
         instrumentId: input.instrumentId,
-        tradingDate: null,
-        windowStart: null,
-        windowEnd: null,
-        details: {
+        source: 'ingestion',
+        scope: { from: input.from, to: input.to },
+        payload: {
+          from: input.from,
+          to: input.to,
           message:
             error instanceof Error ? error.message : 'Candle contract failure',
           rawPayloadId: raw.id,
         },
-        detectedBy: 'ingestion',
       });
       throw error;
     }
 
     const sessions = await this.sessions(input.from, input.to);
+    for (const tradingDate of sessions.keys()) {
+      await clearSystemIssues({
+        sources: ['validation'],
+        kinds: [
+          'calendar_mismatch',
+          'invalid_ohlc',
+          'duplicate_bar',
+          'provider_revision',
+          'tick_size_mismatch',
+        ],
+        instrumentId: input.instrumentId,
+        tradingDate,
+      });
+    }
     const tickSize = Number(await getInstrumentTickSize(input.instrumentId));
     const normalized: NormalizedCandle[] = [];
     let rejected = 0;
@@ -450,14 +457,13 @@ export class IngestionService {
           severity: 'critical',
           providerId: input.providerId,
           instrumentId: input.instrumentId,
-          tradingDate,
-          windowStart: null,
-          windowEnd: null,
-          details: {
+          source: 'validation',
+          scope: { tradingDate },
+          payload: {
+            tradingDate,
             timestamp: candle[0],
             reason: 'candle on a non-trading day',
           },
-          detectedBy: 'validation',
         });
         continue;
       }
@@ -475,15 +481,20 @@ export class IngestionService {
           severity: 'critical',
           providerId: input.providerId,
           instrumentId: input.instrumentId,
-          tradingDate,
-          windowStart: session.open,
-          windowEnd: session.close,
-          details: {
+          source: 'validation',
+          scope: {
+            tradingDate,
+            windowStart: session.open.toISOString(),
+            windowEnd: session.close.toISOString(),
+          },
+          payload: {
+            tradingDate,
+            windowStart: session.open.toISOString(),
+            windowEnd: session.close.toISOString(),
             reason: result.reason,
             message: result.error,
             tuple: candle,
           },
-          detectedBy: 'validation',
         });
         continue;
       }
@@ -494,11 +505,20 @@ export class IngestionService {
           severity: 'warning',
           providerId: input.providerId,
           instrumentId: input.instrumentId,
-          tradingDate,
-          windowStart: session.open,
-          windowEnd: session.close,
-          details: { message: validation.error, tuple: candle, tickSize },
-          detectedBy: 'validation',
+          source: 'validation',
+          scope: {
+            tradingDate,
+            windowStart: session.open.toISOString(),
+            windowEnd: session.close.toISOString(),
+          },
+          payload: {
+            tradingDate,
+            windowStart: session.open.toISOString(),
+            windowEnd: session.close.toISOString(),
+            message: validation.error,
+            tuple: candle,
+            tickSize,
+          },
         });
       }
       normalized.push(result.row);
@@ -511,15 +531,18 @@ export class IngestionService {
         severity: 'warning',
         providerId: input.providerId,
         instrumentId: input.instrumentId,
-        tradingDate: istTradingDate(duplicate.timestamp),
-        windowStart: duplicate.timestamp,
-        windowEnd: duplicate.timestamp,
-        details: {
+        source: 'validation',
+        scope: {
+          tradingDate: istTradingDate(duplicate.timestamp),
+          candleStart: duplicate.timestamp.toISOString(),
+        },
+        payload: {
+          tradingDate: istTradingDate(duplicate.timestamp),
+          candleStart: duplicate.timestamp.toISOString(),
           kept: { ...duplicate.kept },
           dropped: { ...duplicate.dropped },
           rawPayloadId: raw.id,
         },
-        detectedBy: 'validation',
       });
     }
 
@@ -530,17 +553,37 @@ export class IngestionService {
         severity: 'warning',
         providerId: input.providerId,
         instrumentId: input.instrumentId,
-        tradingDate: istTradingDate(revision.candleStart),
-        windowStart: revision.candleStart,
-        windowEnd: revision.candleStart,
-        details: {
+        source: 'validation',
+        scope: {
+          tradingDate: istTradingDate(revision.candleStart),
+          candleStart: revision.candleStart.toISOString(),
+        },
+        payload: {
+          tradingDate: istTradingDate(revision.candleStart),
+          candleStart: revision.candleStart.toISOString(),
           old: revision.old,
           incoming: revision.incoming,
           rawPayloadId: raw.id,
         },
-        detectedBy: 'validation',
       });
     }
+
+    await this.clearChunkIssue({
+      providerId: input.providerId,
+      instrumentId: input.instrumentId,
+      from: input.from,
+      to: input.to,
+      ruleId: 'DQ-026',
+      kind: 'candle_fetch_failed',
+    });
+    await this.clearChunkIssue({
+      providerId: input.providerId,
+      instrumentId: input.instrumentId,
+      from: input.from,
+      to: input.to,
+      ruleId: 'DQ-008',
+      kind: 'schema_invalid',
+    });
 
     return {
       fetched: parsed.data.candles.length,
@@ -682,17 +725,6 @@ export class IngestionService {
         const write = await writeCandles(rows);
         rowsWritten += write.inserted + write.updated;
         instruments += 1;
-        await this.issue({
-          ruleId: 'DQ-004',
-          severity: 'info',
-          providerId: provider.id,
-          instrumentId: target.instrumentId,
-          tradingDate: today,
-          windowStart: session?.open ?? null,
-          windowEnd: session?.close ?? null,
-          details: { reason: 'current-session final bar is not final' },
-          detectedBy: 'ingestion',
-        });
         await this.quality.recomputeCoverage(target.instrumentId, today, today);
         await this.quality.recomputeInstrumentStatus(target.instrumentId);
         this.tracking.progress(jobRunId, 'instruments', {
@@ -806,22 +838,28 @@ export class IngestionService {
           });
         } catch (error) {
           const classification = classifyUpstoxError(error);
+          const fatal = ['reference', 'auth', 'permission', 'contract'].includes(
+            classification.kind,
+          );
           await this.issue({
             ruleId: 'DQ-026',
-            severity: 'warning',
+            severity: fatal ? 'critical' : 'warning',
             providerId: provider.id,
             instrumentId: target.instrumentId,
-            tradingDate: date,
-            windowStart: null,
-            windowEnd: null,
-            details: {
+            source: 'ingestion',
+            scope: { from: date, to: date },
+            payload: {
               from: date,
               to: date,
-              kind: classification.kind,
-              message: classification.message,
-              errorCode: classification.errorCode,
+              error: {
+                kind: classification.kind,
+                code: classification.errorCode,
+                message: classification.message,
+                retryable: classification.retryable,
+                retryAfterSeconds: classification.retryAfterSeconds,
+                attempts: this.config.get<number>('UPSTOX_MAX_ATTEMPTS', 5),
+              },
             },
-            detectedBy: 'ingestion',
           });
           this.tracking.warning(jobRunId, 'repair', {
             instrumentId: target.instrumentId,
@@ -984,7 +1022,6 @@ export class IngestionService {
       completed: days,
       total: days,
       scanned: result.scanned,
-      autoResolved: result.autoResolved,
     });
     this.tracking.enterStage(jobRunId, 'stale');
     const stale = await this.quality.detectStaleIngestion();
@@ -1008,6 +1045,7 @@ export class IngestionService {
       startedAt: new Date(),
     });
     const { markStaleJobsFailed } = await import('@ai-trading/database');
+    await clearSystemIssues({ sources: ['reconciliation'], kinds: ['stale_job'] });
     const stale = await markStaleJobsFailed(15);
     this.tracking.completeStage(jobRunId, 'sweep', 'completed', {
       completed: stale.length,
@@ -1020,15 +1058,13 @@ export class IngestionService {
         severity: 'warning',
         providerId: null,
         instrumentId: job.instrumentId ?? null,
-        tradingDate: null,
-        windowStart: null,
-        windowEnd: null,
-        details: {
+        source: 'reconciliation',
+        scope: { jobRunId: job.id },
+        payload: {
           jobRunId: job.id,
           jobName: job.jobName,
           startedAt: job.startedAt?.toISOString() ?? null,
         },
-        detectedBy: 'reconciliation',
       });
       this.tracking.progress(jobRunId, 'issues', {
         index: index + 1,

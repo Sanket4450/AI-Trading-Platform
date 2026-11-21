@@ -6,8 +6,9 @@ import {
   type UpstoxInstrument,
 } from '@ai-trading/adapters';
 import { sha256Hex } from '@ai-trading/domain';
-import { istToday, qualityFinding, qualityRule } from '@ai-trading/market-data';
+import { istToday } from '@ai-trading/market-data';
 import {
+  clearSystemIssues,
   createInstrumentStatusRows,
   createRawProviderPayload,
   findExchangeByCode,
@@ -20,10 +21,10 @@ import {
   syncTradingCalendarFixture,
   updateJobRun,
   upsertInstrumentMasterRows,
-  upsertQualityIssue,
   type InstrumentMasterRow,
 } from '@ai-trading/database';
 import { JobTrackingService } from '../../observability/job-tracking.service.js';
+import { recordIssue } from './issue-recorder.js';
 
 @Injectable()
 export class ReferenceSyncService {
@@ -158,25 +159,24 @@ export class ReferenceSyncService {
       });
       this.tracking.enterStage(jobRunId, 'finalize');
 
+      await clearSystemIssues({
+        sources: ['reconciliation'],
+        kinds: ['unsupported_instrument'],
+        providerId: provider.id,
+      });
       if (result.excluded > 0) {
-        const finding = qualityFinding({
-          ruleId: qualityRule('DQ-019').ruleId,
-          issueType: 'unsupported_instrument',
+        await recordIssue({
+          ruleId: 'DQ-019',
           severity: 'info',
+          source: 'reconciliation',
           providerId: provider.id,
           instrumentId: null,
-          tradingDate: null,
-          windowStart: null,
-          windowEnd: null,
-          details: {
+          scope: {},
+          payload: {
             excluded: result.excluded,
             limited: result.limited,
             rawPayloadId: raw.id,
           },
-        });
-        await upsertQualityIssue({
-          ...finding,
-          detectedBy: 'reconciliation',
         });
       }
 
@@ -360,17 +360,14 @@ export class ReferenceSyncService {
     date: string,
     details: Record<string, unknown>,
   ): Promise<void> {
-    const finding = qualityFinding({
+    await recordIssue({
       ruleId: 'DQ-005',
-      issueType: 'calendar_mismatch',
       severity: 'critical',
+      source: 'reconciliation',
       providerId,
       instrumentId: null,
-      tradingDate: date,
-      windowStart: null,
-      windowEnd: null,
-      details,
+      scope: { tradingDate: date },
+      payload: { tradingDate: date, ...details },
     });
-    await upsertQualityIssue({ ...finding, detectedBy: 'reconciliation' });
   }
 }

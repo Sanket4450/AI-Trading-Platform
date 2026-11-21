@@ -76,7 +76,7 @@ route and no broker write method.
 - The Upstox adapter is read-only. R2 adds no order, modify or cancel method.
 - A successful HTTP fetch is never displayed as complete; only strict coverage can.
 
-See `docs/operations/r2-runbook.md`, `docs/operations/data-quality-rules.md` and
+See `docs/operations/r2-runbook.md`, `docs/operations/system-issues.md` and
 `docs/operations/catalog-status.md` for the R2 operating model.
 
 See `context/` for the architecture, strategy, risk, execution and backtesting specifications.

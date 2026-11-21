@@ -1,0 +1,220 @@
+import { and, desc, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
+import { uuidv7 } from 'uuidv7';
+import { db } from '../client.js';
+import { instruments, providers, systemIssues } from '../schema/index.js';
+
+/** Current-state issue ledger: one row per active problem, deleted when it is fixed. */
+export interface SystemIssueRow {
+  id: string;
+  source: string;
+  kind: string;
+  severity: string;
+  providerId: string | null;
+  instrumentId: string | null;
+  dedupeKey: string;
+  occurrenceCount: number;
+  firstSeenAt: Date;
+  lastSeenAt: Date;
+  payload: Record<string, unknown>;
+}
+
+const issueColumns = {
+  id: systemIssues.id,
+  source: systemIssues.source,
+  kind: systemIssues.kind,
+  severity: systemIssues.severity,
+  providerId: systemIssues.providerId,
+  providerCode: providers.code,
+  instrumentId: systemIssues.instrumentId,
+  symbol: instruments.tradingSymbol,
+  dedupeKey: systemIssues.dedupeKey,
+  occurrenceCount: systemIssues.occurrenceCount,
+  firstSeenAt: systemIssues.firstSeenAt,
+  lastSeenAt: systemIssues.lastSeenAt,
+  payload: systemIssues.payload,
+  scope: sql<'instrument' | 'provider' | 'system'>`
+    case
+      when ${systemIssues.instrumentId} is not null then 'instrument'
+      when ${systemIssues.providerId} is not null then 'provider'
+      else 'system'
+    end`,
+};
+
+export async function upsertSystemIssue(values: {
+  source: string;
+  kind: string;
+  severity: string;
+  providerId: string | null;
+  instrumentId: string | null;
+  dedupeKey: string;
+  payload: Record<string, unknown>;
+}) {
+  const [row] = await db
+    .insert(systemIssues)
+    .values({
+      id: uuidv7(),
+      source: values.source,
+      kind: values.kind,
+      severity: values.severity,
+      providerId: values.providerId,
+      instrumentId: values.instrumentId,
+      dedupeKey: values.dedupeKey,
+      occurrenceCount: 1,
+      payload: values.payload,
+    })
+    .onConflictDoUpdate({
+      target: systemIssues.dedupeKey,
+      set: {
+        severity: sql`excluded.severity`,
+        occurrenceCount: sql`${systemIssues.occurrenceCount} + 1`,
+        lastSeenAt: new Date(),
+        payload: sql`excluded.payload`,
+      },
+    })
+    .returning();
+  return row;
+}
+
+export async function listSystemIssues(filters: {
+  source?: string;
+  kind?: string;
+  severity?: string;
+  instrumentId?: string;
+  providerId?: string;
+  scope?: 'instrument' | 'provider' | 'system';
+  limit?: number;
+  offset?: number;
+}) {
+  const conditions = [];
+  if (filters.source) conditions.push(eq(systemIssues.source, filters.source));
+  if (filters.kind) conditions.push(eq(systemIssues.kind, filters.kind));
+  if (filters.severity) conditions.push(eq(systemIssues.severity, filters.severity));
+  if (filters.instrumentId)
+    conditions.push(eq(systemIssues.instrumentId, filters.instrumentId));
+  if (filters.providerId) conditions.push(eq(systemIssues.providerId, filters.providerId));
+  if (filters.scope === 'instrument') conditions.push(isNotNull(systemIssues.instrumentId));
+  if (filters.scope === 'provider')
+    conditions.push(isNull(systemIssues.instrumentId), isNotNull(systemIssues.providerId));
+  if (filters.scope === 'system')
+    conditions.push(isNull(systemIssues.instrumentId), isNull(systemIssues.providerId));
+
+  return db
+    .select(issueColumns)
+    .from(systemIssues)
+    .leftJoin(providers, eq(providers.id, systemIssues.providerId))
+    .leftJoin(instruments, eq(instruments.id, systemIssues.instrumentId))
+    .where(conditions.length > 0 ? and(...conditions) : undefined)
+    .orderBy(desc(systemIssues.lastSeenAt))
+    .limit(filters.limit ?? 200)
+    .offset(filters.offset ?? 0);
+}
+
+export async function getSystemIssue(id: string) {
+  const rows = await db
+    .select(issueColumns)
+    .from(systemIssues)
+    .leftJoin(providers, eq(providers.id, systemIssues.providerId))
+    .leftJoin(instruments, eq(instruments.id, systemIssues.instrumentId))
+    .where(eq(systemIssues.id, id))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function listInstrumentIssues(instrumentId: string, limit = 50) {
+  return db
+    .select(issueColumns)
+    .from(systemIssues)
+    .leftJoin(providers, eq(providers.id, systemIssues.providerId))
+    .leftJoin(instruments, eq(instruments.id, systemIssues.instrumentId))
+    .where(eq(systemIssues.instrumentId, instrumentId))
+    .orderBy(desc(systemIssues.lastSeenAt))
+    .limit(limit);
+}
+
+export async function listInstrumentDayIssues(instrumentId: string, date: string) {
+  return db
+    .select(issueColumns)
+    .from(systemIssues)
+    .leftJoin(providers, eq(providers.id, systemIssues.providerId))
+    .leftJoin(instruments, eq(instruments.id, systemIssues.instrumentId))
+    .where(
+      and(
+        eq(systemIssues.instrumentId, instrumentId),
+        sql`${systemIssues.payload}->>'tradingDate' = ${date}`,
+      ),
+    )
+    .orderBy(desc(systemIssues.lastSeenAt))
+    .limit(50);
+}
+
+export async function listRecentIssues(limit = 6) {
+  return db
+    .select({
+      id: systemIssues.id,
+      source: systemIssues.source,
+      kind: systemIssues.kind,
+      severity: systemIssues.severity,
+      instrumentId: systemIssues.instrumentId,
+      symbol: instruments.tradingSymbol,
+      lastSeenAt: systemIssues.lastSeenAt,
+      payload: systemIssues.payload,
+    })
+    .from(systemIssues)
+    .leftJoin(instruments, eq(instruments.id, systemIssues.instrumentId))
+    .orderBy(desc(systemIssues.lastSeenAt))
+    .limit(limit);
+}
+
+export async function getSystemIssueCounts() {
+  const [row] = await db
+    .select({
+      total: sql<number>`count(*)::int`,
+      critical: sql<number>`count(*) filter (where ${systemIssues.severity} = 'critical')::int`,
+    })
+    .from(systemIssues);
+  return { total: row?.total ?? 0, critical: row?.critical ?? 0 };
+}
+
+export async function countInstrumentCriticalIssues(instrumentId: string) {
+  const [row] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(systemIssues)
+    .where(
+      and(
+        eq(systemIssues.instrumentId, instrumentId),
+        eq(systemIssues.severity, 'critical'),
+      ),
+    );
+  return row?.count ?? 0;
+}
+
+/** Removes the exact row a successful operation previously raised. */
+export async function clearSystemIssue(dedupeKey: string) {
+  await db.delete(systemIssues).where(eq(systemIssues.dedupeKey, dedupeKey));
+}
+
+/**
+ * Removes the issues owned by one mechanism for a scope. Used when a re-run
+ * proves a whole window healthy but per-row keys are no longer known.
+ */
+export async function clearSystemIssues(filters: {
+  sources: string[];
+  kinds: string[];
+  instrumentId?: string | null;
+  providerId?: string | null;
+  tradingDate?: string;
+}) {
+  const conditions = [
+    inArray(systemIssues.source, filters.sources),
+    inArray(systemIssues.kind, filters.kinds),
+  ];
+  if (filters.instrumentId)
+    conditions.push(eq(systemIssues.instrumentId, filters.instrumentId));
+  if (filters.providerId) conditions.push(eq(systemIssues.providerId, filters.providerId));
+  if (filters.tradingDate) {
+    conditions.push(
+      sql`${systemIssues.payload}->>'tradingDate' = ${filters.tradingDate}`,
+    );
+  }
+  await db.delete(systemIssues).where(and(...conditions));
+}

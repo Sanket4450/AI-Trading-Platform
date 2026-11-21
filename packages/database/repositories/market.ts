@@ -1,93 +1,11 @@
-import { and, asc, desc, eq, gte, isNull, lte, sql } from 'drizzle-orm';
-import { uuidv7 } from 'uuidv7';
+import { and, asc, desc, eq, gte, lte, sql } from 'drizzle-orm';
 import { db } from '../client.js';
 import {
-  dataQualityIssues,
   exchanges,
   instruments,
   marketCandles1m,
   marketQuoteSnapshots,
-  providers,
 } from '../schema/index.js';
-
-export async function listQualityIssues(filters: {
-  status?: string;
-  severity?: string;
-  instrumentId?: string;
-  providerWideOnly?: boolean;
-  limit?: number;
-}) {
-  const conditions = [];
-  if (filters.status) conditions.push(eq(dataQualityIssues.status, filters.status));
-  if (filters.severity) conditions.push(eq(dataQualityIssues.severity, filters.severity));
-  if (filters.instrumentId)
-    conditions.push(eq(dataQualityIssues.instrumentId, filters.instrumentId));
-  if (filters.providerWideOnly)
-    conditions.push(isNull(dataQualityIssues.instrumentId));
-
-  return db
-    .select({
-      id: dataQualityIssues.id,
-      providerId: dataQualityIssues.providerId,
-      providerCode: providers.code,
-      instrumentId: dataQualityIssues.instrumentId,
-      symbol: instruments.tradingSymbol,
-      issueType: dataQualityIssues.issueType,
-      severity: dataQualityIssues.severity,
-      tradingDate: dataQualityIssues.tradingDate,
-      windowStart: dataQualityIssues.windowStart,
-      windowEnd: dataQualityIssues.windowEnd,
-      details: dataQualityIssues.details,
-      status: dataQualityIssues.status,
-      detectedBy: dataQualityIssues.detectedBy,
-      detectedAt: dataQualityIssues.detectedAt,
-      resolvedAt: dataQualityIssues.resolvedAt,
-      ruleId: dataQualityIssues.ruleId,
-      dedupeKey: dataQualityIssues.dedupeKey,
-      occurrenceCount: dataQualityIssues.occurrenceCount,
-      lastSeenAt: dataQualityIssues.lastSeenAt,
-      acknowledgedBy: dataQualityIssues.acknowledgedBy,
-      acknowledgedAt: dataQualityIssues.acknowledgedAt,
-      resolvedBy: dataQualityIssues.resolvedBy,
-      resolutionNote: dataQualityIssues.resolutionNote,
-    })
-    .from(dataQualityIssues)
-    .leftJoin(providers, eq(providers.id, dataQualityIssues.providerId))
-    .leftJoin(instruments, eq(instruments.id, dataQualityIssues.instrumentId))
-    .where(conditions.length > 0 ? and(...conditions) : undefined)
-    .orderBy(desc(dataQualityIssues.detectedAt))
-    .limit(filters.limit ?? 200);
-}
-
-export async function createQualityIssue(values: {
-  providerId: string | null;
-  instrumentId: string | null;
-  issueType: string;
-  severity: string;
-  tradingDate: string | null;
-  windowStart: Date | null;
-  windowEnd: Date | null;
-  details: Record<string, unknown>;
-  detectedBy: string;
-}) {
-  const [created] = await db
-    .insert(dataQualityIssues)
-    .values({
-      id: uuidv7(),
-      providerId: values.providerId,
-      instrumentId: values.instrumentId,
-      issueType: values.issueType,
-      severity: values.severity,
-      tradingDate: values.tradingDate,
-      windowStart: values.windowStart,
-      windowEnd: values.windowEnd,
-      details: values.details,
-      status: 'open',
-      detectedBy: values.detectedBy,
-    })
-    .returning();
-  return created;
-}
 
 export async function upsertCandles(rows: (typeof marketCandles1m.$inferInsert)[]) {
   if (rows.length === 0) return 0;

@@ -4,13 +4,13 @@ import { isJobName, queueNameOf } from '@ai-trading/domain';
 import { db } from '../client.js';
 import {
   accounts,
-  dataQualityIssues,
   instruments,
   jobRuns,
   instrumentDayCoverage,
   notificationEvents,
   reportRuns,
   systemHealthSnapshots,
+  systemIssues,
 } from '../schema/index.js';
 
 export async function listJobRuns(filters: { limit?: number; status?: string }) {
@@ -115,8 +115,8 @@ export async function getSystemStatus() {
       activeAccounts: sql<number>`(select count(*)::int from accounts where is_active)`,
       instruments: sql<number>`(select count(*)::int from instruments where is_active)`,
       strategies: sql<number>`(select count(*)::int from strategies)`,
-      openQualityIssues: sql<number>`(select count(*)::int from data_quality_issues where status = 'open')`,
-      criticalQualityIssues: sql<number>`(select count(*)::int from data_quality_issues where status = 'open' and severity = 'critical')`,
+      openIssues: sql<number>`(select count(*)::int from system_issues)`,
+      criticalIssues: sql<number>`(select count(*)::int from system_issues where severity = 'critical')`,
       queuedJobs: sql<number>`(select count(*)::int from job_runs where status = 'queued')`,
       runningJobs: sql<number>`(select count(*)::int from job_runs where status = 'running')`,
       failedJobs24h: sql<number>`(select count(*)::int from job_runs where status = 'failed' and created_at >= now() - interval '24 hours')`,
@@ -163,8 +163,8 @@ export async function getDashboardOverview() {
       instruments: sql<number>`(select count(*)::int from instruments where is_active)`,
       syncTargets: sql<number>`(select count(*)::int from instruments where is_sync_target)`,
       strategies: sql<number>`(select count(*)::int from strategies where status in ('research','active'))`,
-      openIssues: sql<number>`(select count(*)::int from data_quality_issues where status = 'open')`,
-      criticalIssues: sql<number>`(select count(*)::int from data_quality_issues where status = 'open' and severity = 'critical')`,
+      openIssues: sql<number>`(select count(*)::int from system_issues)`,
+      criticalIssues: sql<number>`(select count(*)::int from system_issues where severity = 'critical')`,
       coverageRows: sql<number>`(select count(*)::int from instrument_day_coverage)`,
       completeCoverage: sql<number>`(select count(*)::int from instrument_day_coverage where stored_bars = expected_bars)`,
       partialCoverage: sql<number>`(select count(*)::int from instrument_day_coverage where stored_bars > 0 and stored_bars < expected_bars)`,
@@ -191,17 +191,16 @@ export async function getDashboardOverview() {
 
   const openIssues = await db
     .select({
-      id: dataQualityIssues.id,
-      instrumentId: dataQualityIssues.instrumentId,
-      issueType: dataQualityIssues.issueType,
-      severity: dataQualityIssues.severity,
-      status: dataQualityIssues.status,
-      tradingDate: dataQualityIssues.tradingDate,
-      detectedAt: dataQualityIssues.detectedAt,
+      id: systemIssues.id,
+      instrumentId: systemIssues.instrumentId,
+      kind: systemIssues.kind,
+      source: systemIssues.source,
+      severity: systemIssues.severity,
+      lastSeenAt: systemIssues.lastSeenAt,
+      payload: systemIssues.payload,
     })
-    .from(dataQualityIssues)
-    .where(eq(dataQualityIssues.status, 'open'))
-    .orderBy(desc(dataQualityIssues.detectedAt))
+    .from(systemIssues)
+    .orderBy(desc(systemIssues.lastSeenAt))
     .limit(6);
 
   const latestCoverageDate =

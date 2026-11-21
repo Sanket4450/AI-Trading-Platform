@@ -55,7 +55,7 @@ curl -X POST http://localhost:8000/api/v1/system/coverage/rebuild -b cookies.txt
 ```
 
 The endpoint returns the queued job run; watch it on `/jobs`. It deletes no candles and edits no
-quality issues.
+system issues.
 
 ## Token procedure
 

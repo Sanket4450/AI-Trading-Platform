@@ -258,3 +258,35 @@ export const systemSettings = pgTable(
   },
   () => [],
 );
+
+/**
+ * Current-state issue ledger. One row per active problem, deduped by the writer's
+ * own identity fields. A successful re-run deletes its row instead of resolving it.
+ */
+export const systemIssues = pgTable(
+  'system_issues',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    source: varchar('source', { length: 64 }).notNull(),
+    kind: varchar('kind', { length: 64 }).notNull(),
+    severity: varchar('severity', { length: 32 }).notNull(),
+    providerId: uuid('provider_id'),
+    instrumentId: uuid('instrument_id'),
+    dedupeKey: varchar('dedupe_key', { length: 64 }).notNull(),
+    occurrenceCount: integer('occurrence_count').default(1).notNull(),
+    firstSeenAt: timestamp('first_seen_at', { withTimezone: true }).defaultNow().notNull(),
+    lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).defaultNow().notNull(),
+    payload: jsonb('payload')
+      .$type<Record<string, unknown>>()
+      .default(sql`'{}'::jsonb`)
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex('uq_system_issues_dedupe').on(table.dedupeKey),
+    index('idx_system_issues_triage').on(table.source, table.kind, table.lastSeenAt),
+    index('idx_system_issues_instrument').on(table.instrumentId, table.lastSeenAt),
+    index('idx_system_issues_provider').on(table.providerId, table.lastSeenAt),
+    check('chk_system_issues_severity', sql`${table.severity} in ('info', 'warning', 'critical')`),
+    check('chk_system_issues_occurrence', sql`${table.occurrenceCount} > 0`),
+  ],
+);

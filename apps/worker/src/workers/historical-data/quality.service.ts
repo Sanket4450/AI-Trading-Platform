@@ -8,13 +8,11 @@ import {
   deriveFetchStatus,
   gapSeverity,
   istToday,
-  qualityFinding,
-  qualityRule,
   type CalendarSessionRow,
   type SessionWindow,
 } from '@ai-trading/market-data';
 import {
-  autoResolveStaleIssues,
+  clearSystemIssues,
   findProviderByCode,
   getCandleUpdatedAt,
   getCoverageInputs,
@@ -33,8 +31,8 @@ import {
   getTradingSessionsForRange,
   upsertCoverageBatch,
   upsertInstrumentStatus,
-  upsertQualityIssue,
 } from '@ai-trading/database';
+import { recordIssue } from './issue-recorder.js';
 
 @Injectable()
 export class QualityService {
@@ -42,30 +40,8 @@ export class QualityService {
 
   constructor(private readonly config: ConfigService) {}
 
-  private async issue(values: {
-    ruleId: string;
-    severity: 'info' | 'warning' | 'critical';
-    providerId: string | null;
-    instrumentId: string | null;
-    tradingDate: string | null;
-    windowStart: Date | null;
-    windowEnd: Date | null;
-    details: Record<string, unknown>;
-    detectedBy: 'ingestion' | 'validation' | 'reconciliation' | 'manual';
-  }): Promise<void> {
-    const rule = qualityRule(values.ruleId);
-    const finding = qualityFinding({
-      ruleId: rule.ruleId,
-      issueType: rule.issueType,
-      severity: values.severity,
-      providerId: values.providerId,
-      instrumentId: values.instrumentId,
-      tradingDate: values.tradingDate,
-      windowStart: values.windowStart,
-      windowEnd: values.windowEnd,
-      details: values.details,
-    });
-    await upsertQualityIssue({ ...finding, detectedBy: values.detectedBy });
+  private issue(values: Parameters<typeof recordIssue>[0]): Promise<void> {
+    return recordIssue(values);
   }
 
   private async sessions(
@@ -171,13 +147,31 @@ export class QualityService {
     maxGap: number;
   }): Promise<void> {
     const { instrumentId, providerId, date, session, verdict, stored, maxGap } = input;
+
+    // A recheck rebuilds the day's findings: clear what this pass owns, then
+    // raise whatever is still true.
+    await clearSystemIssues({
+      sources: ['validation'],
+      kinds: ['missing_bar', 'gap', 'coverage_shortfall', 'calendar_mismatch', 'partial_bar'],
+      instrumentId,
+      tradingDate: date,
+    });
+
+    const scope = {
+      tradingDate: date,
+      windowStart: session.open.toISOString(),
+      windowEnd: session.close.toISOString(),
+    };
     const base = {
       providerId,
       instrumentId,
+      source: 'validation' as const,
+      scope,
+    };
+    const payload = {
       tradingDate: date,
-      windowStart: session.open,
-      windowEnd: session.close,
-      detectedBy: 'validation' as const,
+      windowStart: session.open.toISOString(),
+      windowEnd: session.close.toISOString(),
     };
 
     if (verdict.status === 'missing') {
@@ -185,7 +179,7 @@ export class QualityService {
         ...base,
         ruleId: 'DQ-003',
         severity: 'critical',
-        details: { expectedBars: verdict.expectedBars, storedBars: 0 },
+        payload: { ...payload, expectedBars: verdict.expectedBars, storedBars: 0 },
       });
     }
     if (verdict.missingBarCount > 0) {
@@ -193,7 +187,8 @@ export class QualityService {
         ...base,
         ruleId: 'DQ-001',
         severity: 'warning',
-        details: {
+        payload: {
+          ...payload,
           missingBarCount: verdict.missingBarCount,
           sample: (verdict.details.missingSample as string[] | undefined) ?? [],
         },
@@ -216,7 +211,8 @@ export class QualityService {
         ...base,
         ruleId: 'DQ-002',
         severity: critical ? 'critical' : 'warning',
-        details: {
+        payload: {
+          ...payload,
           gapRunCount: verdict.gapRunCount,
           maxGapMinutes: verdict.maxGapMinutes,
           runs,
@@ -228,7 +224,8 @@ export class QualityService {
         ...base,
         ruleId: 'DQ-006',
         severity: 'warning',
-        details: {
+        payload: {
+          ...payload,
           missingOpen: verdict.details.missingOpen,
           missingClose: verdict.details.missingClose,
         },
@@ -239,7 +236,10 @@ export class QualityService {
         ...base,
         ruleId: 'DQ-004',
         severity: 'info',
-        details: { partialBars: stored.filter((row) => !row.isFinal).length },
+        payload: {
+          ...payload,
+          partialBars: stored.filter((row) => !row.isFinal).length,
+        },
       });
     }
     if (stored.length > 0) {
@@ -250,7 +250,8 @@ export class QualityService {
           ...base,
           ruleId: 'DQ-005',
           severity: 'critical',
-          details: {
+          payload: {
+            ...payload,
             firstBarAt: first.toISOString(),
             lastBarAt: last.toISOString(),
           },
@@ -339,10 +340,7 @@ export class QualityService {
       scanned += 1;
     }
     await this.detectDuplicateMappings(provider.id);
-    const autoResolved = await autoResolveStaleIssues(
-      this.config.get<number>('DATA_QUALITY_STALE_HOURS', 24),
-    );
-    return { scanned, from: fromDate, to: latest, autoResolved };
+    return { scanned, from: fromDate, to: latest };
   }
 
   async detectCorporateActionMismatch(
@@ -352,6 +350,11 @@ export class QualityService {
   ) {
     const provider = await findProviderByCode('upstox');
     if (!provider) return 0;
+    await clearSystemIssues({
+      sources: ['reconciliation'],
+      kinds: ['corporate_action_mismatch'],
+      instrumentId,
+    });
     const rows = await getDailyAggregatesFromMinutes(instrumentId, from, to);
     let findings = 0;
     for (let index = 1; index < rows.length; index += 1) {
@@ -377,17 +380,16 @@ export class QualityService {
         severity: 'critical',
         providerId: provider.id,
         instrumentId,
-        tradingDate: current.trading_date,
-        windowStart: null,
-        windowEnd: null,
-        details: {
+        source: 'reconciliation',
+        scope: { tradingDate: current.trading_date },
+        payload: {
+          tradingDate: current.trading_date,
           previousClose,
           open,
           impliedFactor: open / previousClose,
           previousDate: previous.trading_date,
           note: 'Confirm or dismiss the corporate action before the backtest preflight.',
         },
-        detectedBy: 'reconciliation',
       });
       findings += 1;
     }
@@ -398,6 +400,11 @@ export class QualityService {
     const targets = await getSyncTargetInstruments();
     let findings = 0;
     for (const target of targets) {
+      await clearSystemIssues({
+        sources: ['reconciliation'],
+        kinds: ['duplicate_mapping'],
+        instrumentId: target.instrumentId,
+      });
       const count = await getPrimaryMappingCount(
         target.instrumentId,
         providerId,
@@ -408,11 +415,9 @@ export class QualityService {
           severity: 'warning',
           providerId,
           instrumentId: target.instrumentId,
-          tradingDate: null,
-          windowStart: null,
-          windowEnd: null,
-          details: { primaryMappings: count },
-          detectedBy: 'reconciliation',
+          source: 'reconciliation',
+          scope: {},
+          payload: { primaryMappings: count },
         });
         findings += 1;
       }
@@ -426,6 +431,12 @@ export class QualityService {
     const candleUpdatedAt = await getCandleUpdatedAt(instrumentId, date);
     if (!candleUpdatedAt) return false;
     const statusRow = await getInstrumentStatusRow(instrumentId);
+    await clearSystemIssues({
+      sources: ['reconciliation'],
+      kinds: ['stale_coverage'],
+      instrumentId,
+      tradingDate: date,
+    });
     if (statusRow?.computedAt && statusRow.computedAt >= candleUpdatedAt)
       return false;
     await this.issue({
@@ -433,14 +444,13 @@ export class QualityService {
       severity: 'info',
       providerId: provider.id,
       instrumentId,
-      tradingDate: date,
-      windowStart: null,
-      windowEnd: null,
-      details: {
+      source: 'reconciliation',
+      scope: { tradingDate: date },
+      payload: {
+        tradingDate: date,
         candleUpdatedAt: candleUpdatedAt.toISOString(),
         computedAt: statusRow?.computedAt?.toISOString() ?? null,
       },
-      detectedBy: 'reconciliation',
     });
     return true;
   }
@@ -452,6 +462,11 @@ export class QualityService {
     const staleHours = this.config.get<number>('DATA_QUALITY_STALE_HOURS', 24);
     let findings = 0;
     for (const target of targets) {
+      await clearSystemIssues({
+        sources: ['reconciliation'],
+        kinds: ['stale_ingestion'],
+        instrumentId: target.instrumentId,
+      });
       const lastSuccess = await getLastSuccessfulJobForInstrument(
         target.instrumentId,
       );
@@ -461,11 +476,9 @@ export class QualityService {
           severity: 'warning',
           providerId: provider.id,
           instrumentId: target.instrumentId,
-          tradingDate: null,
-          windowStart: null,
-          windowEnd: null,
-          details: { reason: 'no successful ingestion' },
-          detectedBy: 'reconciliation',
+          source: 'reconciliation',
+          scope: {},
+          payload: { reason: 'no successful ingestion' },
         });
         findings += 1;
         continue;
@@ -478,14 +491,12 @@ export class QualityService {
           severity: 'warning',
           providerId: provider.id,
           instrumentId: target.instrumentId,
-          tradingDate: null,
-          windowStart: null,
-          windowEnd: null,
-          details: {
+          source: 'reconciliation',
+          scope: {},
+          payload: {
             ageHours: Math.round(ageHours),
             lastSuccessAt: lastSuccess.finishedAt.toISOString(),
           },
-          detectedBy: 'reconciliation',
         });
         findings += 1;
       }
@@ -498,6 +509,11 @@ export class QualityService {
     if (!provider) return 0;
     const tick = Number(await getInstrumentTickSize(instrumentId));
     if (!(tick > 0)) return 0;
+    await clearSystemIssues({
+      sources: ['validation'],
+      kinds: ['tick_size_mismatch'],
+      instrumentId,
+    });
     const candles = await getExistingCandles(
       instrumentId,
       new Date(`${from}T00:00:00Z`),
@@ -526,11 +542,9 @@ export class QualityService {
         severity: 'warning',
         providerId: provider.id,
         instrumentId,
-        tradingDate: null,
-        windowStart: null,
-        windowEnd: null,
-        details: { misalignedBars: misaligned, tickSize: tick },
-        detectedBy: 'validation',
+        source: 'validation',
+        scope: {},
+        payload: { misalignedBars: misaligned, tickSize: tick },
       });
     }
     return misaligned;

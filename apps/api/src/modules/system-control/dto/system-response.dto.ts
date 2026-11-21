@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { JobRunDto } from '../../../common/dto/job-run.dto.js';
-import { QualityIssueDto } from '../../../common/dto/quality-issue.dto.js';
+import { SystemIssueDto } from '../../../common/dto/system-issue.dto.js';
 
 export class HealthCheckDto {
   @ApiProperty({ enum: ['healthy', 'unhealthy'] })
@@ -157,33 +157,36 @@ export class OverviewDto {
       properties: {
         id: { type: 'string', format: 'uuid' },
         instrumentId: { type: 'string', format: 'uuid', nullable: true },
-        issueType: { type: 'string' },
+        source: { type: 'string' },
+        kind: { type: 'string' },
         severity: { type: 'string' },
-        status: { type: 'string' },
-        tradingDate: { type: 'string', format: 'date', nullable: true },
-        detectedAt: { type: 'string', format: 'date-time' },
+        symbol: { type: 'string', nullable: true },
+        lastSeenAt: { type: 'string', format: 'date-time' },
+        payload: { type: 'object', additionalProperties: true },
       },
       required: [
         'id',
         'instrumentId',
-        'issueType',
+        'source',
+        'kind',
         'severity',
-        'status',
-        'tradingDate',
-        'detectedAt',
+        'symbol',
+        'lastSeenAt',
+        'payload',
       ],
     },
   })
   openIssues!: Array<
     Pick<
-      QualityIssueDto,
+      SystemIssueDto,
       | 'id'
       | 'instrumentId'
-      | 'issueType'
+      | 'source'
+      | 'kind'
       | 'severity'
-      | 'status'
-      | 'tradingDate'
-      | 'detectedAt'
+      | 'symbol'
+      | 'lastSeenAt'
+      | 'payload'
     >
   >;
 

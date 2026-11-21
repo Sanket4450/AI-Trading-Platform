@@ -27,15 +27,18 @@ describe('detailHref', () => {
 });
 
 describe('safeReturnPath', () => {
-  it.each(['/instruments?search=infy', '/settings', '/'])('accepts %s', (value) => {
-    expect(safeReturnPath(value)).toBe(value);
-  });
+  it.each(['/instruments?search=infy', '/issues', '/issues?scope=instrument', '/settings', '/'])(
+    'accepts %s',
+    (value) => {
+      expect(safeReturnPath(value)).toBe(value);
+    },
+  );
 
   it.each([
     'https://evil.example.com',
     '//evil.example.com',
     '/login',
-    '/instruments/issues/1',
+    '/instruments/abc',
     '/instruments?search=infy#frag',
     '/instruments\\..\\secret',
     '',
@@ -65,7 +68,7 @@ describe('backLinkFor', () => {
   });
 
   it('falls back when the marker is not a list page', () => {
-    expect(backLinkFor('/instruments/issues/1', '/jobs')).toEqual({
+    expect(backLinkFor('/instruments/abc', '/jobs')).toEqual({
       href: '/jobs',
       label: 'Back to jobs',
     });

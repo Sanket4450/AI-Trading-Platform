@@ -4,7 +4,6 @@ import { db } from '../client.js';
 import { nseHolidays, nseSpecialSessions } from '../fixtures/nse.js';
 import {
   corporateActions,
-  dataQualityIssues,
   exchanges,
   instrumentDataStatus,
   instrumentDayCoverage,
@@ -14,6 +13,10 @@ import {
   rawProviderPayloads,
   tradingCalendar,
 } from '../schema/index.js';
+import {
+  countInstrumentCriticalIssues,
+  listInstrumentIssues,
+} from './issues.js';
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -690,21 +693,7 @@ export async function getInstrumentStatusDetail(instrumentId: string) {
     .groupBy(sql`date_trunc('month', ${instrumentDayCoverage.tradingDate})`)
     .orderBy(sql`date_trunc('month', ${instrumentDayCoverage.tradingDate})`);
 
-  const issues = await db
-    .select({
-      id: dataQualityIssues.id,
-      ruleId: dataQualityIssues.ruleId,
-      issueType: dataQualityIssues.issueType,
-      severity: dataQualityIssues.severity,
-      tradingDate: dataQualityIssues.tradingDate,
-      status: dataQualityIssues.status,
-      occurrenceCount: dataQualityIssues.occurrenceCount,
-      lastSeenAt: dataQualityIssues.lastSeenAt,
-    })
-    .from(dataQualityIssues)
-    .where(eq(dataQualityIssues.instrumentId, instrumentId))
-    .orderBy(desc(dataQualityIssues.lastSeenAt))
-    .limit(50);
+  const issues = await listInstrumentIssues(instrumentId, 50);
 
   return { ...status, months, issues };
 }
@@ -792,17 +781,8 @@ export async function getInstrumentStatusCounters(
     partialDays: 0,
     missingDays: 0,
   };
-  const [issues] = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(dataQualityIssues)
-    .where(
-      and(
-        eq(dataQualityIssues.instrumentId, instrumentId),
-        eq(dataQualityIssues.severity, 'critical'),
-        inArray(dataQualityIssues.status, ['open', 'acknowledged']),
-      ),
-    );
-  return { ...counters, openCriticalIssues: issues?.count ?? 0 };
+  const openCriticalIssues = await countInstrumentCriticalIssues(instrumentId);
+  return { ...counters, openCriticalIssues };
 }
 
 export interface CorporateActionImportRow {

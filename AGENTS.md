@@ -148,7 +148,7 @@ pnpm dev                      # builds all packages, then web:3000, api:8000, wo
 - Nx caches `build`/`typecheck`/`lint`/`test`. If a change seems ignored, rerun with
   `--skip-nx-cache` before debugging.
 - A successful HTTP fetch is not "complete" data: only strict coverage can declare completeness (see
-  `docs/operations/data-quality-rules.md`).
+  `docs/operations/system-issues.md`).
 - The R2 calendar is a fixture with provisional rows; do not treat it as an authoritative exchange
   calendar until the open checks in `docs/operations/implementation-notes.md` close.
 

@@ -7,3 +7,4 @@ export * from './repositories/market.js';
 export * from './repositories/ingestion.js';
 export * from './repositories/operations.js';
 export * from './repositories/jobs.js';
+export * from './repositories/issues.js';

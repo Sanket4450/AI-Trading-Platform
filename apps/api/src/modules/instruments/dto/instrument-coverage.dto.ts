@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { JobRunDto } from '../../../common/dto/job-run.dto.js';
-import { QualityIssueDto } from '../../../common/dto/quality-issue.dto.js';
+import { SystemIssueDto } from '../../../common/dto/system-issue.dto.js';
 
 export class InstrumentCoverageSummaryDto {
   @ApiProperty()
@@ -189,8 +189,8 @@ export class InstrumentCoverageDetailDto {
   @ApiProperty({ type: [InstrumentCoverageMonthDto] })
   months!: InstrumentCoverageMonthDto[];
 
-  @ApiProperty({ type: [QualityIssueDto] })
-  issues!: QualityIssueDto[];
+  @ApiProperty({ type: [SystemIssueDto] })
+  issues!: SystemIssueDto[];
 }
 
 export class CoverageInstrumentDto {
@@ -239,8 +239,8 @@ export class CoverageDayDetailDto {
   })
   coverage!: InstrumentCoverageDayRowDto | null;
 
-  @ApiProperty({ type: [QualityIssueDto] })
-  issues!: QualityIssueDto[];
+  @ApiProperty({ type: [SystemIssueDto] })
+  issues!: SystemIssueDto[];
 }
 
 export class BlockedInstrumentDto {

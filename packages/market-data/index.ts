@@ -18,11 +18,11 @@ export type {
   NormalizationContext,
   NormalizationResult,
   NormalizedCandle,
-  QualityFinding,
   QualityReason,
   QualityRule,
   RawCandle,
   SessionWindow,
+  SystemIssueFinding,
 } from './types.js';
 
 export {
@@ -68,9 +68,10 @@ export {
   QUALITY_RULE_BY_ID,
   gapSeverity,
   isCriticalSeverity,
-  qualityDedupeKey,
-  qualityFinding,
+  issueDedupeKey,
   qualityRule,
+  stableStringify,
+  systemIssue,
 } from './quality.js';
 
 export {

@@ -1,10 +1,9 @@
-import Link from 'next/link';
 import { apiFetch } from '@/lib/api';
 import type { CorporateAction, InstrumentCoverageDetail, InstrumentMapping, JobListResponse } from '@/lib/types';
 import { formatDate, formatNumber } from '@/lib/format';
 import { label } from '@/lib/labels';
 import { displayStatus, statusTone } from '@/lib/status';
-import { backLinkFor, detailHref, type DetailSearchParams } from '@/lib/navigation';
+import { backLinkFor, type DetailSearchParams } from '@/lib/navigation';
 import { PageMeta } from '@/components/shell/page-meta';
 import { StatCard, StatGrid } from '@/components/dashboard/stat-card';
 import { SectionCard } from '@/components/dashboard/section-card';
@@ -30,6 +29,7 @@ import {
 } from '@/components/ui/table';
 import { InstrumentDetailActions } from '../instrument-actions';
 import { InstrumentJobProgress } from '@/features/jobs/components/instrument-job-progress';
+import { IssueList } from '@/features/issues/components/issue-list';
 
 export default async function InstrumentDetailPage({
   params,
@@ -217,31 +217,15 @@ export default async function InstrumentDetailPage({
 
       <SectionCard
         className="mt-4"
-        title="Open issues"
-        description="Every partial or missing day has a rule, severity and decision."
+        title="Active issues"
+        description="One row per active problem; a successful re-fetch removes its row."
       >
-        {detail.issues.length === 0 ? (
-          <EmptyState title="No issues" description="The validation layer is clean." />
-        ) : (
-          <div className="grid gap-2 sm:grid-cols-2">
-            {detail.issues.slice(0, 10).map((issue) => (
-              <Link
-                key={issue.id}
-                href={detailHref(`/instruments/issues/${issue.id}`, back.href)}
-                className="border-border/70 bg-background/40 block rounded-lg border p-3 text-sm"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="font-medium">{label(issue.issueType)}</span>
-                  <StatusBadge status={issue.severity} />
-                </div>
-                <p className="text-muted-foreground mt-1 text-xs">
-                  {issue.ruleId ?? 'No rule'} · {issue.tradingDate ?? 'No date'} · seen{' '}
-                  {issue.occurrenceCount}×
-                </p>
-              </Link>
-            ))}
-          </div>
-        )}
+        <IssueList
+          issues={detail.issues}
+          from={back.href}
+          emptyTitle="No issues"
+          emptyDescription="The validation layer is clean."
+        />
       </SectionCard>
 
       <SectionCard

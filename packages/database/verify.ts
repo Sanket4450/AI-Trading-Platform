@@ -90,7 +90,7 @@ try {
          FROM pg_indexes
         WHERE schemaname = 'public'
           AND indexname IN ('uq_raw_payload_request_hash', 'uq_job_runs_active_backfill',
-                            'uq_quality_open_dedupe', 'idx_job_runs_status_started')) AS indexes
+                            'uq_system_issues_dedupe', 'idx_job_runs_status_started')) AS indexes
   `;
 
   const [seed] = await sql<
