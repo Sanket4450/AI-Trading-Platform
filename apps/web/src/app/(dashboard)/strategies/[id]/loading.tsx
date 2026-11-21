@@ -12,8 +12,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 export default function Loading() {
   return (
     <div aria-busy="true" aria-live="polite">
-      <DetailHeaderSkeleton badges={2} actions={2} metaWidth="w-64" />
-      <StatGridSkeleton count={4} />
+      <DetailHeaderSkeleton badges={2} actions={1} metaWidth="w-64" />
+      <StatGridSkeleton count={3} />
 
       <SectionSkeleton className="mt-4" titleWidth="w-40" descriptionWidth="w-64">
         <Skeleton className="h-4 w-96 max-w-full" />
@@ -44,15 +44,6 @@ export default function Loading() {
               ]}
               rows={4}
             />
-          </div>
-
-          <div>
-            <Skeleton className="mb-2 h-4 w-32" />
-            <div className="flex flex-wrap gap-1.5">
-              {Array.from({ length: 12 }).map((_, index) => (
-                <Skeleton key={index} className="h-5 w-16 rounded-full" />
-              ))}
-            </div>
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2">

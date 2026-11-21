@@ -32,7 +32,7 @@ export default function Loading() {
         </SectionSkeleton>
 
         <SectionSkeleton titleWidth="w-36" descriptionWidth="w-64">
-          <IssueListSkeleton rows={4} />
+          <IssueListSkeleton rows={6} />
         </SectionSkeleton>
       </div>
     </div>

@@ -191,50 +191,48 @@ export default async function IssuesPage({
             />
           </div>
         ) : (
-          <div className="overflow-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Severity</TableHead>
-                  <TableHead>Kind</TableHead>
-                  <TableHead>Source</TableHead>
-                  <TableHead>Scope</TableHead>
-                  <TableHead>Window</TableHead>
-                  <TableHead>Seen</TableHead>
-                  <TableHead>Last seen</TableHead>
-                  <TableHead />
+          <Table containerClassName="h-full overflow-auto">
+            <TableHeader className="bg-card sticky top-0 z-10">
+              <TableRow>
+                <TableHead>Severity</TableHead>
+                <TableHead>Kind</TableHead>
+                <TableHead>Source</TableHead>
+                <TableHead>Scope</TableHead>
+                <TableHead>Window</TableHead>
+                <TableHead>Seen</TableHead>
+                <TableHead>Last seen</TableHead>
+                <TableHead />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {issues.map((issue) => (
+                <TableRow key={issue.id}>
+                  <TableCell>
+                    <StatusBadge status={issue.severity} />
+                  </TableCell>
+                  <TableCell>
+                    <p className="font-medium">{label(issue.kind)}</p>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {label(issue.source)}
+                  </TableCell>
+                  <TableCell>
+                    {issue.symbol ?? issue.providerCode ?? label(issue.scope)}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {issueWindow(issue.payload) ?? '—'}
+                  </TableCell>
+                  <TableCell>{formatNumber(issue.occurrenceCount)}×</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {formatDateTime(issue.lastSeenAt)}
+                  </TableCell>
+                  <TableActions>
+                    <IssueDialog issue={issuePreview(issue)} from={from} />
+                  </TableActions>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {issues.map((issue) => (
-                  <TableRow key={issue.id}>
-                    <TableCell>
-                      <StatusBadge status={issue.severity} />
-                    </TableCell>
-                    <TableCell>
-                      <p className="font-medium">{label(issue.kind)}</p>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {label(issue.source)}
-                    </TableCell>
-                    <TableCell>
-                      {issue.symbol ?? issue.providerCode ?? label(issue.scope)}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {issueWindow(issue.payload) ?? '—'}
-                    </TableCell>
-                    <TableCell>{formatNumber(issue.occurrenceCount)}×</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {formatDateTime(issue.lastSeenAt)}
-                    </TableCell>
-                    <TableActions>
-                      <IssueDialog issue={issuePreview(issue)} from={from} />
-                    </TableActions>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+              ))}
+            </TableBody>
+          </Table>
         )}
       </TableCard>
     </div>

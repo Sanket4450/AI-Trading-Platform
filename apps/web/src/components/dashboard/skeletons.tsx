@@ -138,6 +138,7 @@ export function SectionSkeleton({
   descriptionWidth = 'w-72',
   toolbar,
   actions,
+  footer,
   className,
   contentClassName,
   children,
@@ -146,6 +147,7 @@ export function SectionSkeleton({
   descriptionWidth?: string | null;
   toolbar?: React.ReactNode;
   actions?: React.ReactNode;
+  footer?: React.ReactNode;
   className?: string;
   contentClassName?: string;
   children: React.ReactNode;
@@ -169,28 +171,38 @@ export function SectionSkeleton({
         </div>
       </CardHeader>
       <CardContent className={contentClassName}>{children}</CardContent>
+      {footer ? (
+        <div className="border-border/70 border-t px-6 py-2">{footer}</div>
+      ) : null}
     </Card>
   );
 }
 
-/** DetailHeader placeholder: badges, metadata and right-aligned actions. */
+/** DetailHeader placeholder: back link, badges, metadata, links and right-aligned actions. */
 export function DetailHeaderSkeleton({
   badges = 2,
+  links = 0,
   actions = 1,
   metaWidth = 'w-64',
 }: {
   badges?: number;
+  links?: number;
   actions?: number;
   metaWidth?: string;
 }) {
   return (
-    <div className="border-border/70 bg-card/40 mb-4 flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2">
+    <div className="border-border/70 bg-card/40 mb-4 flex flex-wrap items-center gap-2 rounded-xl border px-2 py-2">
+      <Skeleton className="h-7 w-24 rounded-md" />
+      <span className="bg-border/70 h-4 w-px" aria-hidden />
       <div className="flex flex-wrap items-center gap-1.5">
         {Array.from({ length: badges }).map((_, index) => (
           <Skeleton key={index} className="h-5 w-20 rounded-full" />
         ))}
       </div>
       <Skeleton className={cn('h-3.5', metaWidth)} />{' '}
+      {Array.from({ length: links }).map((_, index) => (
+        <Skeleton key={index} className="h-3 w-16" />
+      ))}
       <div className="ml-auto flex flex-wrap items-center gap-1.5">
         {Array.from({ length: actions }).map((_, index) => (
           <Skeleton key={index} className="h-7 w-24 rounded-md" />
@@ -242,9 +254,15 @@ export function JsonBlockSkeleton({ lines = 5 }: { lines?: number }) {
 }
 
 /** List of bordered issue cards, used by overview and instrument detail. */
-export function IssueListSkeleton({ rows = 3 }: { rows?: number }) {
+export function IssueListSkeleton({
+  rows = 3,
+  columns = 1,
+}: {
+  rows?: number;
+  columns?: 1 | 2;
+}) {
   return (
-    <div className="space-y-2">
+    <div className={cn('grid gap-2', columns === 2 && 'sm:grid-cols-2')}>
       {Array.from({ length: rows }).map((_, index) => (
         <div
           key={index}
@@ -343,17 +361,57 @@ export function MonthGridSkeleton({ months = 12 }: { months?: number }) {
   );
 }
 
+/** Footer placeholder matching the Pagination strip on list and detail tables. */
+export function PaginationSkeleton({
+  mode = 'offset',
+  className,
+}: {
+  mode?: 'offset' | 'cursor';
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn('flex flex-wrap items-center justify-between gap-2 text-xs', className)}
+    >
+      <Skeleton className="h-3 w-44" />
+      <div className="flex flex-wrap items-center gap-2">
+        <Skeleton className="h-7 w-24 rounded-md" />
+        <div className="flex flex-wrap items-center gap-1">
+          {mode === 'cursor' ? (
+            <>
+              <Skeleton className="h-7 w-20 rounded-md" />
+              <Skeleton className="h-7 w-16 rounded-md" />
+            </>
+          ) : (
+            <>
+              <Skeleton className="size-7 rounded-md" />
+              {Array.from({ length: 5 }).map((_, index) => (
+                <Skeleton key={index} className="h-7 w-8 rounded-md" />
+              ))}
+              <Skeleton className="size-7 rounded-md" />
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** Full-height list-page placeholder matching TableCard. */
 export function TablePageSkeleton({
   summaryCount = 4,
   columns,
   rows = 12,
   filters,
+  footer,
+  showSearch = true,
 }: {
   summaryCount?: number;
   columns: readonly SkeletonColumn[];
   rows?: number;
   filters?: React.ReactNode;
+  footer?: React.ReactNode;
+  showSearch?: boolean;
 }) {
   return (
     <div className="flex h-full min-h-0 flex-col" aria-busy="true" aria-live="polite">
@@ -374,7 +432,7 @@ export function TablePageSkeleton({
             ))}
           </div>
           <div className="flex min-w-0 flex-wrap items-center gap-2 xl:justify-end">
-            <Skeleton className="h-8 w-full sm:w-72 xl:w-80" />
+            {showSearch ? <Skeleton className="h-8 w-full sm:w-72 xl:w-80" /> : null}
             {filters}
             <Skeleton className="size-8 rounded-md" />
           </div>
@@ -387,6 +445,9 @@ export function TablePageSkeleton({
             containerClassName="h-full overflow-auto"
           />
         </CardContent>
+        {footer ? (
+          <div className="border-border/70 shrink-0 border-t px-3 py-2">{footer}</div>
+        ) : null}
       </Card>
     </div>
   );

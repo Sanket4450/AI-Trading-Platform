@@ -2,6 +2,7 @@ import {
   DetailHeaderSkeleton,
   IconButtonSkeleton,
   MiniRowListSkeleton,
+  PaginationSkeleton,
   SectionSkeleton,
   StatGridSkeleton,
   TableSkeleton,
@@ -10,11 +11,16 @@ import {
 export default function Loading() {
   return (
     <div aria-busy="true" aria-live="polite">
-      <DetailHeaderSkeleton badges={2} actions={2} metaWidth="w-72" />
+      <DetailHeaderSkeleton badges={2} actions={1} metaWidth="w-72" />
       <StatGridSkeleton count={4} />
 
       <div className="mt-4 grid gap-4 xl:grid-cols-[1.2fr_1fr]">
-        <SectionSkeleton titleWidth="w-28" descriptionWidth="w-96" actions={<IconButtonSkeleton />}>
+        <SectionSkeleton
+          titleWidth="w-28"
+          descriptionWidth="w-96"
+          actions={<IconButtonSkeleton />}
+          footer={<PaginationSkeleton />}
+        >
           <TableSkeleton
             columns={[
               { header: 'w-14', width: 'w-20', secondaryWidth: 'w-28', lines: 2 },
@@ -32,19 +38,23 @@ export default function Loading() {
             titleWidth="w-32"
             descriptionWidth="w-64"
             actions={<IconButtonSkeleton />}
+            footer={<PaginationSkeleton mode="cursor" />}
           >
             <TableSkeleton
               columns={[
                 { header: 'w-16', width: 'w-28' },
                 { header: 'w-10', width: 'w-16' },
-                { header: 'w-16', width: 'w-20' },
                 { actions: true },
               ]}
               rows={6}
             />
           </SectionSkeleton>
 
-          <SectionSkeleton titleWidth="w-16" descriptionWidth="w-48">
+          <SectionSkeleton
+            titleWidth="w-16"
+            descriptionWidth="w-48"
+            footer={<PaginationSkeleton />}
+          >
             <MiniRowListSkeleton rows={2} />
           </SectionSkeleton>
         </div>
@@ -55,6 +65,7 @@ export default function Loading() {
         titleWidth="w-32"
         descriptionWidth="w-96"
         actions={<IconButtonSkeleton />}
+        footer={<PaginationSkeleton mode="cursor" />}
       >
         <TableSkeleton
           columns={[
