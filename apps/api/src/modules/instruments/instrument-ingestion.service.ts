@@ -322,7 +322,12 @@ export class InstrumentIngestionService {
       ipAddress: meta.ipAddress,
       userAgent: meta.userAgent,
     });
-    return { jobRunId: active.id, instrumentId, status: 'cancelled', fetchStatus };
+    return {
+      jobRunId: active.id,
+      instrumentId,
+      status: 'cancelled',
+      fetchStatus,
+    };
   }
 
   /** Re-derives fetch status from the latest backfill run, so a stalled row leaves queued/fetching. */

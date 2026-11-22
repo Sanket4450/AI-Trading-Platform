@@ -375,7 +375,8 @@ export class CancelInstrumentFetchDto {
 
   @ApiProperty({
     example: 'cancelled',
-    description: '`cancelled` when a run was stopped, `not_running` when none existed.',
+    description:
+      '`cancelled` when a run was stopped, `not_running` when none existed.',
   })
   status!: string;
 
