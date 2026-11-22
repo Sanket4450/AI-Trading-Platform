@@ -24,11 +24,16 @@ function scopeValue(value: unknown): string {
   return JSON.stringify(value);
 }
 
-function ScopeTable({ entries }: { entries: [string, unknown][] }) {
-  if (entries.length === 0) {
-    return <p className="text-muted-foreground text-xs">None sent.</p>;
-  }
+/** A section is only worth rendering when it carries something an operator can read. */
+function hasPayload(value: unknown): boolean {
+  if (value === null || value === undefined) return false;
+  if (typeof value === 'string') return value.trim() !== '';
+  if (Array.isArray(value)) return value.length > 0;
+  if (typeof value === 'object') return Object.keys(value as object).length > 0;
+  return true;
+}
 
+function ScopeTable({ entries }: { entries: [string, unknown][] }) {
   return (
     <dl className="divide-border/60 border-border/70 divide-y overflow-hidden rounded-lg border text-xs">
       {entries.map(([key, value]) => (
@@ -51,6 +56,8 @@ function ScopeGroup({
   part: 'path' | 'query' | 'body';
   entries: [string, unknown][];
 }) {
+  if (entries.length === 0) return null;
+
   return (
     <div className="space-y-1.5">
       <div>
@@ -82,6 +89,7 @@ export function ApiCallDialog({ call }: { call: ExternalApiCall }) {
   const outcome = apiOutcomeMeta(call.outcome);
   const hint = apiOperationHint(call.operation);
   const failure = errorPreview(call.errorBody);
+  const hasError = failure.parsed ? hasPayload(failure.value) : Boolean(failure.text?.trim());
 
   const scope: [('path' | 'query' | 'body'), [string, unknown][]][] = [
     ['path', Object.entries(call.requestScope.path)],
@@ -133,22 +141,20 @@ export function ApiCallDialog({ call }: { call: ExternalApiCall }) {
         <ScopeGroup key={part} part={part} entries={entries} />
       ))}
 
-      <div className="space-y-1.5">
-        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
-          Error response
-        </p>
-        {failure.parsed ? (
-          <JsonBlock value={failure.value} />
-        ) : failure.text ? (
-          <pre className="border-border/70 bg-background/60 text-muted-foreground max-h-80 overflow-auto whitespace-pre-wrap break-all rounded-lg border p-3 text-xs">
-            {failure.text}
-          </pre>
-        ) : (
-          <p className="text-muted-foreground text-xs">
-            No error payload recorded. Successful calls never store a response body.
+      {hasError ? (
+        <div className="space-y-1.5">
+          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            Error response
           </p>
-        )}
-      </div>
+          {failure.parsed ? (
+            <JsonBlock value={failure.value} />
+          ) : (
+            <pre className="border-border/70 bg-background/60 text-muted-foreground max-h-80 overflow-auto whitespace-pre-wrap break-all rounded-lg border p-3 text-xs">
+              {failure.text}
+            </pre>
+          )}
+        </div>
+      ) : null}
     </DetailDialog>
   );
 }

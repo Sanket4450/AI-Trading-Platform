@@ -30,37 +30,67 @@ export default function Loading() {
         </div>
       </SectionSkeleton>
 
-      <div className="mt-4 grid gap-4 xl:grid-cols-[1.2fr_1fr]">
+      <div className="mt-4 grid gap-4 xl:min-h-[480px] xl:grid-cols-[1.2fr_1fr]">
         <SectionSkeleton titleWidth="w-24" descriptionWidth="w-96">
           <MonthGridSkeleton months={12} />
         </SectionSkeleton>
 
-        <SectionSkeleton
-          titleWidth="w-32"
-          descriptionWidth="w-80"
-          actions={<IconButtonSkeleton />}
-          footer={<PaginationSkeleton />}
-        >
-          <TableSkeleton
-            columns={[
-              { header: 'w-16', width: 'w-16' },
-              { header: 'w-20', width: 'w-24' },
-              { header: 'w-12', width: 'w-10' },
-              { header: 'w-16', width: 'w-20' },
-              { actions: true },
-            ]}
-            rows={3}
-          />
-        </SectionSkeleton>
+        <div className="flex flex-col gap-4">
+          <SectionSkeleton
+            className="xl:max-h-[320px]"
+            titleWidth="w-32"
+            descriptionWidth="w-80"
+            actions={<IconButtonSkeleton />}
+          >
+            <TableSkeleton
+              columns={[
+                { header: 'w-16', width: 'w-16' },
+                { header: 'w-20', width: 'w-24' },
+                { header: 'w-12', width: 'w-10' },
+                { header: 'w-16', width: 'w-20' },
+                { actions: true },
+              ]}
+              rows={3}
+            />
+          </SectionSkeleton>
+
+          <SectionSkeleton
+            className="xl:min-h-0 xl:flex-1"
+            titleWidth="w-24"
+            descriptionWidth="w-96"
+            actions={<IconButtonSkeleton />}
+            footer={<PaginationSkeleton />}
+          >
+            <IssueListSkeleton rows={4} columns={1} />
+          </SectionSkeleton>
+        </div>
       </div>
 
       <SectionSkeleton
         className="mt-4"
-        titleWidth="w-24"
+        titleWidth="w-36"
         descriptionWidth="w-96"
+        actions={<IconButtonSkeleton />}
         footer={<PaginationSkeleton />}
       >
-        <IssueListSkeleton rows={4} columns={2} />
+        <div className="flex flex-wrap items-center gap-3">
+          <Skeleton className="h-5 w-16 rounded-full" />
+          <Skeleton className="h-5 w-20 rounded-full" />
+          <Skeleton className="h-4 w-24" />
+        </div>
+        <div className="mt-3">
+          <TableSkeleton
+            columns={[
+              { header: 'w-24', width: 'w-32' },
+              { header: 'w-16', badge: true, width: 'w-20' },
+              { header: 'w-14', width: 'w-14' },
+              { header: 'w-16', width: 'w-20' },
+              { header: 'w-20', width: 'w-28' },
+              { actions: true },
+            ]}
+            rows={4}
+          />
+        </div>
       </SectionSkeleton>
 
       <SectionSkeleton

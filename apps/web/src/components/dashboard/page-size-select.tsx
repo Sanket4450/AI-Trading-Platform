@@ -14,7 +14,14 @@ import {
 const PAGINATION_KEYS = ['offset', 'after', 'before'];
 
 /** Page-size control. Changing it resets pagination but keeps every filter. */
-export function PageSizeSelect({ value }: { value: number }) {
+export function PageSizeSelect({
+  value,
+  resetKeys = PAGINATION_KEYS,
+}: {
+  value: number;
+  /** Paginator params owned by this list, cleared when the size changes. */
+  resetKeys?: string[];
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -26,7 +33,7 @@ export function PageSizeSelect({ value }: { value: number }) {
 
   function change(next: string) {
     const query = new URLSearchParams(searchParams.toString());
-    for (const key of PAGINATION_KEYS) query.delete(key);
+    for (const key of resetKeys) query.delete(key);
     query.set('limit', next);
     startTransition(() => {
       router.replace(`${pathname}?${query.toString()}`, { scroll: false });

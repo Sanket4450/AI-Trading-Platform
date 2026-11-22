@@ -39,21 +39,25 @@ function OutcomeChips({ summary }: { summary: ApiCallSummary }) {
 }
 
 /**
- * Provider call ledger of one run. The page renders the filtered page on the server; this
- * component keeps the visible rows live, so a new call lands at the top between renders.
+ * Provider call ledger of one run or one instrument. The page renders the filtered page on the
+ * server; this component keeps the visible rows live, so a new call lands at the top between
+ * renders.
  */
 export function ApiCallsSection({
   jobRunId,
+  instrumentId,
   initial,
   query,
 }: {
-  jobRunId: string;
+  jobRunId?: string;
+  instrumentId?: string;
   initial: ExternalApiCallPage;
   /** Serialized filters, page size and cursor of the current view. */
   query: string;
 }) {
   const [items, setItems] = useState<ExternalApiCall[]>(initial.items);
   const [summary, setSummary] = useState(initial.summary);
+  const endpoint = jobRunId ? `/jobs/${jobRunId}/api-calls?${query}` : `/api-calls?${query}`;
 
   useEffect(() => {
     setItems(initial.items);
@@ -65,14 +69,17 @@ export function ApiCallsSection({
 
     const disconnect = connectJobs((message) => {
       if (message.type !== 'calls') return;
-      if (!message.calls.some((call) => call.jobRunId === jobRunId)) return;
+      const belongs = message.calls.some((call) =>
+        jobRunId ? call.jobRunId === jobRunId : call.instrumentId === instrumentId,
+      );
+      if (!belongs) return;
       if (timer) return;
 
       // The socket is only a hint: refetch the same view so every row keeps the API projection
       // (method, URL, symbol) and the active filters. New rows arrive at the top.
       timer = setTimeout(() => {
         timer = null;
-        void apiRequest<ExternalApiCallPage>(`/jobs/${jobRunId}/api-calls?${query}`)
+        void apiRequest<ExternalApiCallPage>(endpoint)
           .then((response) => {
             setItems(response.items);
             setSummary(response.summary);
@@ -85,7 +92,7 @@ export function ApiCallsSection({
       if (timer) clearTimeout(timer);
       disconnect();
     };
-  }, [jobRunId, query]);
+  }, [endpoint, instrumentId, jobRunId]);
 
   return (
     <>

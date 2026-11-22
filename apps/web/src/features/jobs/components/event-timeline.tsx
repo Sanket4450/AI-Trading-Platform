@@ -92,7 +92,7 @@ export function EventTimeline({ events }: { events: JobEvent[] }) {
             </p>
             {event.type !== 'entered' && Object.keys(event.data).length > 0 ? (
               <details className="mt-1">
-                <summary className="text-muted-foreground cursor-pointer text-[11px]">
+                <summary className="text-muted-foreground w-fit cursor-pointer text-[11px] transition-colors hover:text-foreground">
                   Details
                 </summary>
                 <div className="mt-1">

@@ -10,6 +10,7 @@ export type {
 } from './types/trading.js';
 
 export {
+  INSTRUMENT_ISSUE_PAGE_LIMIT,
   PAGINATION_CURSOR_VERSION,
   PAGINATION_DEFAULT_LIMIT,
   PAGINATION_LIMIT_OPTIONS,

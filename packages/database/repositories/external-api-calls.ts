@@ -69,6 +69,7 @@ const callColumns = {
 
 export interface ExternalApiCallFilters {
   jobRunId?: string;
+  instrumentId?: string;
   services?: string[];
   outcomes?: string[];
   search?: string;
@@ -77,6 +78,8 @@ export interface ExternalApiCallFilters {
 function callConditions(filters: ExternalApiCallFilters) {
   const conditions: SQL[] = [];
   if (filters.jobRunId) conditions.push(eq(externalApiCalls.jobRunId, filters.jobRunId));
+  if (filters.instrumentId)
+    conditions.push(eq(externalApiCalls.instrumentId, filters.instrumentId));
   if (filters.services && filters.services.length > 0) {
     conditions.push(inArray(externalApiCalls.service, filters.services));
   }
@@ -158,6 +161,7 @@ export async function listJobApiCalls(filters: {
  */
 export async function listExternalApiCalls(filters: {
   limit: number;
+  instrumentId?: string;
   services?: string[];
   outcomes?: string[];
   search?: string;

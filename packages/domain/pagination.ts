@@ -10,6 +10,9 @@ export const PAGINATION_MAX_LIMIT = 200;
 /** Sizes offered by the web page-size control. */
 export const PAGINATION_LIMIT_OPTIONS = [25, 50, 100] as const;
 
+/** Fixed page size of the active-issue list on the instrument page. */
+export const INSTRUMENT_ISSUE_PAGE_LIMIT = 20;
+
 export const PAGINATION_CURSOR_VERSION = 1;
 
 export const PAGINATION_MAX_CURSOR_LENGTH = 1024;

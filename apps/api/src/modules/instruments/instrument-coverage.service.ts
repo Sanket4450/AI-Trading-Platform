@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import type { Queue } from 'bullmq';
-import { PAGINATION_DEFAULT_LIMIT, QUEUES } from '@ai-trading/domain';
+import { PAGINATION_DEFAULT_LIMIT, INSTRUMENT_ISSUE_PAGE_LIMIT, QUEUES } from '@ai-trading/domain';
 import {
   createJobRun,
   deleteJobRun,
@@ -18,11 +18,17 @@ import {
   listInstrumentIssues,
   recordAudit,
 } from '@ai-trading/database';
-import { offsetPage } from '../../common/pagination/page.js';
+import { offsetPage, backwardPage, forwardPage } from '../../common/pagination/page.js';
+import {
+  filterFingerprint,
+  parseTimestampCursor,
+  readDirectionalCursor,
+} from '../../common/pagination/cursor.js';
 import type { OffsetQueryDto } from '../../common/pagination/pagination.dto.js';
 import type { RequestMeta } from '../../common/http/request-meta.js';
 import type {
   InstrumentCoverageQueryDto,
+  InstrumentIssueQueryDto,
   RecomputeInstrumentCoverageDto,
 } from './dto/instrument-coverage-query.dto.js';
 
@@ -59,12 +65,43 @@ export class InstrumentCoverageService {
     return detail;
   }
 
-  async issues(instrumentId: string, query: OffsetQueryDto) {
-    const limit = query.limit ?? PAGINATION_DEFAULT_LIMIT;
-    const offset = query.offset ?? 0;
+  async issues(instrumentId: string, query: InstrumentIssueQueryDto) {
+    const fingerprint = filterFingerprint({ scope: 'instrument-issues', instrumentId });
+    const { after, before } = readDirectionalCursor(query, fingerprint);
+    const limit = query.limit ?? INSTRUMENT_ISSUE_PAGE_LIMIT;
+    const afterKey = after ? parseTimestampCursor(after) : undefined;
+    const beforeKey = before ? parseTimestampCursor(before) : undefined;
+
     await this.detail(instrumentId);
-    const result = await listInstrumentIssues(instrumentId, { limit, offset });
-    return offsetPage(result.items, result.total, limit, offset);
+    const result = await listInstrumentIssues(instrumentId, {
+      limit,
+      after: afterKey ? { lastSeenAt: afterKey.createdAt, id: afterKey.id } : undefined,
+      before: beforeKey ? { lastSeenAt: beforeKey.createdAt, id: beforeKey.id } : undefined,
+    });
+    const items = result.items;
+
+    if (before) {
+      return backwardPage({
+        items: [...items].reverse(),
+        total: result.total,
+        limit,
+        hasExtra: result.hasExtra,
+        fingerprint,
+        keyOf: (item) => item.lastSeenAt.toISOString(),
+        idOf: (item) => item.id,
+      });
+    }
+
+    return forwardPage({
+      items,
+      total: result.total,
+      limit,
+      hasExtra: result.hasExtra,
+      fingerprint,
+      keyOf: (item) => item.lastSeenAt.toISOString(),
+      idOf: (item) => item.id,
+      hadAfter: Boolean(after),
+    });
   }
 
   coverageDay(instrumentId: string, date: string) {

@@ -150,7 +150,7 @@ export function IssueDetailContent({
       ) : null}
 
       <details className="border-border/70 border-t pt-3">
-        <summary className="text-muted-foreground w-fit cursor-pointer text-xs font-medium">
+        <summary className="text-muted-foreground w-fit cursor-pointer text-xs font-medium transition-colors hover:text-foreground">
           Raw payload
         </summary>
         <JsonBlock className="mt-2" value={issue.payload} />

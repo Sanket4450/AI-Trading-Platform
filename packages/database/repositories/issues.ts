@@ -185,27 +185,54 @@ export async function getSystemIssue(id: string) {
   return rows[0] ?? null;
 }
 
+/**
+ * Newest-seen-first issue page for one instrument. `last_seen_at` is mutable, so the cursor is
+ * applied to it and `id` breaks ties; a row bumped mid-traversal moves ahead and is skipped until
+ * the next refresh, never duplicated.
+ */
 export async function listInstrumentIssues(
   instrumentId: string,
-  page: { limit: number; offset: number },
+  page: {
+    limit: number;
+    after?: { lastSeenAt: Date; id: string };
+    before?: { lastSeenAt: Date; id: string };
+  },
 ) {
-  const [items, totalRows] = await Promise.all([
+  const conditions = [eq(systemIssues.instrumentId, instrumentId)];
+  const backward = Boolean(page.before);
+  const cursor = page.before ?? page.after;
+  const pageConditions = cursor
+    ? [
+        ...conditions,
+        backward
+          ? sql`(${systemIssues.lastSeenAt}, ${systemIssues.id}) > (${cursor.lastSeenAt.toISOString()}::timestamptz, ${cursor.id}::uuid)`
+          : sql`(${systemIssues.lastSeenAt}, ${systemIssues.id}) < (${cursor.lastSeenAt.toISOString()}::timestamptz, ${cursor.id}::uuid)`,
+      ]
+    : conditions;
+
+  const [rows, totalRows] = await Promise.all([
     db
       .select(issueColumns)
       .from(systemIssues)
       .leftJoin(providers, eq(providers.id, systemIssues.providerId))
       .leftJoin(instruments, eq(instruments.id, systemIssues.instrumentId))
-      .where(eq(systemIssues.instrumentId, instrumentId))
-      .orderBy(desc(systemIssues.lastSeenAt), desc(systemIssues.id))
-      .limit(page.limit)
-      .offset(page.offset),
+      .where(and(...pageConditions))
+      .orderBy(
+        backward ? asc(systemIssues.lastSeenAt) : desc(systemIssues.lastSeenAt),
+        backward ? asc(systemIssues.id) : desc(systemIssues.id),
+      )
+      .limit(page.limit + 1),
     db
       .select({ total: sql<number>`count(*)::int` })
       .from(systemIssues)
-      .where(eq(systemIssues.instrumentId, instrumentId)),
+      .where(and(...conditions)),
   ]);
 
-  return { items, total: totalRows[0]?.total ?? 0 };
+  return {
+    items: rows.slice(0, page.limit),
+    total: totalRows[0]?.total ?? 0,
+    hasExtra: rows.length > page.limit,
+  };
 }
 
 export async function listInstrumentDayIssues(

@@ -18,6 +18,8 @@ export interface PaginationProps {
   names?: { offset?: string; after?: string; before?: string };
   /** Optional page-size control rendered before the navigation buttons. */
   pageSizeControl?: React.ReactNode;
+  /** Set false for a fixed-size list where the page size is not useful context. */
+  showPageSize?: boolean;
   className?: string;
 }
 
@@ -35,6 +37,7 @@ export function Pagination({
   itemLabel,
   names,
   pageSizeControl,
+  showPageSize = true,
   className,
 }: PaginationProps) {
   const offsetName = names?.offset ?? 'offset';
@@ -50,7 +53,7 @@ export function Pagination({
         <p className="text-muted-foreground">
           {page.total === 0
             ? `No ${itemLabel}`
-            : `Showing ${formatNumber(itemsCount)} of ${formatNumber(page.total)} ${itemLabel} · page size ${formatNumber(page.limit)}`}
+            : `Showing ${formatNumber(itemsCount)} of ${formatNumber(page.total)} ${itemLabel}${showPageSize ? ` · page size ${formatNumber(page.limit)}` : ''}`}
         </p>
         <div className="flex items-center gap-2">
           {pageSizeControl}

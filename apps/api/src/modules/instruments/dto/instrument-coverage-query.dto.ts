@@ -5,14 +5,24 @@ import {
   IsArray,
   IsBoolean,
   IsIn,
+  IsInt,
   IsObject,
   IsOptional,
   IsString,
   Matches,
+  Max,
   MaxLength,
+  Min,
   ValidateNested,
 } from 'class-validator';
-import { OffsetQueryDto } from '../../../common/pagination/pagination.dto.js';
+import {
+  INSTRUMENT_ISSUE_PAGE_LIMIT,
+  PAGINATION_MAX_LIMIT,
+} from '@ai-trading/domain';
+import {
+  CursorQueryDto,
+  OffsetQueryDto,
+} from '../../../common/pagination/pagination.dto.js';
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -62,6 +72,25 @@ export class InstrumentCoverageQueryDto extends OffsetQueryDto {
   @IsString()
   @MaxLength(80)
   search?: string;
+}
+
+/**
+ * Cursor query for the instrument issue list. The page size is a product decision; the web page
+ * never offers a size control, so the default is the fixed page size rather than the global one.
+ */
+export class InstrumentIssueQueryDto extends CursorQueryDto {
+  @ApiPropertyOptional({
+    type: Number,
+    minimum: 1,
+    maximum: PAGINATION_MAX_LIMIT,
+    default: INSTRUMENT_ISSUE_PAGE_LIMIT,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(PAGINATION_MAX_LIMIT)
+  declare limit?: number;
 }
 
 export class FetchInstrumentDto {

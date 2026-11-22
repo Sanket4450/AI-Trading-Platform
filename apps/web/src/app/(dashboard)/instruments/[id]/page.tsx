@@ -1,14 +1,15 @@
 import { apiFetch } from '@/lib/api';
 import type {
   CorporateAction,
+  ExternalApiCallPage,
   InstrumentCoverageDetail,
   InstrumentMapping,
   JobListResponse,
   Paginated,
   SystemIssue,
 } from '@/lib/types';
-import { PAGINATION_DEFAULT_LIMIT } from '@ai-trading/domain';
-import { readOffset } from '@/lib/pagination';
+import { INSTRUMENT_ISSUE_PAGE_LIMIT, PAGINATION_DEFAULT_LIMIT } from '@ai-trading/domain';
+import { readCursorValue, readLimit, readOffset } from '@/lib/pagination';
 import { formatDate, formatNumber } from '@/lib/format';
 import { label } from '@/lib/labels';
 import { displayStatus, statusTone } from '@/lib/status';
@@ -27,6 +28,8 @@ import {
   TableActions,
   TableRefreshButton,
 } from '@/components/dashboard/table-actions';
+import { MultiSelectFilter, TableFilters } from '@/components/dashboard/table-filters';
+import { PageSizeSelect } from '@/components/dashboard/page-size-select';
 import { Badge } from '@/components/ui/badge';
 import {
   Table,
@@ -38,6 +41,8 @@ import {
 } from '@/components/ui/table';
 import { InstrumentDetailActions } from '../instrument-actions';
 import { InstrumentJobProgress } from '@/features/jobs/components/instrument-job-progress';
+import { ApiCallsSection } from '@/features/jobs/components/api-calls';
+import { API_OUTCOME_OPTIONS, API_SERVICE_OPTIONS } from '@/features/jobs/api-call-labels';
 import { IssueList } from '@/features/issues/components/issue-list';
 import { Pagination } from '@/components/dashboard/pagination';
 
@@ -49,7 +54,13 @@ export default async function InstrumentDetailPage({
   searchParams: Promise<{
     from?: string | string[];
     actionsOffset?: string | string[];
-    issuesOffset?: string | string[];
+    issuesAfter?: string | string[];
+    issuesBefore?: string | string[];
+    service?: string | string[];
+    outcome?: string | string[];
+    limit?: string | string[];
+    callsAfter?: string | string[];
+    callsBefore?: string | string[];
   }>;
 }) {
   const { id } = await params;
@@ -57,14 +68,42 @@ export default async function InstrumentDetailPage({
   const fromParam = queryParams.from;
   const back = backLinkFor(fromParam, '/instruments');
   const actionsOffset = readOffset(queryParams.actionsOffset);
-  const issuesOffset = readOffset(queryParams.issuesOffset);
-  const [detail, mappings, actions, issues] = await Promise.all([
+
+  const services = queryParams.service
+    ? Array.isArray(queryParams.service)
+      ? queryParams.service
+      : [queryParams.service]
+    : [];
+  const outcomes = queryParams.outcome
+    ? Array.isArray(queryParams.outcome)
+      ? queryParams.outcome
+      : [queryParams.outcome]
+    : [];
+  const callsLimit = readLimit(queryParams.limit);
+  const callsAfter = readCursorValue(queryParams.callsAfter);
+  const callsBefore = readCursorValue(queryParams.callsBefore);
+
+  const issuesQuery = new URLSearchParams({ limit: String(INSTRUMENT_ISSUE_PAGE_LIMIT) });
+  const issuesAfter = readCursorValue(queryParams.issuesAfter);
+  const issuesBefore = readCursorValue(queryParams.issuesBefore);
+  if (issuesAfter) issuesQuery.set('after', issuesAfter);
+  if (issuesBefore) issuesQuery.set('before', issuesBefore);
+
+  const callsQuery = new URLSearchParams({ instrumentId: id, limit: String(callsLimit) });
+  for (const service of services) callsQuery.append('service', service);
+  for (const outcome of outcomes) callsQuery.append('outcome', outcome);
+  if (callsAfter) callsQuery.set('after', callsAfter);
+  if (callsBefore) callsQuery.set('before', callsBefore);
+  const callsQueryString = callsQuery.toString();
+
+  const [detail, mappings, actions, issues, calls] = await Promise.all([
     apiFetch<InstrumentCoverageDetail>(`/instruments/${id}/coverage`),
     apiFetch<InstrumentMapping[]>(`/instruments/${id}/mappings`),
     apiFetch<Paginated<CorporateAction>>(
       `/instruments/${id}/corporate-actions?limit=${PAGINATION_DEFAULT_LIMIT}&offset=${actionsOffset}`,
     ),
-    apiFetch<Paginated<SystemIssue>>(`/instruments/${id}/issues?limit=${PAGINATION_DEFAULT_LIMIT}&offset=${issuesOffset}`),
+    apiFetch<Paginated<SystemIssue>>(`/instruments/${id}/issues?${issuesQuery.toString()}`),
+    apiFetch<ExternalApiCallPage>(`/api-calls?${callsQueryString}`),
   ]);
   const jobs = await apiFetch<JobListResponse>(`/jobs?instrumentId=${id}&limit=1`);
   const latestJob = jobs.items[0] ?? null;
@@ -128,12 +167,13 @@ export default async function InstrumentDetailPage({
         />
       </StatGrid>
 
-      <InstrumentJobProgress
-        initial={latestJob}
-        returnTo={`/instruments/${detail.instrumentId}`}
-      />
+      <InstrumentJobProgress initial={latestJob} returnTo={`/instruments/${detail.instrumentId}`} />
 
-      <div className="mt-4 grid gap-4 xl:grid-cols-[1.2fr_1fr]">
+      {/*
+        The right column is absolutely positioned on xl so the month grid alone sets the row
+        height; mappings keep a 320px band and active issues absorb whatever remains.
+      */}
+      <div className="mt-4 grid gap-4 xl:min-h-[480px] xl:grid-cols-[1.2fr_1fr]">
         <SectionCard
           title="Month grid"
           description="Repair is month-granular because the provider returns a whole month per request."
@@ -158,9 +198,7 @@ export default async function InstrumentDetailPage({
                     <p className="mt-1 opacity-80">
                       {month.complete} complete · {month.partial} partial
                     </p>
-                    <p className="opacity-70">
-                      {month.missing} missing
-                    </p>
+                    <p className="opacity-70">{month.missing} missing</p>
                   </div>
                 );
               })}
@@ -168,95 +206,151 @@ export default async function InstrumentDetailPage({
           )}
         </SectionCard>
 
-        <SectionCard
-          title="Provider mappings"
-          description="Upstox keys live only here; the canonical UUID never changes."
-          actions={<TableRefreshButton />}
-        >
-          {mappings.length === 0 ? (
-            <EmptyState title="No mappings" description="Run instrument sync." />
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Provider</TableHead>
-                  <TableHead>External key</TableHead>
-                  <TableHead>Primary</TableHead>
-                  <TableHead>Valid from</TableHead>
-                  <TableHead />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {mappings.map((mapping) => (
-                  <TableRow key={mapping.id}>
-                    <TableCell>{label(mapping.providerCode)}</TableCell>
-                    <TableCell className="font-mono text-xs">{mapping.externalKey}</TableCell>
-                    <TableCell>{mapping.isPrimary ? 'Yes' : 'No'}</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {formatDate(mapping.validFrom)}
-                    </TableCell>
-                    <TableActions>
-                      <DetailDialog
-                        title={`${label(mapping.providerCode)} mapping`}
-                        description={mapping.externalKey}
-                        trigger={<TableActionButton label="View mapping" />}
-                      >
-                        <KeyValueGrid
-                          columns={2}
-                          items={[
-                            { label: 'Provider', value: label(mapping.providerCode) },
-                            { label: 'Provider name', value: mapping.providerName },
-                            {
-                              label: 'External key',
-                              value: (
-                                <span className="break-all font-mono text-xs">
-                                  {mapping.externalKey}
-                                </span>
-                              ),
-                            },
-                            { label: 'Exchange token', value: mapping.exchangeToken ?? '—' },
-                            { label: 'Provider symbol', value: mapping.providerSymbol ?? '—' },
-                            { label: 'Provider segment', value: mapping.providerSegment ?? '—' },
-                            { label: 'Primary', value: mapping.isPrimary ? 'Yes' : 'No' },
-                            { label: 'Valid from', value: formatDate(mapping.validFrom) },
-                            {
-                              label: 'Valid to',
-                              value: mapping.validTo ? formatDate(mapping.validTo) : 'Open',
-                            },
-                          ]}
-                        />
-                      </DetailDialog>
-                    </TableActions>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </SectionCard>
+        <div className="relative min-h-0">
+          <div className="flex flex-col gap-4 xl:absolute xl:inset-0">
+            <SectionCard
+              className="max-h-[320px] shrink-0"
+              title="Provider mappings"
+              description="Upstox keys live only here; the canonical UUID never changes."
+              actions={<TableRefreshButton />}
+              contentClassName="min-h-0 overflow-auto"
+            >
+              {mappings.length === 0 ? (
+                <EmptyState title="No mappings" description="Run instrument sync." />
+              ) : (
+                <Table>
+                  <TableHeader className="bg-card sticky top-0 z-10">
+                    <TableRow>
+                      <TableHead>Provider</TableHead>
+                      <TableHead>External key</TableHead>
+                      <TableHead>Primary</TableHead>
+                      <TableHead>Valid from</TableHead>
+                      <TableHead />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {mappings.map((mapping) => (
+                      <TableRow key={mapping.id}>
+                        <TableCell>{label(mapping.providerCode)}</TableCell>
+                        <TableCell className="font-mono text-xs">{mapping.externalKey}</TableCell>
+                        <TableCell>{mapping.isPrimary ? 'Yes' : 'No'}</TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {formatDate(mapping.validFrom)}
+                        </TableCell>
+                        <TableActions>
+                          <DetailDialog
+                            title={`${label(mapping.providerCode)} mapping`}
+                            description={mapping.externalKey}
+                            trigger={<TableActionButton label="View mapping" />}
+                          >
+                            <KeyValueGrid
+                              columns={2}
+                              items={[
+                                { label: 'Provider', value: label(mapping.providerCode) },
+                                { label: 'Provider name', value: mapping.providerName },
+                                {
+                                  label: 'External key',
+                                  value: (
+                                    <span className="break-all font-mono text-xs">
+                                      {mapping.externalKey}
+                                    </span>
+                                  ),
+                                },
+                                { label: 'Exchange token', value: mapping.exchangeToken ?? '—' },
+                                { label: 'Provider symbol', value: mapping.providerSymbol ?? '—' },
+                                {
+                                  label: 'Provider segment',
+                                  value: mapping.providerSegment ?? '—',
+                                },
+                                { label: 'Primary', value: mapping.isPrimary ? 'Yes' : 'No' },
+                                { label: 'Valid from', value: formatDate(mapping.validFrom) },
+                                {
+                                  label: 'Valid to',
+                                  value: mapping.validTo ? formatDate(mapping.validTo) : 'Open',
+                                },
+                              ]}
+                            />
+                          </DetailDialog>
+                        </TableActions>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </SectionCard>
+
+            <SectionCard
+              className="min-h-0 flex-1"
+              title="Active issues"
+              description="One row per active problem; a successful re-fetch removes its row."
+              actions={<TableRefreshButton label="Refresh issues" />}
+              contentClassName="min-h-0 flex-1 overflow-auto"
+              footer={
+                <Pagination
+                  page={issues.page}
+                  itemsCount={issues.items.length}
+                  pathname={`/instruments/${id}`}
+                  searchParams={queryParams}
+                  itemLabel="issues"
+                  names={{ after: 'issuesAfter', before: 'issuesBefore' }}
+                  showPageSize={false}
+                />
+              }
+            >
+              <IssueList
+                issues={issues.items}
+                from={back.href}
+                currentInstrumentId={id}
+                emptyTitle="No issues"
+                emptyDescription="The validation layer is clean."
+                className="sm:grid-cols-1"
+              />
+            </SectionCard>
+          </div>
+        </div>
       </div>
 
       <SectionCard
         className="mt-4"
-        title="Active issues"
-        description="One row per active problem; a successful re-fetch removes its row."
+        title="External API calls"
+        description="Every outbound request this instrument made, with its exact failure and request URL."
+        toolbar={
+          <TableFilters>
+            {typeof queryParams.from === 'string' ? (
+              <input type="hidden" name="from" value={queryParams.from} readOnly />
+            ) : null}
+            <MultiSelectFilter
+              id="service"
+              name="service"
+              defaultValue={services}
+              options={API_SERVICE_OPTIONS}
+              placeholder="All services"
+            />
+            <MultiSelectFilter
+              id="outcome"
+              name="outcome"
+              defaultValue={outcomes}
+              options={API_OUTCOME_OPTIONS}
+              placeholder="All outcomes"
+            />
+          </TableFilters>
+        }
+        actions={<TableRefreshButton />}
         footer={
           <Pagination
-            page={issues.page}
-            itemsCount={issues.items.length}
+            pageSizeControl={
+              <PageSizeSelect value={callsLimit} resetKeys={['callsAfter', 'callsBefore']} />
+            }
+            page={calls.page}
+            itemsCount={calls.items.length}
             pathname={`/instruments/${id}`}
             searchParams={queryParams}
-            itemLabel="issues"
-            names={{ offset: 'issuesOffset' }}
+            itemLabel="calls"
+            names={{ after: 'callsAfter', before: 'callsBefore' }}
           />
         }
       >
-        <IssueList
-          issues={issues.items}
-          from={back.href}
-          currentInstrumentId={id}
-          emptyTitle="No issues"
-          emptyDescription="The validation layer is clean."
-        />
+        <ApiCallsSection instrumentId={id} initial={calls} query={callsQueryString} />
       </SectionCard>
 
       <SectionCard

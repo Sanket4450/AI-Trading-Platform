@@ -1,11 +1,16 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsArray, IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsArray, IsIn, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 import { EXTERNAL_API_OUTCOMES, EXTERNAL_API_SERVICES } from '@ai-trading/domain';
 import { toList } from '../../../common/query/list-param.js';
 import { CursorQueryDto } from '../../../common/pagination/pagination.dto.js';
 
 export class ApiCallQueryDto extends CursorQueryDto {
+  @ApiPropertyOptional({ format: 'uuid', description: 'Only calls attached to this instrument.' })
+  @IsOptional()
+  @IsUUID()
+  instrumentId?: string;
+
   @ApiPropertyOptional({
     enum: [...EXTERNAL_API_SERVICES],
     isArray: true,

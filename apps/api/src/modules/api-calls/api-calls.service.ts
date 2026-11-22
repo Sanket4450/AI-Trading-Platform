@@ -25,12 +25,14 @@ export class ApiCallsService {
   /** Global call feed with the same keyset pagination as every other list page. */
   async list(query: ApiCallQueryDto) {
     const filters = {
+      instrumentId: query.instrumentId,
       services: query.service,
       outcomes: query.outcome,
       search: query.search,
     };
     const fingerprint = filterFingerprint({
       scope: 'api-calls',
+      instrumentId: query.instrumentId ?? null,
       services: query.service ?? [],
       outcomes: query.outcome ?? [],
       search: query.search ?? null,

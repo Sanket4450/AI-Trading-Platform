@@ -28,6 +28,7 @@ import { ApiSessionAuth } from '../../common/swagger/api-session-auth.decorator.
 import {
   InstrumentCoverageQueryDto,
   FetchInstrumentDto,
+  InstrumentIssueQueryDto,
   RecomputeInstrumentCoverageDto,
 } from './dto/instrument-coverage-query.dto.js';
 import {
@@ -69,13 +70,16 @@ export class InstrumentCoverageController {
   }
 
   @Get(':instrumentId/issues')
-  @ApiOperation({ summary: 'List active issues for one instrument' })
+  @ApiOperation({
+    summary: 'List active issues for one instrument',
+    description: 'Newest-seen first, with cursor pagination (after/before).',
+  })
   @ApiParam({ name: 'instrumentId', format: 'uuid' })
   @ApiOkResponse({ type: InstrumentIssueListResponseDto })
   @ApiNotFoundResponse({ type: ErrorResponseDto, description: 'Instrument not found' })
   issues(
     @Param('instrumentId', ParseUUIDPipe) instrumentId: string,
-    @Query() query: OffsetQueryDto,
+    @Query() query: InstrumentIssueQueryDto,
   ) {
     return this.coverage.issues(instrumentId, query);
   }
