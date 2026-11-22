@@ -11,16 +11,19 @@ import type { Queue } from 'bullmq';
 import { QUEUES } from '@ai-trading/domain';
 import {
   HISTORY_START,
+  deriveFetchStatus,
   monthChunks,
   validateBackfillRange,
   type MonthChunk,
 } from '@ai-trading/market-data';
 import {
+  correctStalledFetchStatus,
   createJobRun,
   deleteJobRun,
   findActiveBackfillJob,
   getCoverageMonths,
   getInstrumentsByIds,
+  getLatestBackfillJobForInstrument,
   getLatestCompletedSession,
   getTradingSessionsForRange,
   recordAudit,
@@ -275,10 +278,29 @@ export class InstrumentIngestionService {
 
   async cancel(instrumentId: string, actorUserId: string, meta: RequestMeta) {
     const active = await findActiveBackfillJob(instrumentId);
+
     if (!active) {
-      throw new NotFoundException(
-        'No active backfill job for this instrument',
-      );
+      // Nothing to cancel: the projection claims a fetch is in flight, so correct it instead of
+      // failing. Cancel stays safe to repeat.
+      const fetchStatus = await this.repairFetchStatus(instrumentId);
+      await recordAudit({
+        actorUserId,
+        accountId: null,
+        action: 'data.instrument_cancel_noop',
+        entityType: 'instrument',
+        entityId: instrumentId,
+        beforeState: null,
+        afterState: { instrumentId, fetchStatus },
+        requestId: meta.requestId,
+        ipAddress: meta.ipAddress,
+        userAgent: meta.userAgent,
+      });
+      return {
+        jobRunId: null,
+        instrumentId,
+        status: 'not_running',
+        fetchStatus,
+      };
     }
 
     await updateJobRun(active.id, {
@@ -287,6 +309,7 @@ export class InstrumentIngestionService {
     });
     await this.historicalQueue.remove(active.id).catch(() => undefined);
 
+    const fetchStatus = await this.repairFetchStatus(instrumentId);
     await recordAudit({
       actorUserId,
       accountId: null,
@@ -294,11 +317,25 @@ export class InstrumentIngestionService {
       entityType: 'job_run',
       entityId: active.id,
       beforeState: { status: active.status },
-      afterState: { status: 'cancelled', instrumentId },
+      afterState: { status: 'cancelled', instrumentId, fetchStatus },
       requestId: meta.requestId,
       ipAddress: meta.ipAddress,
       userAgent: meta.userAgent,
     });
-    return { jobRunId: active.id, instrumentId, status: 'cancelled' };
+    return { jobRunId: active.id, instrumentId, status: 'cancelled', fetchStatus };
+  }
+
+  /** Re-derives fetch status from the latest backfill run, so a stalled row leaves queued/fetching. */
+  private async repairFetchStatus(instrumentId: string): Promise<string> {
+    const latest = await getLatestBackfillJobForInstrument(instrumentId);
+    const fetchStatus = deriveFetchStatus({
+      hasRun: Boolean(latest),
+      queued: latest?.status === 'queued' ? 1 : 0,
+      running: latest?.status === 'running' ? 1 : 0,
+      lastStatus: latest?.status ?? null,
+      stale: false,
+    });
+    await correctStalledFetchStatus(instrumentId, fetchStatus);
+    return fetchStatus;
   }
 }

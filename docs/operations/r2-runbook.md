@@ -117,6 +117,10 @@ network latency, dominates: at 1,600 requests per 30 minutes the floor is about 
   `coverage-recompute` from the instrument page.
   Jobs older than 15 minutes are marked failed; launch a new missing-month fetch from the catalog.
   Months that strict coverage already marks complete are skipped.
+- **Stuck Queued or Fetching badge**: the badge is a projection of the latest
+  `historical-backfill` run. If nothing is in flight, **Cancel fetch** is idempotent: it re-derives
+  the row and returns `status: "not_running"` instead of failing, so the row leaves the stalled
+  state on the first click. The catalog's `activeJobId` is the live truth behind the button.
 - **Redis unavailable**: queue and limiter fail. Start Redis, restart the worker and retry queued or
   failed jobs. No database state is lost.
 - **Database unavailable**: restore PostgreSQL and restart the worker. In-flight batches roll back;

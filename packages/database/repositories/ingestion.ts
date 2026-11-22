@@ -128,13 +128,43 @@ export async function resolveAbandonedQueuedJob(
   return rows[0] ?? null;
 }
 
-export async function getLatestJobForInstrument(instrumentId: string) {
+/**
+ * Latest backfill run for one instrument. Fetch status is about fetching only, so a
+ * `coverage-recompute` or other instrument-scoped job must never drive it.
+ */
+export async function getLatestBackfillJobForInstrument(instrumentId: string) {
   const rows = await db
     .select()
     .from(jobRuns)
-    .where(eq(jobRuns.instrumentId, instrumentId))
+    .where(
+      and(
+        eq(jobRuns.jobName, 'historical-backfill'),
+        eq(jobRuns.instrumentId, instrumentId),
+      ),
+    )
     .orderBy(desc(jobRuns.createdAt))
     .limit(1);
+  return rows[0] ?? null;
+}
+
+/**
+ * Corrects a projection that claims a fetch is in flight when no backfill job exists. Only a
+ * `queued`/`fetching` row is rewritten, so a live or terminal state is never overwritten.
+ */
+export async function correctStalledFetchStatus(
+  instrumentId: string,
+  fetchStatus: string,
+) {
+  const rows = await db
+    .update(instrumentDataStatus)
+    .set({ fetchStatus, updatedAt: new Date() })
+    .where(
+      and(
+        eq(instrumentDataStatus.instrumentId, instrumentId),
+        inArray(instrumentDataStatus.fetchStatus, ['queued', 'fetching']),
+      ),
+    )
+    .returning();
   return rows[0] ?? null;
 }
 

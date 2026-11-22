@@ -24,8 +24,8 @@ import {
   getInstrumentStatusRow,
   getInstrumentTickSize,
   getLastSuccessfulJobForInstrument,
+  getLatestBackfillJobForInstrument,
   getLatestCompletedSession,
-  getLatestJobForInstrument,
   getPrimaryMappingCount,
   getSyncTargetInstruments,
   getTradingSessionsForRange,
@@ -270,7 +270,7 @@ export class QualityService {
       targetFrom,
       targetTo,
     );
-    const latestJob = await getLatestJobForInstrument(instrumentId);
+    const latestJob = await getLatestBackfillJobForInstrument(instrumentId);
     const lastSuccess = await getLastSuccessfulJobForInstrument(instrumentId);
     const staleSessions = this.config.get<number>(
       'DATA_STATUS_STALE_SESSIONS',

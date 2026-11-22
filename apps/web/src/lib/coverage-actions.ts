@@ -15,6 +15,8 @@ export interface CoverageSignal {
   completeDays: number | null;
   partialDays: number | null;
   missingDays: number | null;
+  /** Live queued/running backfill. The projection alone can lag behind reality. */
+  activeJobId: string | null;
 }
 
 export interface CoverageActionCopy {
@@ -38,7 +40,7 @@ function windowLabel(signal: CoverageSignal): string {
  */
 export function coverageFetchCopy(signal: CoverageSignal): CoverageActionCopy | null {
   if (signal.dataStatus === 'not_applicable') return null;
-  if (signal.fetchStatus === 'queued' || signal.fetchStatus === 'fetching') return null;
+  if (signal.activeJobId) return null;
 
   const complete = Math.max(signal.completeDays ?? 0, 0);
   const partial = Math.max(signal.partialDays ?? 0, 0);

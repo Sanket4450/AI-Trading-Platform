@@ -12,6 +12,7 @@ const base: CoverageSignal = {
   completeDays: null,
   partialDays: null,
   missingDays: null,
+  activeJobId: null,
 };
 
 describe('coverageFetchCopy', () => {
@@ -76,7 +77,15 @@ describe('coverageFetchCopy', () => {
   });
 
   it('offers no fetch while a fetch is active or for a non-applicable instrument', () => {
-    expect(coverageFetchCopy({ ...base, fetchStatus: 'fetching' })).toBeNull();
+    expect(
+      coverageFetchCopy({ ...base, activeJobId: 'job-1', fetchStatus: 'fetching' }),
+    ).toBeNull();
     expect(coverageFetchCopy({ ...base, dataStatus: 'not_applicable' })).toBeNull();
+  });
+
+  it('still offers a fetch when the projection claims a run that no longer exists', () => {
+    const copy = coverageFetchCopy({ ...base, fetchStatus: 'queued', activeJobId: null });
+
+    expect(copy?.label).toBe('Fetch full history');
   });
 });

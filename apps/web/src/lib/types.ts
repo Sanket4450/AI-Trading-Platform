@@ -456,6 +456,8 @@ export interface InstrumentCoverageRow {
   openCriticalIssues: number | null;
   lastSuccessAt: string | null;
   computedAt: string | null;
+  /** Live queued/running historical-backfill job, or null when nothing is in flight. */
+  activeJobId: string | null;
   mappingCount: number;
 }
 

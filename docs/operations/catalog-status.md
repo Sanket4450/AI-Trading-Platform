@@ -17,6 +17,11 @@ The instrument catalog is a read model over persisted evidence. It is not a seco
 | `cancelled`     | Stopped by an operator.                                              |
 | `stale`         | Was complete, but the latest completed session is not covered.       |
 
+Fetch status is derived from the latest `historical-backfill` run for the instrument, never from
+`coverage-recompute` or other instrument-scoped jobs. The catalog row also carries `activeJobId`,
+the queued or running backfill job id, so row actions follow live queue state instead of the
+projection.
+
 ### Data status
 
 | Value                | Meaning                                                              |

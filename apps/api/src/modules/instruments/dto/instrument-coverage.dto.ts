@@ -101,6 +101,15 @@ export class InstrumentCoverageRowDto {
   @ApiProperty({ type: String, format: 'date-time', nullable: true })
   computedAt!: string | null;
 
+  @ApiProperty({
+    type: String,
+    format: 'uuid',
+    nullable: true,
+    description:
+      'Queued or running historical-backfill job for this instrument, or null when nothing is in flight.',
+  })
+  activeJobId!: string | null;
+
   @ApiProperty()
   mappingCount!: number;
 }
@@ -182,6 +191,15 @@ export class InstrumentCoverageDetailDto {
 
   @ApiProperty({ type: String, format: 'date-time', nullable: true })
   computedAt!: string | null;
+
+  @ApiProperty({
+    type: String,
+    format: 'uuid',
+    nullable: true,
+    description:
+      'Queued or running historical-backfill job for this instrument, or null when nothing is in flight.',
+  })
+  activeJobId!: string | null;
 
   @ApiProperty()
   mappingCount!: number;
@@ -345,14 +363,28 @@ export class InstrumentFetchResponseDto {
 }
 
 export class CancelInstrumentFetchDto {
-  @ApiProperty({ format: 'uuid' })
-  jobRunId!: string;
+  @ApiProperty({
+    format: 'uuid',
+    nullable: true,
+    description: 'Cancelled run, or null when nothing was in flight.',
+  })
+  jobRunId!: string | null;
 
   @ApiProperty({ format: 'uuid' })
   instrumentId!: string;
 
-  @ApiProperty({ example: 'cancelled' })
+  @ApiProperty({
+    example: 'cancelled',
+    description: '`cancelled` when a run was stopped, `not_running` when none existed.',
+  })
   status!: string;
+
+  @ApiProperty({
+    example: 'cancelled',
+    description:
+      'Fetch status re-derived from the latest backfill run, so the row leaves a stalled queued/fetching state.',
+  })
+  fetchStatus!: string;
 }
 
 export class CorporateActionImportRowResultDto {

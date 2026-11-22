@@ -28,7 +28,7 @@ export function InstrumentRowActions({
   const cancelInstrument = useCancelInstrument();
   const fetchCopy = coverageFetchCopy(row);
   const cancelCopy = coverageCancelCopy(row.symbol);
-  const fetching = row.fetchStatus === 'queued' || row.fetchStatus === 'fetching';
+  const fetching = Boolean(row.activeJobId);
 
   return (
     <TableActions>
@@ -86,7 +86,7 @@ export function InstrumentDetailActions({
   const fetchInstruments = useFetchInstruments();
   const cancelInstrument = useCancelInstrument();
   const recomputeStatus = useRecomputeStatus();
-  const fetching = detail.fetchStatus === 'queued' || detail.fetchStatus === 'fetching';
+  const fetching = Boolean(detail.activeJobId);
   const fetchCopy = coverageFetchCopy(detail);
   const cancelCopy = coverageCancelCopy(detail.symbol);
   const recomputeCopy = coverageRecomputeCopy(detail.symbol);

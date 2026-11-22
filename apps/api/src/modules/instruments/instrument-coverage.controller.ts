@@ -156,13 +156,13 @@ export class InstrumentCoverageController {
   }
 
   @Post(':instrumentId/fetch/cancel')
-  @ApiOperation({ summary: 'Cancel the active backfill run for one instrument' })
+  @ApiOperation({
+    summary: 'Cancel the active backfill run for one instrument',
+    description:
+      'Idempotent. When no backfill is in flight the projection is re-derived instead of failing, and the response reports status "not_running".',
+  })
   @ApiParam({ name: 'instrumentId', format: 'uuid' })
   @ApiCreatedResponse({ type: CancelInstrumentFetchDto })
-  @ApiNotFoundResponse({
-    type: ErrorResponseDto,
-    description: 'No active backfill run for this instrument',
-  })
   cancel(
     @Param('instrumentId', ParseUUIDPipe) instrumentId: string,
     @CurrentUser() user: AuthenticatedUser,

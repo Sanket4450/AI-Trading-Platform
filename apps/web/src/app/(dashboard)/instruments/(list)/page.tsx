@@ -66,10 +66,7 @@ export default async function InstrumentsPage({ searchParams }: { searchParams: 
   const rows = data.items;
 
   const active = rows.some(
-    (row) =>
-      row.fetchStatus === 'queued' ||
-      row.fetchStatus === 'fetching' ||
-      row.dataStatus === 'pending',
+    (row) => Boolean(row.activeJobId) || row.dataStatus === 'pending',
   );
   const hasFilters = Boolean(params.dataStatus || params.search);
 
