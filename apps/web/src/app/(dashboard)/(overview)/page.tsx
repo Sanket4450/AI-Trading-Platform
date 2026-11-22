@@ -40,17 +40,7 @@ export default async function OverviewPage() {
 
   return (
     <div>
-      <PageMeta
-        actions={
-          <Link
-            href="/instruments"
-            className={buttonVariants({ variant: 'outline', size: 'sm' })}
-          >
-            Open catalog
-            <ArrowUpRight className="size-4" />
-          </Link>
-        }
-      />
+      <PageMeta />
 
       <StatGrid>
         <StatCard
