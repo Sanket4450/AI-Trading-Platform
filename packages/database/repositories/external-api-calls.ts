@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, ilike, inArray, lt, or, sql, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, ilike, inArray, lt, or, sql, type SQL } from 'drizzle-orm';
 import type { ExternalApiOutcome, ExternalApiScope } from '@ai-trading/domain';
 import { db } from '../client.js';
 import { externalApiCalls, instruments, jobRuns } from '../schema/index.js';
@@ -104,23 +104,39 @@ function baseQuery() {
     .leftJoin(jobRuns, eq(jobRuns.id, externalApiCalls.jobRunId));
 }
 
-/** Newest-first page of one run's calls; `beforeId` walks toward older rows. */
+/**
+ * Newest-first page of one run's calls. `afterId` walks toward older rows; `beforeId` walks back
+ * toward newer ones, so the page can be reversed for the previous-page control.
+ */
 export async function listJobApiCalls(filters: {
   jobRunId: string;
   limit: number;
+  afterId?: number;
   beforeId?: number;
-  outcome?: string;
-  service?: string;
+  outcomes?: string[];
+  services?: string[];
 }) {
-  const conditions = [eq(externalApiCalls.jobRunId, filters.jobRunId)];
-  if (filters.beforeId !== undefined) conditions.push(lt(externalApiCalls.id, filters.beforeId));
-  if (filters.outcome) conditions.push(eq(externalApiCalls.outcome, filters.outcome));
-  if (filters.service) conditions.push(eq(externalApiCalls.service, filters.service));
+  const conditions: SQL[] = [eq(externalApiCalls.jobRunId, filters.jobRunId)];
+  if (filters.services && filters.services.length > 0) {
+    conditions.push(inArray(externalApiCalls.service, filters.services));
+  }
+  if (filters.outcomes && filters.outcomes.length > 0) {
+    conditions.push(inArray(externalApiCalls.outcome, filters.outcomes));
+  }
+
+  const pageConditions = [...conditions];
+  const backward = filters.beforeId !== undefined;
+  if (filters.afterId !== undefined) {
+    pageConditions.push(lt(externalApiCalls.id, filters.afterId));
+  }
+  if (filters.beforeId !== undefined) {
+    pageConditions.push(gt(externalApiCalls.id, filters.beforeId));
+  }
 
   const [rows, totalRows] = await Promise.all([
     baseQuery()
-      .where(and(...conditions))
-      .orderBy(desc(externalApiCalls.id))
+      .where(and(...pageConditions))
+      .orderBy(backward ? asc(externalApiCalls.id) : desc(externalApiCalls.id))
       .limit(filters.limit + 1),
     db
       .select({ total: sql<number>`count(*)::int` })
@@ -128,8 +144,9 @@ export async function listJobApiCalls(filters: {
       .where(and(...conditions)),
   ]);
 
+  const pageRows = rows.slice(0, filters.limit);
   return {
-    items: rows.slice(0, filters.limit),
+    items: backward ? pageRows.reverse() : pageRows,
     total: totalRows[0]?.total ?? 0,
     hasExtra: rows.length > filters.limit,
   };

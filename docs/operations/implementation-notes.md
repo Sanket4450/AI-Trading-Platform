@@ -216,7 +216,7 @@ R1 lifecycle tables.
   data status.
 - `0012_drop_ingestion_runs.sql` removes the per-chunk `market_data_ingestion_runs` ledger.
 - `0014_job_ledger_v2.sql` rebuilds `job_runs` and `job_run_events` as the current ledger: one row per
-  BullMQ job, typed `instrument_id`/`group_id`, structured `error`, six event columns (`stage`, `type`,
+  BullMQ job, typed `instrument_id`, structured `error`, six event columns (`stage`, `type`,
   `occurred_at`, `data`) and a `latest_event_id` pointer. The old ledger is discarded by design.
   The database ends at 55 logical tables.
 - `0015_system_issues.sql` drops `data_quality_issues` and creates `system_issues`, a current-state
@@ -231,6 +231,9 @@ R1 lifecycle tables.
   classified outcome, the three-bucket `request_scope` and a capped error body. Successful
   response bodies are never stored — the payload tables already own them. The maintenance job
   deletes rows older than 90 days, so the ledger stays a debugging surface rather than an archive.
+- `0019_drop_job_runs_group_id.sql` drops `job_runs.group_id`, which was written once per fetch as a
+  fresh UUID and never read by a query, rollup or cancellation. The partial index on the column
+  drops with it.
 - `pnpm db:verify` asserts 56 tables, the R2 tables and indexes, 51 sync targets, 51 status rows,
   51 primary mappings, valid tick sizes, calendar coverage and zero orders.
 

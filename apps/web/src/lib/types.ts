@@ -311,7 +311,6 @@ export interface JobRun {
   queueName: string;
   jobType: string;
   status: string;
-  groupId: string | null;
   instrumentId: string | null;
   attempt: number;
   maxAttempts: number;
@@ -341,6 +340,8 @@ export interface JobStage {
 
 export interface JobDetail {
   run: JobRun;
+  /** Resolved from the instrument master; null for runs without an instrument. */
+  instrument: { symbol: string; name: string } | null;
   stages: JobStage[];
   events: JobEvent[];
   eventsPage: PaginationMeta;

@@ -31,12 +31,11 @@ import { InstrumentReferenceService } from './instrument-reference.service.js';
 import { CorporateActionImportDto } from './dto/instrument-coverage-query.dto.js';
 import { CorporateActionImportResultDto } from './dto/instrument-coverage.dto.js';
 import { InstrumentCandlesQueryDto } from './dto/instrument-candles-query.dto.js';
-import { CandleDto, InstrumentDto } from './dto/instrument-response.dto.js';
+import { CandleDto, InstrumentDto, InstrumentMappingDto } from './dto/instrument-response.dto.js';
 import { OffsetQueryDto } from '../../common/pagination/pagination.dto.js';
 import {
   CorporateActionListResponseDto,
   InstrumentListResponseDto,
-  InstrumentMappingListResponseDto,
 } from './dto/instrument-list-response.dto.js';
 import { ListInstrumentsDto } from './dto/list-instruments.dto.js';
 
@@ -88,14 +87,14 @@ export class InstrumentsController {
   }
 
   @Get(':id/mappings')
-  @ApiOperation({ summary: 'List provider mappings for an instrument' })
+  @ApiOperation({
+    summary: 'List all provider mappings for an instrument',
+    description: 'Unpaginated: returns every mapping associated with the instrument.',
+  })
   @ApiParam({ name: 'id', format: 'uuid' })
-  @ApiOkResponse({ type: InstrumentMappingListResponseDto })
-  mappings(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Query() query: OffsetQueryDto,
-  ) {
-    return this.instruments.mappings(id, query);
+  @ApiOkResponse({ type: InstrumentMappingDto, isArray: true })
+  mappings(@Param('id', ParseUUIDPipe) id: string) {
+    return this.instruments.mappings(id);
   }
 
   @Get(':id/corporate-actions')

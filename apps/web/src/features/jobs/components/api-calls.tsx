@@ -1,13 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { PAGINATION_DEFAULT_LIMIT } from '@ai-trading/domain';
-import type { ApiCallSummary, ExternalApiCall, ExternalApiCallPage, Paginated } from '@/lib/types';
+import type { ApiCallSummary, ExternalApiCall, ExternalApiCallPage } from '@/lib/types';
 import { formatDuration, formatNumber } from '@/lib/format';
 import { connectJobs } from '@/lib/realtime';
 import { apiRequest } from '@/lib/api-browser';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/dashboard/empty-state';
 import { cn } from '@/lib/utils';
 import { API_OUTCOME_ORDER, apiOutcomeMeta } from '../api-call-labels';
@@ -25,9 +23,6 @@ function OutcomeChips({ summary }: { summary: ApiCallSummary }) {
       <Badge variant="outline" className="border-info/30 bg-info/10 text-info">
         {formatNumber(summary.total)} calls
       </Badge>
-      <Badge variant="outline" className="border-border/70 bg-muted/30 text-muted-foreground">
-        p95 {formatDuration(summary.p95LatencyMs)}
-      </Badge>
       {ordered.map((outcome) => {
         const meta = apiOutcomeMeta(outcome);
         return (
@@ -36,30 +31,33 @@ function OutcomeChips({ summary }: { summary: ApiCallSummary }) {
           </Badge>
         );
       })}
+      <Badge variant="outline" className="border-border/70 bg-muted/30 text-muted-foreground">
+        p95 {formatDuration(summary.p95LatencyMs)}
+      </Badge>
     </div>
   );
 }
 
 /**
- * Provider call ledger of one run. The page renders the first page on the server; this component
- * keeps it live from the socket and pages toward older calls on demand.
+ * Provider call ledger of one run. The page renders the filtered page on the server; this
+ * component keeps the visible rows live, so a new call lands at the top between renders.
  */
 export function ApiCallsSection({
   jobRunId,
   initial,
+  query,
 }: {
   jobRunId: string;
   initial: ExternalApiCallPage;
+  /** Serialized filters, page size and cursor of the current view. */
+  query: string;
 }) {
-  const [items, setItems] = useState(initial.items);
+  const [items, setItems] = useState<ExternalApiCall[]>(initial.items);
   const [summary, setSummary] = useState(initial.summary);
-  const [page, setPage] = useState(initial.page);
-  const [loading, setLoading] = useState<'older' | 'refresh' | null>(null);
 
   useEffect(() => {
     setItems(initial.items);
     setSummary(initial.summary);
-    setPage(initial.page);
   }, [initial]);
 
   useEffect(() => {
@@ -70,17 +68,14 @@ export function ApiCallsSection({
       if (!message.calls.some((call) => call.jobRunId === jobRunId)) return;
       if (timer) return;
 
-      // The socket is only a hint: refetch so every row keeps the API projection (method,
-      // URL, symbol). While a run is active this resets the view to the newest page.
+      // The socket is only a hint: refetch the same view so every row keeps the API projection
+      // (method, URL, symbol) and the active filters. New rows arrive at the top.
       timer = setTimeout(() => {
         timer = null;
-        void apiRequest<ExternalApiCallPage>(
-          `/jobs/${jobRunId}/api-calls?limit=${PAGINATION_DEFAULT_LIMIT}`,
-        )
+        void apiRequest<ExternalApiCallPage>(`/jobs/${jobRunId}/api-calls?${query}`)
           .then((response) => {
             setItems(response.items);
             setSummary(response.summary);
-            setPage(response.page);
           })
           .catch(() => undefined);
       }, LIVE_REFRESH_MS);
@@ -90,60 +85,11 @@ export function ApiCallsSection({
       if (timer) clearTimeout(timer);
       disconnect();
     };
-  }, [jobRunId]);
-
-  async function loadOlder() {
-    if (!page.nextCursor || loading) return;
-    setLoading('older');
-    try {
-      const response = await apiRequest<Paginated<ExternalApiCall>>(
-        `/jobs/${jobRunId}/api-calls?limit=${PAGINATION_DEFAULT_LIMIT}&before=${encodeURIComponent(page.nextCursor)}`,
-      );
-      setItems((current) => [...current, ...response.items]);
-      setPage(response.page);
-    } catch {
-      // Leave the loaded rows in place; the control stays available for a retry.
-    } finally {
-      setLoading(null);
-    }
-  }
-
-  async function refresh() {
-    if (loading) return;
-    setLoading('refresh');
-    try {
-      const response = await apiRequest<ExternalApiCallPage>(
-        `/jobs/${jobRunId}/api-calls?limit=${PAGINATION_DEFAULT_LIMIT}`,
-      );
-      setItems(response.items);
-      setSummary(response.summary);
-      setPage(response.page);
-    } catch {
-      // Keep the current view; the next socket batch still lands.
-    } finally {
-      setLoading(null);
-    }
-  }
+  }, [jobRunId, query]);
 
   return (
     <>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <OutcomeChips summary={summary} />
-        <div className="flex items-center gap-2">
-          <span className="text-muted-foreground text-xs">
-            {formatNumber(items.length)} shown of {formatNumber(page.total)}
-          </span>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={refresh}
-            disabled={loading !== null}
-          >
-            {loading === 'refresh' ? 'Refreshing…' : 'Refresh'}
-          </Button>
-        </div>
-      </div>
+      <OutcomeChips summary={summary} />
 
       <div className="mt-3">
         {items.length === 0 ? (
@@ -155,20 +101,6 @@ export function ApiCallsSection({
           <ApiCallTable calls={items} containerClassName="max-h-[420px] overflow-auto" />
         )}
       </div>
-
-      {page.nextCursor ? (
-        <div className="mt-3 flex justify-end">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={loadOlder}
-            disabled={loading !== null}
-          >
-            {loading === 'older' ? 'Loading…' : 'Load older calls'}
-          </Button>
-        </div>
-      ) : null}
     </>
   );
 }

@@ -55,9 +55,6 @@ export class JobRunDto {
   status!: string;
 
   @ApiProperty({ type: String, format: 'uuid', nullable: true })
-  groupId!: string | null;
-
-  @ApiProperty({ type: String, format: 'uuid', nullable: true })
   instrumentId!: string | null;
 
   @ApiProperty({ example: 0 })

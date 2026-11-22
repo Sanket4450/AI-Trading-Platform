@@ -11,6 +11,7 @@ import {
 } from '@ai-trading/domain';
 import {
   getAllJobRunEvents,
+  getInstrument,
   getJobRun,
   getJobRunEventsPage,
   getJobRunSummary,
@@ -31,11 +32,11 @@ import {
   readDirectionalCursor,
   readCursor,
 } from '../../common/pagination/cursor.js';
-import { backwardPage, forwardPage, olderPage } from '../../common/pagination/page.js';
+import { backwardPage, forwardPage } from '../../common/pagination/page.js';
 import type { RequestMeta } from '../../common/http/request-meta.js';
-import type { CursorQueryDto } from '../../common/pagination/pagination.dto.js';
-import type { JobQueryDto } from './dto/job-query.dto.js';
 import type { JobApiCallQueryDto } from './dto/job-api-call-query.dto.js';
+import type { JobEventQueryDto } from './dto/job-event-query.dto.js';
+import type { JobQueryDto } from './dto/job-query.dto.js';
 import { createApiCallMapper } from '../api-calls/api-call.mapper.js';
 import { JobEventsPublisher } from './jobs-events.publisher.js';
 
@@ -100,7 +101,6 @@ function mapRun(
     queueName: queueNameOf(row.jobName) ?? 'unknown',
     jobType: jobTypeOf(row.jobName) ?? 'ingestion',
     status: row.status,
-    groupId: row.groupId,
     instrumentId: row.instrumentId,
     attempt: row.attempt,
     maxAttempts: row.maxAttempts,
@@ -135,7 +135,6 @@ function mapListRun(row: ListRow) {
     queueName: queueNameOf(row.jobName) ?? 'unknown',
     jobType: jobTypeOf(row.jobName) ?? 'ingestion',
     status: row.status,
-    groupId: row.groupId,
     instrumentId: row.instrumentId,
     attempt: row.attempt,
     maxAttempts: row.maxAttempts,
@@ -157,7 +156,6 @@ function broadcastOf(row: RunRow): JobRunBroadcast {
     jobName: row.jobName,
     queueName: queueNameOf(row.jobName) ?? 'unknown',
     status: row.status,
-    groupId: row.groupId,
     instrumentId: row.instrumentId,
     attempt: row.attempt,
     maxAttempts: row.maxAttempts,
@@ -267,23 +265,22 @@ export class JobsService {
     return getJobRunSummary();
   }
 
-  async listEvents(id: string, query: CursorQueryDto) {
-    if (query.after) throw new BadRequestException('Use before for event history');
+  async listEvents(id: string, query: JobEventQueryDto) {
     const run = await getJobRun(id);
     if (!run) throw new NotFoundException('Job not found');
 
     const fingerprint = filterFingerprint({ scope: 'job-events', jobRunId: id });
-    const cursor = readCursor(query.before, fingerprint);
-    const beforeId = cursor ? Number(cursor.key) : undefined;
-    if (beforeId !== undefined && !Number.isInteger(beforeId)) {
+    const cursor = readCursor(query.after, fingerprint);
+    const afterId = cursor ? Number(cursor.key) : undefined;
+    if (afterId !== undefined && !Number.isInteger(afterId)) {
       throw new BadRequestException('Pagination cursor has an invalid event id');
     }
     const limit = query.limit ?? PAGINATION_DEFAULT_LIMIT;
 
-    const result = await getJobRunEventsPage(id, { limit, beforeId });
+    const result = await getJobRunEventsPage(id, { limit, afterId });
     const items = result.items.map(mapEvent);
 
-    return olderPage({
+    return forwardPage({
       items,
       total: result.total,
       limit,
@@ -291,6 +288,7 @@ export class JobsService {
       fingerprint,
       keyOf: (item) => String(item.id),
       idOf: (item) => String(item.id),
+      hadAfter: Boolean(cursor),
     });
   }
 
@@ -299,18 +297,21 @@ export class JobsService {
    * the browser never needs the endpoint templates.
    */
   async listApiCalls(id: string, query: JobApiCallQueryDto) {
-    if (query.after) throw new BadRequestException('Use before for API call history');
     const run = await getJobRun(id);
     if (!run) throw new NotFoundException('Job not found');
 
     const fingerprint = filterFingerprint({
       scope: 'job-api-calls',
       jobRunId: id,
-      outcome: query.outcome ?? null,
-      service: query.service ?? null,
+      outcomes: query.outcome ?? [],
+      services: query.service ?? [],
     });
-    const cursor = readCursor(query.before, fingerprint);
-    const beforeId = cursor ? Number(cursor.key) : undefined;
+    const { after, before } = readDirectionalCursor(query, fingerprint);
+    const afterId = after ? Number(after.key) : undefined;
+    const beforeId = before ? Number(before.key) : undefined;
+    if (afterId !== undefined && !Number.isInteger(afterId)) {
+      throw new BadRequestException('Pagination cursor has an invalid call id');
+    }
     if (beforeId !== undefined && !Number.isInteger(beforeId)) {
       throw new BadRequestException('Pagination cursor has an invalid call id');
     }
@@ -320,44 +321,66 @@ export class JobsService {
       listJobApiCalls({
         jobRunId: id,
         limit,
+        afterId,
         beforeId,
-        outcome: query.outcome,
-        service: query.service,
+        outcomes: query.outcome,
+        services: query.service,
       }),
-      summarizeExternalApiCalls({ jobRunId: id }),
+      summarizeExternalApiCalls({
+        jobRunId: id,
+        outcomes: query.outcome,
+        services: query.service,
+      }),
     ]);
     const items = result.items.map((row) => this.mapApiCall(row));
 
-    return {
-      ...olderPage({
-        items,
-        total: result.total,
-        limit,
-        hasExtra: result.hasExtra,
-        fingerprint,
-        keyOf: (item) => String(item.id),
-        idOf: (item) => String(item.id),
-      }),
-      summary,
-    };
+    const keyOf = (item: (typeof items)[number]) => String(item.id);
+    const idOf = (item: (typeof items)[number]) => String(item.id);
+
+    const page = before
+      ? backwardPage({
+          items,
+          total: result.total,
+          limit,
+          hasExtra: result.hasExtra,
+          fingerprint,
+          keyOf,
+          idOf,
+        })
+      : forwardPage({
+          items,
+          total: result.total,
+          limit,
+          hasExtra: result.hasExtra,
+          fingerprint,
+          keyOf,
+          idOf,
+          hadAfter: Boolean(after),
+        });
+
+    return { ...page, summary };
   }
 
   async detail(id: string) {
     const run = await getJobRun(id);
     if (!run) throw new NotFoundException('Job not found');
     const fingerprint = filterFingerprint({ scope: 'job-events', jobRunId: id });
-    const [allEvents, latest, eventPage] = await Promise.all([
+    const [allEvents, latest, eventPage, instrument] = await Promise.all([
       getAllJobRunEvents(id),
       getLatestJobRunEvent(id),
       getJobRunEventsPage(id, { limit: PAGINATION_DEFAULT_LIMIT }),
+      run.instrumentId ? getInstrument(run.instrumentId) : Promise.resolve(null),
     ]);
     const events = eventPage.items.map(mapEvent);
 
     return {
       run: mapRun(run, latest),
+      instrument: instrument
+        ? { symbol: instrument.tradingSymbol, name: instrument.name }
+        : null,
       stages: deriveStages(run, allEvents),
       events,
-      eventsPage: olderPage({
+      eventsPage: forwardPage({
         items: events,
         total: eventPage.total,
         limit: PAGINATION_DEFAULT_LIMIT,
@@ -365,6 +388,7 @@ export class JobsService {
         fingerprint,
         keyOf: (item) => String(item.id),
         idOf: (item) => String(item.id),
+        hadAfter: false,
       }).page,
       progress: progressOf(run.jobName, latest),
     };

@@ -5,6 +5,8 @@
  * reads lives here so backend configuration carries no presentation copy.
  */
 
+import { EXTERNAL_API_OUTCOMES, EXTERNAL_API_SERVICES } from '@ai-trading/domain';
+
 export const API_SERVICE_LABELS: Record<string, string> = {
   upstox: 'Upstox API',
   'upstox-assets': 'Upstox assets CDN',
@@ -124,6 +126,17 @@ export const API_PARAM_LABELS: Record<string, string> = {
   orderType: 'Order type',
   product: 'Product',
 };
+
+/** Filter options shared by every provider-call table. */
+export const API_SERVICE_OPTIONS = EXTERNAL_API_SERVICES.map((value) => ({
+  value,
+  label: apiServiceLabel(value),
+}));
+
+export const API_OUTCOME_OPTIONS = EXTERNAL_API_OUTCOMES.map((value) => ({
+  value,
+  label: apiOutcomeMeta(value).label,
+}));
 
 export function apiParamLabel(key: string): string {
   if (API_PARAM_LABELS[key]) return API_PARAM_LABELS[key];

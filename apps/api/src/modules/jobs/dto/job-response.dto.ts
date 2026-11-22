@@ -25,10 +25,13 @@ export class JobListResponseDto {
 }
 
 export class JobEventListResponseDto {
-  @ApiProperty({ type: [JobEventDto] })
+  @ApiProperty({ type: [JobEventDto], description: 'Chronological page, oldest first.' })
   items!: JobEventDto[];
 
-  @ApiProperty({ type: PaginationMetaDto })
+  @ApiProperty({
+    type: PaginationMetaDto,
+    description: 'nextCursor continues toward newer events.',
+  })
   page!: PaginationMetaDto;
 }
 
@@ -60,17 +63,35 @@ export class JobStageDto {
   durationMs!: number | null;
 }
 
+export class JobInstrumentDto {
+  @ApiProperty({ example: 'RELIANCE' })
+  symbol!: string;
+
+  @ApiProperty()
+  name!: string;
+}
+
 export class JobDetailResponseDto {
   @ApiProperty({ type: JobRunDto })
   run!: JobRunDto;
 
+  @ApiProperty({
+    type: JobInstrumentDto,
+    nullable: true,
+    description: 'Instrument targeted by the run; null for account-wide jobs.',
+  })
+  instrument!: JobInstrumentDto | null;
+
   @ApiProperty({ type: [JobStageDto] })
   stages!: JobStageDto[];
 
-  @ApiProperty({ type: [JobEventDto], description: 'Newest page, chronological order.' })
+  @ApiProperty({ type: [JobEventDto], description: 'First page, chronological order.' })
   events!: JobEventDto[];
 
-  @ApiProperty({ type: PaginationMetaDto })
+  @ApiProperty({
+    type: PaginationMetaDto,
+    description: 'nextCursor continues toward newer events.',
+  })
   eventsPage!: PaginationMetaDto;
 
   @ApiProperty({ type: JobProgressDto, nullable: true })

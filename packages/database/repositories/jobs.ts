@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, ilike, inArray, lt, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, ilike, inArray, or, sql } from 'drizzle-orm';
 import { db } from '../client.js';
 import { jobRunEvents, jobRuns } from '../schema/index.js';
 
@@ -167,7 +167,6 @@ export async function listTrackedJobRuns(filters: {
         id: jobRuns.id,
         jobName: jobRuns.jobName,
         status: jobRuns.status,
-        groupId: jobRuns.groupId,
         instrumentId: jobRuns.instrumentId,
         attempt: jobRuns.attempt,
         maxAttempts: jobRuns.maxAttempts,
@@ -228,16 +227,16 @@ export async function getAllJobRunEvents(jobRunId: string) {
 }
 
 /**
- * One page of a run's events. The response stays chronological: the newest page is fetched
- * descending and reversed, and `beforeId` walks toward older events.
+ * One page of a run's events, always oldest first. No cursor returns the first page; `afterId`
+ * walks toward newer events, which is the direction the timeline expands in.
  */
 export async function getJobRunEventsPage(
   jobRunId: string,
-  filters: { limit: number; beforeId?: number },
+  filters: { limit: number; afterId?: number },
 ) {
   const conditions = [eq(jobRunEvents.jobRunId, jobRunId)];
-  if (filters.beforeId !== undefined) {
-    conditions.push(lt(jobRunEvents.id, filters.beforeId));
+  if (filters.afterId !== undefined) {
+    conditions.push(gt(jobRunEvents.id, filters.afterId));
   }
 
   const [rows, totalRows] = await Promise.all([
@@ -245,7 +244,7 @@ export async function getJobRunEventsPage(
       .select()
       .from(jobRunEvents)
       .where(and(...conditions))
-      .orderBy(desc(jobRunEvents.id))
+      .orderBy(asc(jobRunEvents.id))
       .limit(filters.limit + 1),
     db
       .select({ total: sql<number>`count(*)::int` })
@@ -254,7 +253,7 @@ export async function getJobRunEventsPage(
   ]);
 
   return {
-    items: rows.slice(0, filters.limit).reverse(),
+    items: rows.slice(0, filters.limit),
     total: totalRows[0]?.total ?? 0,
     hasExtra: rows.length > filters.limit,
   };

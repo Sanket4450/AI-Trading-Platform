@@ -29,7 +29,6 @@ export async function listJobRuns(filters: { limit?: number; status?: string }) 
 export async function createJobRun(values: {
   jobName: string;
   status?: string;
-  groupId?: string | null;
   instrumentId?: string | null;
   payload?: Record<string, unknown>;
   maxAttempts?: number;
@@ -45,7 +44,6 @@ export async function createJobRun(values: {
       id: uuidv7(),
       jobName: values.jobName,
       status: values.status ?? 'queued',
-      groupId: values.groupId ?? null,
       instrumentId: values.instrumentId ?? null,
       attempt: 0,
       maxAttempts: values.maxAttempts ?? 1,

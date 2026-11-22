@@ -17,7 +17,6 @@ parent rows exist.
 | `id` | uuidv7, also the BullMQ `jobId` |
 | `job_name` | BullMQ name; the queue is derived from it |
 | `status` | `queued`, `running`, `succeeded`, `failed`, `partially_failed`, `cancelled` |
-| `group_id` | Selection/plan grouping. Not a job row. |
 | `instrument_id` | Typed scope for instrument-bounded jobs; nullable |
 | `attempt`, `max_attempts` | Mirrors `attemptsMade` and `opts.attempts` |
 | `payload`, `result`, `error` | Input, terminal totals, structured failure |

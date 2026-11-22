@@ -5,7 +5,6 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { randomUUID } from 'node:crypto';
 import { InjectQueue } from '@nestjs/bullmq';
 import type { Queue } from 'bullmq';
 import { QUEUES } from '@ai-trading/domain';
@@ -202,7 +201,6 @@ export class InstrumentIngestionService {
 
     const job = await createJobRun({
       jobName: 'historical-backfill',
-      groupId: randomUUID(),
       instrumentId,
       status: 'queued',
       payload: {

@@ -36,12 +36,9 @@ export class InstrumentsService {
     return instrument;
   }
 
-  async mappings(id: string, query: OffsetQueryDto) {
+  async mappings(id: string) {
     await this.detail(id);
-    const limit = query.limit ?? PAGINATION_DEFAULT_LIMIT;
-    const offset = query.offset ?? 0;
-    const result = await listInstrumentMappings(id, { limit, offset });
-    return offsetPage(result.items, result.total, limit, offset);
+    return listInstrumentMappings(id);
   }
 
   async corporateActions(id: string, query: OffsetQueryDto) {

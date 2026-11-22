@@ -48,7 +48,6 @@ export default async function InstrumentDetailPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{
     from?: string | string[];
-    mappingsOffset?: string | string[];
     actionsOffset?: string | string[];
     issuesOffset?: string | string[];
   }>;
@@ -57,12 +56,11 @@ export default async function InstrumentDetailPage({
   const queryParams = await searchParams;
   const fromParam = queryParams.from;
   const back = backLinkFor(fromParam, '/instruments');
-  const mappingsOffset = readOffset(queryParams.mappingsOffset);
   const actionsOffset = readOffset(queryParams.actionsOffset);
   const issuesOffset = readOffset(queryParams.issuesOffset);
   const [detail, mappings, actions, issues] = await Promise.all([
     apiFetch<InstrumentCoverageDetail>(`/instruments/${id}/coverage`),
-    apiFetch<Paginated<InstrumentMapping>>(`/instruments/${id}/mappings?limit=${PAGINATION_DEFAULT_LIMIT}&offset=${mappingsOffset}`),
+    apiFetch<InstrumentMapping[]>(`/instruments/${id}/mappings`),
     apiFetch<Paginated<CorporateAction>>(
       `/instruments/${id}/corporate-actions?limit=${PAGINATION_DEFAULT_LIMIT}&offset=${actionsOffset}`,
     ),
@@ -174,18 +172,8 @@ export default async function InstrumentDetailPage({
           title="Provider mappings"
           description="Upstox keys live only here; the canonical UUID never changes."
           actions={<TableRefreshButton />}
-          footer={
-            <Pagination
-              page={mappings.page}
-              itemsCount={mappings.items.length}
-              pathname={`/instruments/${id}`}
-              searchParams={queryParams}
-              itemLabel="mappings"
-              names={{ offset: 'mappingsOffset' }}
-            />
-          }
         >
-          {mappings.items.length === 0 ? (
+          {mappings.length === 0 ? (
             <EmptyState title="No mappings" description="Run instrument sync." />
           ) : (
             <Table>
@@ -199,7 +187,7 @@ export default async function InstrumentDetailPage({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {mappings.items.map((mapping) => (
+                {mappings.map((mapping) => (
                   <TableRow key={mapping.id}>
                     <TableCell>{label(mapping.providerCode)}</TableCell>
                     <TableCell className="font-mono text-xs">{mapping.externalKey}</TableCell>

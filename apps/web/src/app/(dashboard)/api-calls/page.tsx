@@ -1,5 +1,4 @@
 import { apiFetch } from '@/lib/api';
-import { EXTERNAL_API_OUTCOMES, EXTERNAL_API_SERVICES } from '@ai-trading/domain';
 import type { ExternalApiCallPage } from '@/lib/types';
 import { formatDuration, formatNumber } from '@/lib/format';
 import { originHref } from '@/lib/navigation';
@@ -16,17 +15,7 @@ import { TableRefreshButton } from '@/components/dashboard/table-actions';
 import { PageSizeSelect } from '@/components/dashboard/page-size-select';
 import { Pagination } from '@/components/dashboard/pagination';
 import { ApiCallTable } from '@/features/jobs/components/api-call-table';
-import { apiOutcomeMeta, apiServiceLabel } from '@/features/jobs/api-call-labels';
-
-const SERVICE_OPTIONS = EXTERNAL_API_SERVICES.map((value) => ({
-  value,
-  label: apiServiceLabel(value),
-}));
-
-const OUTCOME_OPTIONS = EXTERNAL_API_OUTCOMES.map((value) => ({
-  value,
-  label: apiOutcomeMeta(value).label,
-}));
+import { API_OUTCOME_OPTIONS, API_SERVICE_OPTIONS } from '@/features/jobs/api-call-labels';
 
 export default async function ApiCallsPage({
   searchParams,
@@ -113,14 +102,14 @@ export default async function ApiCallsPage({
               id="service"
               name="service"
               defaultValue={services}
-              options={SERVICE_OPTIONS}
+              options={API_SERVICE_OPTIONS}
               placeholder="All services"
             />
             <MultiSelectFilter
               id="outcome"
               name="outcome"
               defaultValue={outcomes}
-              options={OUTCOME_OPTIONS}
+              options={API_OUTCOME_OPTIONS}
               placeholder="All outcomes"
             />
           </TableFilters>

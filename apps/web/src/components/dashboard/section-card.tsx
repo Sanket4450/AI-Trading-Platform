@@ -14,6 +14,7 @@ export function SectionCard({
   children,
   className,
   contentClassName,
+  style,
 }: {
   title: string;
   description?: React.ReactNode;
@@ -23,12 +24,13 @@ export function SectionCard({
   children: React.ReactNode;
   className?: string;
   contentClassName?: string;
+  style?: React.CSSProperties;
 }) {
   const hasHeaderControls = Boolean(actions || toolbar);
 
   return (
-    <Card className={cn('border-border/70 bg-card/60', className)}>
-      <CardHeader>
+    <Card className={cn('border-border/70 bg-card/60', className)} style={style}>
+      <CardHeader className="shrink-0">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <div className="min-w-0 space-y-1">
             <CardTitle>{title}</CardTitle>

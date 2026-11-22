@@ -4,21 +4,12 @@ import { PaginationMetaDto } from '../../../common/pagination/pagination.dto.js'
 import {
   CorporateActionDto,
   InstrumentDto,
-  InstrumentMappingDto,
 } from './instrument-response.dto.js';
 import { InstrumentCoverageRowDto } from './instrument-coverage.dto.js';
 
 export class InstrumentListResponseDto {
   @ApiProperty({ type: [InstrumentDto] })
   items!: InstrumentDto[];
-
-  @ApiProperty({ type: PaginationMetaDto })
-  page!: PaginationMetaDto;
-}
-
-export class InstrumentMappingListResponseDto {
-  @ApiProperty({ type: [InstrumentMappingDto] })
-  items!: InstrumentMappingDto[];
 
   @ApiProperty({ type: PaginationMetaDto })
   page!: PaginationMetaDto;

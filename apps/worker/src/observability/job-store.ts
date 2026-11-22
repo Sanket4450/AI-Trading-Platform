@@ -17,7 +17,6 @@ function runBroadcast(row: {
   id: string;
   jobName: string;
   status: string;
-  groupId: string | null;
   instrumentId: string | null;
   attempt: number;
   maxAttempts: number;
@@ -32,7 +31,6 @@ function runBroadcast(row: {
     jobName: row.jobName,
     queueName: queueNameOf(row.jobName) ?? 'unknown',
     status: row.status,
-    groupId: row.groupId,
     instrumentId: row.instrumentId,
     attempt: row.attempt,
     maxAttempts: row.maxAttempts,

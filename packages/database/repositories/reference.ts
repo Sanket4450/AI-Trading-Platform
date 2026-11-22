@@ -99,38 +99,26 @@ export async function getInstrument(id: string) {
   return rows[0] ?? null;
 }
 
-export async function listInstrumentMappings(
-  instrumentId: string,
-  page: { limit: number; offset: number },
-) {
-  const [items, totalRows] = await Promise.all([
-    db
-      .select({
-        id: instrumentProviderMappings.id,
-        providerId: instrumentProviderMappings.providerId,
-        providerCode: providers.code,
-        providerName: providers.name,
-        externalKey: instrumentProviderMappings.externalKey,
-        exchangeToken: instrumentProviderMappings.exchangeToken,
-        providerSymbol: instrumentProviderMappings.providerSymbol,
-        providerSegment: instrumentProviderMappings.providerSegment,
-        isPrimary: instrumentProviderMappings.isPrimary,
-        validFrom: instrumentProviderMappings.validFrom,
-        validTo: instrumentProviderMappings.validTo,
-      })
-      .from(instrumentProviderMappings)
-      .innerJoin(providers, eq(providers.id, instrumentProviderMappings.providerId))
-      .where(eq(instrumentProviderMappings.instrumentId, instrumentId))
-      .orderBy(desc(instrumentProviderMappings.validFrom), desc(instrumentProviderMappings.id))
-      .limit(page.limit)
-      .offset(page.offset),
-    db
-      .select({ total: sql<number>`count(*)::int` })
-      .from(instrumentProviderMappings)
-      .where(eq(instrumentProviderMappings.instrumentId, instrumentId)),
-  ]);
-
-  return { items, total: totalRows[0]?.total ?? 0 };
+/** Unpaginated: an instrument has a small, fixed set of provider mappings. */
+export async function listInstrumentMappings(instrumentId: string) {
+  return db
+    .select({
+      id: instrumentProviderMappings.id,
+      providerId: instrumentProviderMappings.providerId,
+      providerCode: providers.code,
+      providerName: providers.name,
+      externalKey: instrumentProviderMappings.externalKey,
+      exchangeToken: instrumentProviderMappings.exchangeToken,
+      providerSymbol: instrumentProviderMappings.providerSymbol,
+      providerSegment: instrumentProviderMappings.providerSegment,
+      isPrimary: instrumentProviderMappings.isPrimary,
+      validFrom: instrumentProviderMappings.validFrom,
+      validTo: instrumentProviderMappings.validTo,
+    })
+    .from(instrumentProviderMappings)
+    .innerJoin(providers, eq(providers.id, instrumentProviderMappings.providerId))
+    .where(eq(instrumentProviderMappings.instrumentId, instrumentId))
+    .orderBy(desc(instrumentProviderMappings.validFrom), desc(instrumentProviderMappings.id));
 }
 
 export async function listCorporateActions(

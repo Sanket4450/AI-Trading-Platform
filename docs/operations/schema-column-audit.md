@@ -192,7 +192,7 @@ Legend: **—** = no removal recommended.
 | --------------------------- | ---------------------------------------------------------------------- |
 | `daily_performance`         | derived columns in §2 (table reserved)                                 |
 | `strategy_performance_daily`| derived columns in §2 (table reserved)                                 |
-| `job_runs`                  | `queue_name`                                                           |
+| `job_runs`                  | `queue_name`, `group_id`                                               |
 | `job_run_events`            | —                                                                      |
 | `system_health_snapshots`   | `created_at` (also no producer)                                        |
 | `notification_events`       | — (table reserved)                                                     |

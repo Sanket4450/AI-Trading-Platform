@@ -154,7 +154,6 @@ export interface JobRunBroadcast {
   jobName: string;
   queueName: string;
   status: string;
-  groupId: string | null;
   instrumentId: string | null;
   attempt: number;
   maxAttempts: number;

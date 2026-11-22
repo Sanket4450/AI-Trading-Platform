@@ -22,7 +22,6 @@ import {
 } from '../../common/auth/current-user.decorator.js';
 import { ErrorResponseDto } from '../../common/dto/error-response.dto.js';
 import { JobRunDto } from '../../common/dto/job-run.dto.js';
-import { CursorQueryDto } from '../../common/pagination/pagination.dto.js';
 import { requestMeta } from '../../common/http/request-meta.js';
 import { ApiSessionAuth } from '../../common/swagger/api-session-auth.decorator.js';
 import {
@@ -33,6 +32,7 @@ import {
 } from './dto/job-response.dto.js';
 import { ExternalApiCallListResponseDto } from '../../common/dto/external-api-call.dto.js';
 import { JobApiCallQueryDto } from './dto/job-api-call-query.dto.js';
+import { JobEventQueryDto } from './dto/job-event-query.dto.js';
 import { JobQueryDto } from './dto/job-query.dto.js';
 import { JobsService } from './jobs.service.js';
 
@@ -70,13 +70,13 @@ export class JobsController {
   }
 
   @Get(':id/events')
-  @ApiOperation({ summary: 'List older events for one job run' })
+  @ApiOperation({ summary: 'List newer events for one job run, oldest first' })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiOkResponse({ type: JobEventListResponseDto })
   @ApiNotFoundResponse({ type: ErrorResponseDto, description: 'Job not found' })
   events(
     @Param('id', ParseUUIDPipe) id: string,
-    @Query() query: CursorQueryDto,
+    @Query() query: JobEventQueryDto,
   ) {
     return this.jobs.listEvents(id, query);
   }

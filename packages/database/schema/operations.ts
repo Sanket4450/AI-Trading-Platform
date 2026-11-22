@@ -89,7 +89,6 @@ export const jobRuns = pgTable(
     id: uuid('id').primaryKey(),
     jobName: varchar('job_name', { length: 80 }).notNull(),
     status: varchar('status', { length: 20 }).notNull(),
-    groupId: uuid('group_id'),
     instrumentId: uuid('instrument_id'),
     attempt: smallint('attempt').default(0).notNull(),
     maxAttempts: smallint('max_attempts').default(1).notNull(),
@@ -110,7 +109,6 @@ export const jobRuns = pgTable(
       table.status,
       table.finishedAt,
     ),
-    index('idx_job_runs_group').on(table.groupId),
     index('idx_job_runs_instrument').on(table.instrumentId),
     index('idx_job_runs_latest_event').on(table.latestEventId),
     check(
