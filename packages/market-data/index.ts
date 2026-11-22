@@ -78,6 +78,7 @@ export {
   deriveDataStatus,
   deriveFetchStatus,
   displayStatus,
+  fetchStatusFromRun,
   type DisplayStatus,
   type InstrumentStatusCounters,
 } from './catalog.js';

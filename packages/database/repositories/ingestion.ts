@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, ilike, inArray, isNotNull, lte, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, ilike, inArray, isNotNull, lte, ne, or, sql } from 'drizzle-orm';
 import type { InferInsertModel } from 'drizzle-orm';
 import { db } from '../client.js';
 import {
@@ -132,7 +132,10 @@ export async function resolveAbandonedQueuedJob(
  * Latest backfill run for one instrument. Fetch status is about fetching only, so a
  * `coverage-recompute` or other instrument-scoped job must never drive it.
  */
-export async function getLatestBackfillJobForInstrument(instrumentId: string) {
+export async function getLatestBackfillJobForInstrument(
+  instrumentId: string,
+  options: { excludeJobRunId?: string } = {},
+) {
   const rows = await db
     .select()
     .from(jobRuns)
@@ -140,10 +143,27 @@ export async function getLatestBackfillJobForInstrument(instrumentId: string) {
       and(
         eq(jobRuns.jobName, 'historical-backfill'),
         eq(jobRuns.instrumentId, instrumentId),
+        options.excludeJobRunId ? ne(jobRuns.id, options.excludeJobRunId) : undefined,
       ),
     )
     .orderBy(desc(jobRuns.createdAt))
     .limit(1);
+  return rows[0] ?? null;
+}
+
+/**
+ * Writes the in-flight marker the moment a run is enqueued or starts. Without it the catalog
+ * would keep showing the previous run's verdict until the backfill finished.
+ */
+export async function markInstrumentFetchInFlight(
+  instrumentId: string,
+  fetchStatus: 'queued' | 'fetching',
+) {
+  const rows = await db
+    .update(instrumentDataStatus)
+    .set({ fetchStatus, updatedAt: new Date() })
+    .where(eq(instrumentDataStatus.instrumentId, instrumentId))
+    .returning();
   return rows[0] ?? null;
 }
 
@@ -168,7 +188,10 @@ export async function correctStalledFetchStatus(
   return rows[0] ?? null;
 }
 
-export async function getLastSuccessfulJobForInstrument(instrumentId: string) {
+export async function getLastSuccessfulJobForInstrument(
+  instrumentId: string,
+  options: { excludeJobRunId?: string } = {},
+) {
   const rows = await db
     .select()
     .from(jobRuns)
@@ -177,6 +200,7 @@ export async function getLastSuccessfulJobForInstrument(instrumentId: string) {
         eq(jobRuns.jobName, 'historical-backfill'),
         eq(jobRuns.status, 'succeeded'),
         eq(jobRuns.instrumentId, instrumentId),
+        options.excludeJobRunId ? ne(jobRuns.id, options.excludeJobRunId) : undefined,
       ),
     )
     .orderBy(desc(jobRuns.finishedAt))

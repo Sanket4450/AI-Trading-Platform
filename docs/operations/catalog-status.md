@@ -18,9 +18,10 @@ The instrument catalog is a read model over persisted evidence. It is not a seco
 | `stale`         | Was complete, but the latest completed session is not covered.       |
 
 Fetch status is derived from the latest `historical-backfill` run for the instrument, never from
-`coverage-recompute` or other instrument-scoped jobs. The catalog row also carries `activeJobId`,
-the queued or running backfill job id, so row actions follow live queue state instead of the
-projection.
+`coverage-recompute` or other instrument-scoped jobs. The projection is marked `queued` when the
+request is enqueued and `fetching` when the worker starts, so a long fetch is visible while it runs.
+The catalog row also carries `activeJobId`, the queued or running backfill job id, so row actions
+follow live queue state instead of the projection.
 
 ### Data status
 
@@ -60,7 +61,9 @@ names its window. A stock listed in 2024 cannot claim complete history from 2022
 
 ## Recompute triggers
 
-- Instrument job close.
+- Instrument job close: the run reaches its terminal status first, then coverage and the projection
+  are recomputed from that status. A run skipped because the provider is not configured is not
+  fetch evidence, so it leaves the previous verdict in place.
 - T+1 finalization.
 - The scheduled quality scan.
 - The 08:30 ingestion reconciliation.

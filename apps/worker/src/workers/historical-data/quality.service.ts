@@ -5,7 +5,7 @@ import {
   computeCoverageVerdict,
   eachDate,
   deriveDataStatus,
-  deriveFetchStatus,
+  fetchStatusFromRun,
   gapSeverity,
   istToday,
   type CalendarSessionRow,
@@ -260,7 +260,14 @@ export class QualityService {
     }
   }
 
-  async recomputeInstrumentStatus(instrumentId: string) {
+  /**
+   * Rebuilds the catalog projection for one instrument. `excludeJobRunId` leaves a run out of the
+   * evidence, which is how a skipped run releases the in-flight marker without claiming a fetch.
+   */
+  async recomputeInstrumentStatus(
+    instrumentId: string,
+    options: { excludeJobRunId?: string } = {},
+  ) {
     const latestSession = await getLatestCompletedSession();
     const statusRow = await getInstrumentStatusRow(instrumentId);
     const targetFrom = statusRow?.targetFrom ?? '2022-01-01';
@@ -270,8 +277,8 @@ export class QualityService {
       targetFrom,
       targetTo,
     );
-    const latestJob = await getLatestBackfillJobForInstrument(instrumentId);
-    const lastSuccess = await getLastSuccessfulJobForInstrument(instrumentId);
+    const latestJob = await getLatestBackfillJobForInstrument(instrumentId, options);
+    const lastSuccess = await getLastSuccessfulJobForInstrument(instrumentId, options);
     const staleSessions = this.config.get<number>(
       'DATA_STATUS_STALE_SESSIONS',
       1,
@@ -293,11 +300,7 @@ export class QualityService {
       (!listing?.delistedOn || listing.delistedOn >= targetFrom) &&
       (!listing?.listedOn || listing.listedOn <= targetTo);
     const dataStatus = deriveDataStatus(counters, expectsData);
-    const fetchStatus = deriveFetchStatus({
-      hasRun: Boolean(latestJob),
-      queued: latestJob?.status === 'queued' ? 1 : 0,
-      running: latestJob?.status === 'running' ? 1 : 0,
-      lastStatus: latestJob?.status ?? null,
+    const fetchStatus = fetchStatusFromRun(latestJob, {
       stale: dataStatus === 'complete' && stale,
     });
 

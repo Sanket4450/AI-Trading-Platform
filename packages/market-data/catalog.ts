@@ -57,6 +57,20 @@ export function deriveFetchStatus(input: {
   }
 }
 
+/** Fetch status from the latest backfill run; the only evidence the catalog accepts for fetching. */
+export function fetchStatusFromRun(
+  latest: { status: string } | null,
+  options: { stale?: boolean } = {},
+): FetchStatus {
+  return deriveFetchStatus({
+    hasRun: Boolean(latest),
+    queued: latest?.status === 'queued' ? 1 : 0,
+    running: latest?.status === 'running' ? 1 : 0,
+    lastStatus: latest?.status ?? null,
+    stale: options.stale ?? false,
+  });
+}
+
 export type DisplayStatus =
   | 'Failed'
   | 'Stopped'

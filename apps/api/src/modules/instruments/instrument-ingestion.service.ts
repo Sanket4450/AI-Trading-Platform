@@ -10,7 +10,7 @@ import type { Queue } from 'bullmq';
 import { QUEUES } from '@ai-trading/domain';
 import {
   HISTORY_START,
-  deriveFetchStatus,
+  fetchStatusFromRun,
   monthChunks,
   validateBackfillRange,
   type MonthChunk,
@@ -25,6 +25,7 @@ import {
   getLatestBackfillJobForInstrument,
   getLatestCompletedSession,
   getTradingSessionsForRange,
+  markInstrumentFetchInFlight,
   recordAudit,
   updateJobRun,
 } from '@ai-trading/database';
@@ -212,6 +213,10 @@ export class InstrumentIngestionService {
       maxAttempts: 1,
     });
 
+    // Mark the request before it reaches the queue so the catalog shows queued immediately and a
+    // worker start cannot be overwritten by the slower HTTP request path.
+    await markInstrumentFetchInFlight(instrumentId, 'queued');
+
     try {
       await this.historicalQueue.add(
         'historical-backfill',
@@ -233,6 +238,7 @@ export class InstrumentIngestionService {
       );
     } catch {
       await deleteJobRun(job.id);
+      await this.repairFetchStatus(instrumentId);
       throw new ServiceUnavailableException(
         'The background queue is unavailable',
       );
@@ -331,13 +337,7 @@ export class InstrumentIngestionService {
   /** Re-derives fetch status from the latest backfill run, so a stalled row leaves queued/fetching. */
   private async repairFetchStatus(instrumentId: string): Promise<string> {
     const latest = await getLatestBackfillJobForInstrument(instrumentId);
-    const fetchStatus = deriveFetchStatus({
-      hasRun: Boolean(latest),
-      queued: latest?.status === 'queued' ? 1 : 0,
-      running: latest?.status === 'running' ? 1 : 0,
-      lastStatus: latest?.status ?? null,
-      stale: false,
-    });
+    const fetchStatus = fetchStatusFromRun(latest);
     await correctStalledFetchStatus(instrumentId, fetchStatus);
     return fetchStatus;
   }

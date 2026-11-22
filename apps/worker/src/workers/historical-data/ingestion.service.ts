@@ -10,6 +10,7 @@ import { sha256Hex } from '@ai-trading/domain';
 import {
   buildSessionWindow,
   dedupeCandles,
+  fetchStatusFromRun,
   HISTORY_START,
   istToday,
   istTradingDate,
@@ -26,17 +27,20 @@ import {
   clearSystemIssue,
   clearSystemIssues,
   closeJobRun,
+  correctStalledFetchStatus,
   createRawProviderPayload,
   deleteAllCoverage,
   findProviderByCode,
   findProviderMapping,
   getInstrumentTickSize,
   getJobRun,
+  getLatestBackfillJobForInstrument,
   getLatestCompletedSession,
   getTradingCalendarRow,
   getTradingSessionsForRange,
   getSyncTargetInstruments,
   isMonthComplete,
+  markInstrumentFetchInFlight,
   markStaleJobsFailed,
   refreshDailyStats,
   updateJobRun,
@@ -150,6 +154,7 @@ export class IngestionService {
       status: 'running',
       startedAt: new Date(),
     });
+    await markInstrumentFetchInFlight(instrumentId, 'fetching');
     const client = this.client(jobRunId);
     const reason = client.configurationReason();
     if (reason) {
@@ -160,6 +165,8 @@ export class IngestionService {
         finishedAt: new Date(),
         result,
       });
+      // A skipped run is not fetch evidence: settle against the runs before it.
+      await this.settleFetchStatus(instrumentId, { excludeJobRunId: jobRunId });
       return result;
     }
 
@@ -184,6 +191,7 @@ export class IngestionService {
         error: { code: 'mapping_missing', message: 'No primary Upstox mapping', retryable: false },
         result,
       });
+      await this.settleFetchStatus(instrumentId);
       return result;
     }
 
@@ -322,9 +330,6 @@ export class IngestionService {
     });
     this.tracking.enterStage(jobRunId, 'finalize');
 
-    await this.quality.recomputeCoverage(instrumentId, from, to);
-    await this.quality.recomputeInstrumentStatus(instrumentId);
-
     const status = cancelled
       ? 'cancelled'
       : failedChunks === 0
@@ -340,6 +345,7 @@ export class IngestionService {
       failedChunks,
       chunks: chunks.length,
     };
+    // Close first: the projection reads the run's terminal status and its finish time.
     await closeJobRun({
       jobRunId,
       status,
@@ -354,6 +360,8 @@ export class IngestionService {
             }
           : null,
     });
+    await this.quality.recomputeCoverage(instrumentId, from, to);
+    await this.quality.recomputeInstrumentStatus(instrumentId);
     this.tracking.completeStage(jobRunId, 'finalize', cancelled ? 'skipped' : 'completed', {
       fetched,
       written,
@@ -362,6 +370,18 @@ export class IngestionService {
       failedChunks,
     });
     return result;
+  }
+
+  /**
+   * Re-derives fetch status from the latest backfill run and releases the in-flight marker left
+   * by a run that never reached the chunk loop. Only queued/fetching rows are rewritten.
+   */
+  private async settleFetchStatus(
+    instrumentId: string,
+    options: { excludeJobRunId?: string } = {},
+  ) {
+    const latest = await getLatestBackfillJobForInstrument(instrumentId, options);
+    await correctStalledFetchStatus(instrumentId, fetchStatusFromRun(latest));
   }
 
   private async runChunk(input: ChunkInput) {

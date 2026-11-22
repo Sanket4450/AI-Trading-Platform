@@ -3,6 +3,7 @@ import {
   computeCoverageVerdict,
   dedupeCandles,
   displayStatus,
+  fetchStatusFromRun,
   gapRuns,
   monthChunks,
   normalizeCandle,
@@ -166,6 +167,16 @@ describe('catalog and quality', () => {
         computedAt: null,
       }),
     ).toBe('Failed');
+  });
+
+  it('derives fetch status from the latest backfill run, never from a closed run still running', () => {
+    expect(fetchStatusFromRun(null)).toBe('not_requested');
+    expect(fetchStatusFromRun({ status: 'queued' })).toBe('queued');
+    expect(fetchStatusFromRun({ status: 'running' })).toBe('fetching');
+    expect(fetchStatusFromRun({ status: 'succeeded' })).toBe('fetched');
+    expect(fetchStatusFromRun({ status: 'partially_failed' })).toBe('partial');
+    expect(fetchStatusFromRun({ status: 'failed' })).toBe('failed');
+    expect(fetchStatusFromRun({ status: 'cancelled' })).toBe('cancelled');
   });
 
   it('builds a stable dedupe key', () => {
