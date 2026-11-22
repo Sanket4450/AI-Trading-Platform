@@ -36,7 +36,7 @@ provisional where marked; reconcile it with NSE circulars before relying on it f
 | 08:00    | Mon–Fri      | `instrument-sync`           | Refresh the BOD master, mappings and tick sizes.               |
 | 08:05    | Mon–Fri      | `calendar-sync`             | Reconcile the current year with Upstox holidays and timings.   |
 | 08:15    | Mon–Fri      | `historical-finalize`       | Replace the previous session's partial bar with final history. |
-| 08:30    | Mon–Fri      | `ingestion-reconcile`       | Mark stale running jobs failed and surface them.               |
+| 08:30    | Mon–Fri      | `ingestion-reconcile`       | Recover stale runs — heartbeat-expired and queue-abandoned — and refresh their status. |
 | 16:00    | Mon–Fri      | `intraday-sync`             | Capture the current session; the last bar stays non-final.     |
 | 16:15    | Mon–Fri      | `coverage-recompute`        | Recompute strict coverage and project instrument status.       |
 | 16:30    | Mon–Fri      | `quality-scan`              | Scan the last 10 trading days.                                 |

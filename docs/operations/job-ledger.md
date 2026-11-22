@@ -41,6 +41,11 @@ duplicated an event. `job_type` and the stage list come from the job catalog in
 | `cancelled` | domain: cooperative cancellation between units |
 | `partially_failed` | domain: some units failed without the handler throwing |
 
+A `queued` row can also be closed by `ingestion-reconcile` when BullMQ no longer holds a live job
+for it: the row is marked `failed` with `error.code = 'stale_job'`, or mirrors the queue's terminal
+state when the run actually finished and only the ledger fell behind. Rows still waiting or delayed
+in the queue are left alone.
+
 ## `job_run_events`
 
 Six columns only:

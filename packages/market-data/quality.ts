@@ -136,7 +136,8 @@ export const QUALITY_RULES: readonly QualityRule[] = [
     issueType: 'stale_job',
     dimension: 'timeliness',
     defaultSeverity: 'warning',
-    description: 'A running chunk exceeded the heartbeat window and was recovered.',
+    description:
+      'A running chunk exceeded the heartbeat window, or a queued run lost its queue entry, and was recovered.',
     blocksPreflightWhenCritical: false,
   },
   {

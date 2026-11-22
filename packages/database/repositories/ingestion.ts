@@ -83,6 +83,51 @@ export async function markStaleJobsFailed(minutes: number) {
   return stale;
 }
 
+/**
+ * Queued runs old enough that a live queue entry is unlikely. Age only bounds the candidate set;
+ * the caller decides from the queue's own state whether the run is really abandoned.
+ */
+export async function listQueuedJobsOlderThan(minutes: number) {
+  return db
+    .select()
+    .from(jobRuns)
+    .where(
+      and(
+        eq(jobRuns.status, 'queued'),
+        sql`${jobRuns.createdAt} < now() - (${minutes} || ' minutes')::interval`,
+      ),
+    );
+}
+
+/**
+ * Closes a `queued` run that the queue no longer holds. The row is updated only while it is still
+ * `queued`, so a run that starts between the read and the write keeps its live status.
+ */
+export async function resolveAbandonedQueuedJob(
+  jobRunId: string,
+  input: { status: 'succeeded' | 'failed'; queueState: string },
+) {
+  const patch: { status: 'succeeded' | 'failed'; finishedAt: Date; error?: unknown } = {
+    status: input.status,
+    finishedAt: new Date(),
+  };
+  if (input.status === 'failed') {
+    patch.error = {
+      code: 'stale_job',
+      message: 'Queued run was recovered: the queue held no live job for it',
+      retryable: true,
+      details: { queueState: input.queueState },
+    };
+  }
+
+  const rows = await db
+    .update(jobRuns)
+    .set(patch)
+    .where(and(eq(jobRuns.id, jobRunId), eq(jobRuns.status, 'queued')))
+    .returning();
+  return rows[0] ?? null;
+}
+
 export async function getLatestJobForInstrument(instrumentId: string) {
   const rows = await db
     .select()

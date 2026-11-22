@@ -51,7 +51,7 @@ A partially failed or failed run deletes nothing.
 | `coverage_shortfall` | validation | critical | A scheduled trading day has zero bars. |
 | `stale_coverage` | reconciliation | info | A coverage verdict is older than the latest candle for the same instrument-day. |
 | `stale_ingestion` | reconciliation | warning | No successful ingestion within the freshness window. |
-| `stale_job` | reconciliation | warning | A running chunk exceeded the heartbeat window and was recovered. |
+| `stale_job` | reconciliation | warning | A running chunk exceeded the heartbeat window, or a queued run lost its queue entry; the run was recovered. |
 | `corporate_action_mismatch` | reconciliation | critical | A discontinuity implies an unconfirmed corporate action. |
 | `duplicate_mapping` | reconciliation | warning | More than one primary mapping resolves to an instrument. |
 | `unsupported_instrument` | reconciliation | info | The instrument type or segment is outside the R2 whitelist. |

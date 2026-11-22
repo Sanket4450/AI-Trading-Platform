@@ -37,6 +37,7 @@ import {
   getTradingSessionsForRange,
   getSyncTargetInstruments,
   isMonthComplete,
+  markStaleJobsFailed,
   refreshDailyStats,
   updateJobRun,
   writeCandles,
@@ -46,6 +47,7 @@ import { ExternalApiRecorder } from '../../observability/external-api-recorder.j
 import { recordIssue } from './issue-recorder.js';
 import { QualityService } from './quality.service.js';
 import { RedisRateLimiter } from './rate-limit.service.js';
+import { StaleJobSweeper } from './stale-job.sweeper.js';
 
 interface ChunkInput {
   jobRunId: string;
@@ -69,6 +71,7 @@ export class IngestionService {
     private readonly quality: QualityService,
     private readonly tracking: JobTrackingService,
     private readonly recorder: ExternalApiRecorder,
+    private readonly staleJobs: StaleJobSweeper,
   ) {}
 
   private client(jobRunId: string | null): UpstoxClient {
@@ -1053,49 +1056,101 @@ export class IngestionService {
       status: 'running',
       startedAt: new Date(),
     });
-    const { markStaleJobsFailed } = await import('@ai-trading/database');
+
     await clearSystemIssues({ sources: ['reconciliation'], kinds: ['stale_job'] });
-    const stale = await markStaleJobsFailed(15);
-    this.tracking.completeStage(jobRunId, 'sweep', 'completed', {
-      completed: stale.length,
-      total: stale.length,
-    });
-    this.tracking.enterStage(jobRunId, 'issues');
-    for (const [index, job] of stale.entries()) {
-      await this.issue({
-        ruleId: 'DQ-023',
-        severity: 'warning',
-        providerId: null,
+
+    const heartbeatExpired = await markStaleJobsFailed(15);
+    const abandoned = await this.staleJobs.sweepQueued(15);
+    const recovered = [
+      ...heartbeatExpired.map((job) => ({
+        jobRunId: job.id,
+        jobName: job.jobName,
         instrumentId: job.instrumentId ?? null,
-        source: 'reconciliation',
-        scope: { jobRunId: job.id },
+        severity: 'warning' as const,
         payload: {
+          reason: 'running_job_heartbeat_expired',
           jobRunId: job.id,
           jobName: job.jobName,
           startedAt: job.startedAt?.toISOString() ?? null,
         },
+      })),
+      ...abandoned.map((job) => ({
+        jobRunId: job.id,
+        jobName: job.jobName,
+        instrumentId: job.instrumentId,
+        severity: job.status === 'succeeded' ? ('info' as const) : ('warning' as const),
+        payload: {
+          reason:
+            job.status === 'succeeded'
+              ? 'queued_job_ledger_reconciled'
+              : 'queued_job_never_started',
+          jobRunId: job.id,
+          jobName: job.jobName,
+          queueState: job.queueState,
+          createdAt: job.createdAt.toISOString(),
+        },
+      })),
+    ];
+
+    const refreshed = [
+      ...new Set(
+        recovered
+          .map((run) => run.instrumentId)
+          .filter((value): value is string => Boolean(value)),
+      ),
+    ];
+    for (const [index, instrumentId] of refreshed.entries()) {
+      await this.quality.recomputeInstrumentStatus(instrumentId);
+      this.tracking.progress(jobRunId, 'sweep', {
+        index: index + 1,
+        total: refreshed.length,
+        instrumentId,
+      });
+    }
+    this.tracking.completeStage(jobRunId, 'sweep', 'completed', {
+      completed: recovered.length,
+      total: recovered.length,
+      running: heartbeatExpired.length,
+      queued: abandoned.length,
+      refreshed: refreshed.length,
+    });
+
+    this.tracking.enterStage(jobRunId, 'issues');
+    for (const [index, run] of recovered.entries()) {
+      await this.issue({
+        ruleId: 'DQ-023',
+        severity: run.severity,
+        providerId: null,
+        instrumentId: run.instrumentId,
+        source: 'reconciliation',
+        scope: { jobRunId: run.jobRunId },
+        payload: run.payload,
       });
       this.tracking.progress(jobRunId, 'issues', {
         index: index + 1,
-        total: stale.length,
-        jobRunId: job.id,
-        jobName: job.jobName,
+        total: recovered.length,
+        jobRunId: run.jobRunId,
+        jobName: run.jobName,
       });
     }
     this.tracking.completeStage(jobRunId, 'issues', 'completed', {
-      completed: stale.length,
-      total: stale.length,
+      completed: recovered.length,
+      total: recovered.length,
     });
+
     this.tracking.enterStage(jobRunId, 'finalize');
-    const result = { recovered: stale.length };
+    const result = {
+      recovered: recovered.length,
+      running: heartbeatExpired.length,
+      queued: abandoned.length,
+      refreshed: refreshed.length,
+    };
     await updateJobRun(jobRunId, {
       status: 'succeeded',
       finishedAt: new Date(),
       result,
     });
-    this.tracking.completeStage(jobRunId, 'finalize', 'completed', {
-      recovered: stale.length,
-    });
+    this.tracking.completeStage(jobRunId, 'finalize', 'completed', result);
     return result;
   }
 }

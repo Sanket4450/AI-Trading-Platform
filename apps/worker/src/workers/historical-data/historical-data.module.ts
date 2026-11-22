@@ -8,10 +8,14 @@ import { IngestionService } from './ingestion.service.js';
 import { QualityService } from './quality.service.js';
 import { RedisRateLimiter } from './rate-limit.service.js';
 import { ReferenceSyncService } from './reference-sync.service.js';
+import { StaleJobSweeper } from './stale-job.sweeper.js';
 
 @Module({
   imports: [
-    BullModule.registerQueue({ name: QUEUES.historicalData }),
+    BullModule.registerQueue(
+      { name: QUEUES.historicalData },
+      { name: QUEUES.maintenance },
+    ),
     JobObservabilityModule,
   ],
   providers: [
@@ -21,6 +25,7 @@ import { ReferenceSyncService } from './reference-sync.service.js';
     IngestionService,
     HistoricalDataService,
     HistoricalDataProcessor,
+    StaleJobSweeper,
   ],
   exports: [QualityService, RedisRateLimiter],
 })
