@@ -56,6 +56,9 @@ yarn-error.log*
 # Deployment
 .vercel/
 
+# Local API collections (Postman, Bruno, etc.)
+collections/
+
 # OS and editor files
 .DS_Store
 .vscode/
