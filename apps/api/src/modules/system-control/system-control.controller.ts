@@ -1,6 +1,14 @@
-import { Controller, Get, Post, Query, Req } from '@nestjs/common';
+import {
+  Controller,
+  ForbiddenException,
+  Get,
+  Post,
+  Query,
+  Req,
+} from '@nestjs/common';
 import {
   ApiCreatedResponse,
+  ApiForbiddenResponse,
   ApiOkResponse,
   ApiOperation,
   ApiTags,
@@ -10,6 +18,7 @@ import {
   CurrentUser,
   type AuthenticatedUser,
 } from '../../common/auth/current-user.decorator.js';
+import { ErrorResponseDto } from '../../common/dto/error-response.dto.js';
 import { requestMeta } from '../../common/http/request-meta.js';
 import { ApiSessionAuth } from '../../common/swagger/api-session-auth.decorator.js';
 import { JobRunDto } from '../../common/dto/job-run.dto.js';
@@ -36,6 +45,12 @@ function limit(value: number | undefined, fallback = 100): number {
   return Number.isFinite(value) && value! > 0
     ? Math.min(value!, 500)
     : fallback;
+}
+
+function assertAdmin(user: AuthenticatedUser): void {
+  if (user.role !== 'admin') {
+    throw new ForbiddenException('This operation requires the admin user role');
+  }
 }
 
 @ApiTags('system')
@@ -77,6 +92,25 @@ export class SystemControlController {
     @Req() request: Request,
   ) {
     return this.system.rebuildCoverage(user.id, requestMeta(request));
+  }
+
+  @Post('ingestion/reconcile')
+  @ApiOperation({
+    summary: 'Queue an ingestion reconciliation sweep (admin only)',
+    description:
+      'Recovers runs whose heartbeat expired or whose queue entry is gone, records each recovery as a stale-job issue and re-derives the affected instrument status. The same sweep runs on the 08:30 IST schedule.',
+  })
+  @ApiCreatedResponse({ type: JobRunDto })
+  @ApiForbiddenResponse({
+    type: ErrorResponseDto,
+    description: 'Requires the admin user role',
+  })
+  reconcileIngestion(
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() request: Request,
+  ) {
+    assertAdmin(user);
+    return this.system.reconcileIngestion(user.id, requestMeta(request));
   }
 
   @Get('health-snapshots')

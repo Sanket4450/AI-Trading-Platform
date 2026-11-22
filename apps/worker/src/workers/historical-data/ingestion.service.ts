@@ -1078,7 +1078,8 @@ export class IngestionService {
         jobRunId: job.id,
         jobName: job.jobName,
         instrumentId: job.instrumentId,
-        severity: job.status === 'succeeded' ? ('info' as const) : ('warning' as const),
+        severity:
+          job.status === 'succeeded' ? ('info' as const) : ('warning' as const),
         payload: {
           reason:
             job.status === 'succeeded'

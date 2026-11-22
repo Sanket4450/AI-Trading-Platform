@@ -6,7 +6,13 @@ describe('abandonedQueuedJobStatus', () => {
   });
 
   it('leaves runs the queue still owns', () => {
-    for (const state of ['waiting', 'delayed', 'prioritized', 'waiting-children', 'active']) {
+    for (const state of [
+      'waiting',
+      'delayed',
+      'prioritized',
+      'waiting-children',
+      'active',
+    ]) {
       expect(abandonedQueuedJobStatus(state)).toBeNull();
     }
   });

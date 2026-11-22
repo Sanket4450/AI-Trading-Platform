@@ -73,6 +73,16 @@ curl -X POST http://localhost:8000/api/v1/system/coverage/rebuild -b cookies.txt
 The endpoint returns the queued job run; watch it on `/jobs`. It deletes no candles and edits no
 system issues.
 
+The 08:30 reconciliation sweep can be run on demand (admin only) when a job looks stuck:
+
+```bash
+curl -X POST http://localhost:8000/api/v1/system/ingestion/reconcile -b cookies.txt
+```
+
+It recovers runs whose heartbeat expired and runs whose queue entry is gone, records each recovery
+as a `stale_job` issue and refreshes the affected instrument status. A run still waiting in the
+queue is left alone, so a long backlog is never marked failed.
+
 ## Token procedure
 
 1. Generate the access token in the Upstox developer portal.

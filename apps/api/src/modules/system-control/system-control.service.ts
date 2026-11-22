@@ -168,6 +168,46 @@ export class SystemControlService implements OnModuleInit, OnModuleDestroy {
     return jobRun;
   }
 
+  async reconcileIngestion(actorUserId: string, meta: RequestMeta) {
+    const jobRun = await createJobRun({
+      jobName: 'ingestion-reconcile',
+      status: 'queued',
+      payload: { source: 'operator' },
+      maxAttempts: 2,
+    });
+    try {
+      await this.historicalQueue.add(
+        'ingestion-reconcile',
+        { jobRunId: jobRun.id },
+        {
+          jobId: jobRun.id,
+          priority: 5,
+          attempts: 2,
+          removeOnComplete: 200,
+          removeOnFail: 500,
+        },
+      );
+    } catch {
+      await deleteJobRun(jobRun.id);
+      throw new ServiceUnavailableException(
+        'The background queue is unavailable',
+      );
+    }
+    await recordAudit({
+      actorUserId,
+      accountId: null,
+      action: 'data.ingestion_reconcile_queued',
+      entityType: 'job_run',
+      entityId: jobRun.id,
+      beforeState: null,
+      afterState: { jobName: 'ingestion-reconcile' },
+      requestId: meta.requestId,
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+    });
+    return jobRun;
+  }
+
   healthSnapshots(limit = 100, component?: string) {
     return listHealthSnapshots({ limit, component });
   }
