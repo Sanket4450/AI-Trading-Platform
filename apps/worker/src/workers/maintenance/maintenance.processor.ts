@@ -2,11 +2,15 @@ import { Processor, WorkerHost } from '@nestjs/bullmq';
 import type { Job } from 'bullmq';
 import { QUEUES } from '@ai-trading/domain';
 import {
+  deleteExternalApiCallsBefore,
   ensureMarketPartitions,
   refreshDailyStats,
   updateJobRun,
 } from '@ai-trading/database';
 import { JobTrackingService } from '../../observability/job-tracking.service.js';
+
+/** The API call ledger is a debugging surface, not an archive. */
+const API_CALL_RETENTION_DAYS = 90;
 
 @Processor(QUEUES.maintenance)
 export class MaintenanceProcessor extends WorkerHost {
@@ -33,7 +37,10 @@ export class MaintenanceProcessor extends WorkerHost {
         result = { refreshed: true };
       } else if (job.name === 'ensure-partitions') {
         await ensureMarketPartitions(6);
-        result = { partitionsEnsured: true };
+        const apiCallsPurged = await deleteExternalApiCallsBefore(
+          new Date(Date.now() - API_CALL_RETENTION_DAYS * 86_400_000),
+        );
+        result = { partitionsEnsured: true, apiCallsPurged };
       } else {
         throw new Error(`Unknown maintenance job: ${job.name}`);
       }

@@ -24,6 +24,7 @@ import {
   type InstrumentMasterRow,
 } from '@ai-trading/database';
 import { JobTrackingService } from '../../observability/job-tracking.service.js';
+import { ExternalApiRecorder } from '../../observability/external-api-recorder.js';
 import { recordIssue } from './issue-recorder.js';
 
 @Injectable()
@@ -33,9 +34,10 @@ export class ReferenceSyncService {
   constructor(
     private readonly config: ConfigService,
     private readonly tracking: JobTrackingService,
+    private readonly recorder: ExternalApiRecorder,
   ) {}
 
-  private client(): UpstoxClient {
+  private client(jobRunId: string): UpstoxClient {
     return new UpstoxClient({
       baseUrl: this.config.get<string>('UPSTOX_BASE_URL'),
       instrumentsUrl: this.config.get<string>('UPSTOX_INSTRUMENTS_URL'),
@@ -45,6 +47,8 @@ export class ReferenceSyncService {
       networkEnabled:
         this.config.get<boolean | string>('UPSTOX_NETWORK_ENABLED', true) ===
           true || this.config.get<string>('UPSTOX_NETWORK_ENABLED') === 'true',
+      sink: this.recorder,
+      context: { jobRunId },
     });
   }
 
@@ -53,7 +57,7 @@ export class ReferenceSyncService {
       status: 'running',
       startedAt: new Date(),
     });
-    const client = this.client();
+    const client = this.client(jobRunId);
     const reason = client.configurationReason();
     if (reason) {
       const result = { skipped: true, reason };
@@ -240,7 +244,7 @@ export class ReferenceSyncService {
       mismatches: 0,
     };
 
-    const client = this.client();
+    const client = this.client(jobRunId);
     if (!client.configurationReason()) {
       try {
         const holidays = await client.fetchMarketHolidays();

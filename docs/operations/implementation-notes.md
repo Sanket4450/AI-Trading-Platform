@@ -67,7 +67,7 @@ seed, repositories, configuration management, API, dashboard, worker jobs and au
 
 ### Database
 
-- **55 logical tables + 1 materialized view.** The explicit M:N tables are
+- **56 logical tables + 1 materialized view.** The explicit M:N tables are
   `user_account_access`, `account_instrument_permissions`, `strategy_config_bindings` and
   `strategy_activations`.
 - **Drizzle schema mirrors the database.** `packages/database/schema/*.ts` defines the tables, checks and simple
@@ -226,7 +226,12 @@ R1 lifecycle tables.
   `docs/operations/schema-column-audit.md`: duplicate timestamps, cash/INR/IST constants,
   same-row calculations and unused reserved-feature fields. The `positions` open-position guard
   moves from the derived `status` to `closed_at IS NULL`. No logical table is dropped.
-- `pnpm db:verify` asserts 55 tables, the R2 tables and indexes, 51 sync targets, 51 status rows,
+- `0018_external_api_calls.sql` adds `external_api_calls`, the append-only ledger of every outbound
+  network request: one row per attempt with service, operation, instrument, latency, status,
+  classified outcome, the three-bucket `request_scope` and a capped error body. Successful
+  response bodies are never stored — the payload tables already own them. The maintenance job
+  deletes rows older than 90 days, so the ledger stays a debugging surface rather than an archive.
+- `pnpm db:verify` asserts 56 tables, the R2 tables and indexes, 51 sync targets, 51 status rows,
   51 primary mappings, valid tick sizes, calendar coverage and zero orders.
 
 ### Provider and pipeline

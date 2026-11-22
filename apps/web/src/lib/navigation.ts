@@ -25,6 +25,7 @@ const ORIGIN_PATHS = new Set([
   '/issues',
   '/strategies',
   '/jobs',
+  '/api-calls',
   '/audit',
   '/settings',
 ]);

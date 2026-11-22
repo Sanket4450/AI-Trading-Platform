@@ -347,6 +347,50 @@ export interface JobDetail {
   progress: JobProgress | null;
 }
 
+/** Recorded shape of a call's parameters; all three buckets are always present. */
+export interface ApiCallScope {
+  path: Record<string, string>;
+  query: Record<string, string>;
+  body: Record<string, unknown>;
+}
+
+export interface ExternalApiCall {
+  id: number;
+  jobRunId: string | null;
+  jobName: string | null;
+  instrumentId: string | null;
+  instrumentSymbol: string | null;
+  startedAt: string;
+  latencyMs: number;
+  service: string;
+  operation: string;
+  method: string;
+  endpoint: string;
+  url: string;
+  requestScope: ApiCallScope;
+  statusCode: number | null;
+  outcome: string;
+  errorBody: string | null;
+}
+
+export interface ApiCallOutcomeCount {
+  outcome: string;
+  count: number;
+}
+
+export interface ApiCallSummary {
+  total: number;
+  p95LatencyMs: number;
+  maxLatencyMs: number;
+  outcomes: ApiCallOutcomeCount[];
+}
+
+export interface ExternalApiCallPage {
+  items: ExternalApiCall[];
+  page: PaginationMeta;
+  summary: ApiCallSummary;
+}
+
 export interface HealthCheck {
   status: 'healthy' | 'unhealthy';
   latencyMs: number | null;

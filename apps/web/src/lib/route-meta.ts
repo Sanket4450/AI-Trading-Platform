@@ -32,6 +32,11 @@ const routes: Record<string, RouteMeta> = {
     title: 'Jobs',
     description: 'Scheduled and manual jobs with progress, timing and outcomes.',
   },
+  '/api-calls': {
+    title: 'API calls',
+    description:
+      'Every outbound provider request with its outcome, latency and exact failure detail.',
+  },
   '/audit': {
     title: 'Audit',
     description: 'A permanent history of sign-ins, configuration changes and system actions.',

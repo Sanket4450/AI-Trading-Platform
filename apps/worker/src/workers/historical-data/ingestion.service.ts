@@ -42,11 +42,13 @@ import {
   writeCandles,
 } from '@ai-trading/database';
 import { JobTrackingService } from '../../observability/job-tracking.service.js';
+import { ExternalApiRecorder } from '../../observability/external-api-recorder.js';
 import { recordIssue } from './issue-recorder.js';
 import { QualityService } from './quality.service.js';
 import { RedisRateLimiter } from './rate-limit.service.js';
 
 interface ChunkInput {
+  jobRunId: string;
   providerId: string;
   instrumentId: string;
   externalKey: string;
@@ -66,9 +68,10 @@ export class IngestionService {
     private readonly limiter: RedisRateLimiter,
     private readonly quality: QualityService,
     private readonly tracking: JobTrackingService,
+    private readonly recorder: ExternalApiRecorder,
   ) {}
 
-  private client(): UpstoxClient {
+  private client(jobRunId: string | null): UpstoxClient {
     return new UpstoxClient({
       baseUrl: this.config.get<string>('UPSTOX_BASE_URL'),
       apiKey: this.config.get<string>('UPSTOX_API_KEY'),
@@ -77,6 +80,8 @@ export class IngestionService {
       networkEnabled:
         this.config.get<boolean | string>('UPSTOX_NETWORK_ENABLED', true) ===
           true || this.config.get<string>('UPSTOX_NETWORK_ENABLED') === 'true',
+      sink: this.recorder,
+      context: { jobRunId },
     });
   }
 
@@ -142,7 +147,7 @@ export class IngestionService {
       status: 'running',
       startedAt: new Date(),
     });
-    const client = this.client();
+    const client = this.client(jobRunId);
     const reason = client.configurationReason();
     if (reason) {
       const result = { skipped: true, reason };
@@ -234,6 +239,7 @@ export class IngestionService {
 
       try {
         const result = await this.runChunk({
+          jobRunId,
           providerId: provider.id,
           instrumentId,
           externalKey: mapping.externalKey,
@@ -358,7 +364,7 @@ export class IngestionService {
   private async runChunk(input: ChunkInput) {
     const started = Date.now();
     await this.limiter.acquire();
-    const client = this.client();
+    const client = this.client(input.jobRunId);
     const response = await this.withRetry(() =>
       client.fetchHistoricalCandles({
         instrumentKey: input.externalKey,
@@ -366,6 +372,7 @@ export class IngestionService {
         to: input.to,
         unit: 'minutes',
         interval: 1,
+        instrumentId: input.instrumentId,
       }),
     );
 
@@ -625,7 +632,7 @@ export class IngestionService {
       status: 'running',
       startedAt: new Date(),
     });
-    const client = this.client();
+    const client = this.client(jobRunId);
     const reason = client.configurationReason();
     if (reason) {
       const result = { skipped: true, reason };
@@ -682,7 +689,10 @@ export class IngestionService {
       try {
         await this.limiter.acquire();
         const response = await this.withRetry(() =>
-          client.fetchIntradayCandles({ instrumentKey: mapping.externalKey }),
+          client.fetchIntradayCandles({
+            instrumentKey: mapping.externalKey,
+            instrumentId: target.instrumentId,
+          }),
         );
         const serialized = JSON.stringify(response);
         const raw = await createRawProviderPayload({
@@ -767,7 +777,7 @@ export class IngestionService {
       status: 'running',
       startedAt: new Date(),
     });
-    const client = this.client();
+    const client = this.client(jobRunId);
     const reason = client.configurationReason();
     if (reason) {
       const result = { skipped: true, reason };
@@ -812,6 +822,7 @@ export class IngestionService {
       for (const date of dates) {
         try {
           const result = await this.runChunk({
+            jobRunId,
             providerId: provider.id,
             instrumentId: target.instrumentId,
             externalKey: mapping.externalKey,

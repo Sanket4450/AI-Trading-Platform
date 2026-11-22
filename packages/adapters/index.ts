@@ -20,6 +20,11 @@ export {
   type UpstoxMarketTiming,
 } from './upstox/client.js';
 export { UpstoxContractError, candleTuples, parseCandleEnvelope } from './upstox/candles.js';
+export {
+  type ExternalApiCallContext,
+  type ExternalApiCallEvent,
+  type ExternalApiCallSink,
+} from './external-api.js';
 export { mapUpstoxOrderStatus, type InternalOrderStatus } from './upstox/order-status.js';
 export { parseUpstoxTimestamp } from './upstox/timestamp.js';
 export {

@@ -31,6 +31,8 @@ import {
   JobListResponseDto,
   JobSummaryDto,
 } from './dto/job-response.dto.js';
+import { ExternalApiCallListResponseDto } from '../../common/dto/external-api-call.dto.js';
+import { JobApiCallQueryDto } from './dto/job-api-call-query.dto.js';
 import { JobQueryDto } from './dto/job-query.dto.js';
 import { JobsService } from './jobs.service.js';
 
@@ -77,6 +79,18 @@ export class JobsController {
     @Query() query: CursorQueryDto,
   ) {
     return this.jobs.listEvents(id, query);
+  }
+
+  @Get(':id/api-calls')
+  @ApiOperation({ summary: 'List the outbound API calls of one job run, newest first' })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiOkResponse({ type: ExternalApiCallListResponseDto })
+  @ApiNotFoundResponse({ type: ErrorResponseDto, description: 'Job not found' })
+  apiCalls(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: JobApiCallQueryDto,
+  ) {
+    return this.jobs.listApiCalls(id, query);
   }
 
   @Get(':id')

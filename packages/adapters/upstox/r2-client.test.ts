@@ -7,6 +7,7 @@ import {
   UpstoxClient,
   classifyUpstoxError,
   parseCandleEnvelope,
+  type ExternalApiCallEvent,
 } from '../index.js';
 import {
   error401Fixture,
@@ -178,6 +179,117 @@ describe('Upstox read-only client', () => {
   it('sorts unsorted candles only after parsing', () => {
     const envelope = parseCandleEnvelope(historicalUnsortedFixture);
     expect(envelope.data.candles[0]?.[0]).toContain('09:17');
+  });
+});
+
+describe('external API call ledger', () => {
+  function traced(sink: (call: ExternalApiCallEvent) => void, jobRunId = 'job-1'): UpstoxClient {
+    return new UpstoxClient({
+      baseUrl,
+      apiKey: 'key',
+      accessToken: 'token',
+      timeoutMs: 1000,
+      sink: { record: sink },
+      context: { jobRunId },
+    });
+  }
+
+  it('records one success row with the request scope and no error body', async () => {
+    handler = (_request, response) => json(response, 200, historicalNormalFixture);
+    const calls: ExternalApiCallEvent[] = [];
+    await traced((call) => calls.push(call)).fetchHistoricalCandles({
+      instrumentKey: 'NSE_EQ|INE002A01018',
+      from: '2026-09-01',
+      to: '2026-09-30',
+      instrumentId: 'instrument-1',
+    });
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({
+      jobRunId: 'job-1',
+      service: 'upstox',
+      operation: 'historical-candle',
+      instrumentId: 'instrument-1',
+      statusCode: 200,
+      outcome: 'success',
+      errorBody: null,
+    });
+    expect(calls[0]?.requestScope).toEqual({
+      path: {
+        instrumentKey: 'NSE_EQ|INE002A01018',
+        unit: 'minutes',
+        interval: '1',
+        to: '2026-09-30',
+        from: '2026-09-01',
+      },
+      query: {},
+      body: {},
+    });
+    expect(calls[0]?.latencyMs).toBeGreaterThanOrEqual(0);
+  });
+
+  it('records the provider error body and the retryable outcome', async () => {
+    handler = (_request, response) => json(response, 429, error429Fixture, { 'retry-after': '17' });
+    const calls: ExternalApiCallEvent[] = [];
+    const error = await traced((call) => calls.push(call))
+      .fetchHistoricalCandles({
+        instrumentKey: 'NSE_EQ|INE002A01018',
+        from: '2026-09-01',
+        to: '2026-09-30',
+      })
+      .then(
+        () => null,
+        (caught: unknown) => caught,
+      );
+
+    expect(error).toBeInstanceOf(UpstoxApiError);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.outcome).toBe('throttled');
+    expect(calls[0]?.statusCode).toBe(429);
+    expect(calls[0]?.errorBody).toContain('error');
+  });
+
+  it('records a 200 response that fails the contract as a contract error', async () => {
+    handler = (_request, response) => json(response, 200, { status: 'error', data: null });
+    const calls: ExternalApiCallEvent[] = [];
+    await traced((call) => calls.push(call))
+      .fetchHistoricalCandles({
+        instrumentKey: 'NSE_EQ|INE002A01018',
+        from: '2026-09-01',
+        to: '2026-09-30',
+      })
+      .catch(() => null);
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.outcome).toBe('contract_error');
+    expect(calls[0]?.statusCode).toBe(200);
+    expect(calls[0]?.errorBody).toContain('documented contract');
+  });
+
+  it('records the assets CDN as its own service', async () => {
+    handler = (_request, response) => {
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(gzipSync(JSON.stringify(instrumentMasterFixture)));
+    };
+    const calls: ExternalApiCallEvent[] = [];
+    await new UpstoxClient({
+      baseUrl,
+      instrumentsUrl: `${baseUrl}/instruments/NSE.json.gz`,
+      apiKey: 'key',
+      accessToken: 'token',
+      timeoutMs: 1000,
+      sink: { record: (call) => calls.push(call) },
+      context: { jobRunId: 'job-2' },
+    }).fetchInstrumentMaster();
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({
+      jobRunId: 'job-2',
+      service: 'upstox-assets',
+      operation: 'instrument-master',
+      outcome: 'success',
+    });
+    expect(calls[0]?.requestScope).toEqual({ path: {}, query: {}, body: {} });
   });
 });
 

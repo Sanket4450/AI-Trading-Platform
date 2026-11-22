@@ -1,5 +1,6 @@
 import { apiFetch } from '@/lib/api';
-import type { JobDetail } from '@/lib/types';
+import { PAGINATION_DEFAULT_LIMIT } from '@ai-trading/domain';
+import type { ExternalApiCallPage, JobDetail } from '@/lib/types';
 import { label } from '@/lib/labels';
 import { backLinkFor, type DetailSearchParams } from '@/lib/navigation';
 import { PageMeta } from '@/components/shell/page-meta';
@@ -18,7 +19,10 @@ export default async function JobDetailPage({
   const { id } = await params;
   const { from: fromParam } = await searchParams;
   const back = backLinkFor(fromParam, '/jobs');
-  const detail = await apiFetch<JobDetail>(`/jobs/${id}`);
+  const [detail, apiCalls] = await Promise.all([
+    apiFetch<JobDetail>(`/jobs/${id}`),
+    apiFetch<ExternalApiCallPage>(`/jobs/${id}/api-calls?limit=${PAGINATION_DEFAULT_LIMIT}`),
+  ]);
   const run = detail.run;
 
   return (
@@ -39,7 +43,7 @@ export default async function JobDetailPage({
         title="Live run"
         description="The page updates from the event stream while the job is active."
       >
-        <JobLiveDetail initial={detail} />
+        <JobLiveDetail initial={detail} apiCalls={apiCalls} />
       </SectionCard>
     </div>
   );

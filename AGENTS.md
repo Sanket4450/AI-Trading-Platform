@@ -125,7 +125,7 @@ pnpm dev                      # builds all packages, then web:3000, api:8000, wo
   Drizzle schema files cover tables, checks and simple indexes.
 - `pnpm db:seed` builds `@ai-trading/domain` first. Running `tsx seed.ts` directly can fail on stale
   package output.
-- `pnpm db:verify` expects 55 logical tables, 1 materialized view, >=63 candle partitions, >=15
+- `pnpm db:verify` expects 56 logical tables, 1 materialized view, >=63 candle partitions, >=15
   quote partitions, 0 live orders, and a parameters binding for every strategy version.
 
 ## Framework quirks

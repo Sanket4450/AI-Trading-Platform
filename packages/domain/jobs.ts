@@ -1,4 +1,5 @@
 import { QUEUES } from './queues.js';
+import type { ExternalApiOutcome, ExternalApiScope } from './external-apis.js';
 
 /** Database status vocabulary. `retrying` is gone: a retried BullMQ job returns to `queued`. */
 export const JOB_STATUSES = [
@@ -173,6 +174,21 @@ export interface JobEventBroadcast {
   data: Record<string, unknown>;
 }
 
+export interface ApiCallBroadcast {
+  id: number;
+  jobRunId: string | null;
+  startedAt: string;
+  latencyMs: number;
+  service: string;
+  operation: string;
+  instrumentId: string | null;
+  requestScope: ExternalApiScope;
+  statusCode: number | null;
+  outcome: ExternalApiOutcome;
+  errorBody: string | null;
+}
+
 export type JobBroadcast =
   | { type: 'run'; run: JobRunBroadcast }
-  | { type: 'event'; event: JobEventBroadcast };
+  | { type: 'event'; event: JobEventBroadcast }
+  | { type: 'calls'; calls: ApiCallBroadcast[] };

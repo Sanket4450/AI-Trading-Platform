@@ -108,6 +108,7 @@ export function JobsLive({
         setItems((current) => mergeRun(current, message.run));
         return;
       }
+      if (message.type !== 'event') return;
       setItems((current) =>
         current.map((item) =>
           item.id === message.event.jobRunId

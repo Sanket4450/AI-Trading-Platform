@@ -149,6 +149,37 @@ export const jobRunEvents = pgTable(
   ],
 );
 
+export const externalApiCalls = pgTable(
+  'external_api_calls',
+  {
+    id: bigint('id', { mode: 'number' }).primaryKey().generatedByDefaultAsIdentity(),
+    jobRunId: uuid('job_run_id'),
+    instrumentId: uuid('instrument_id'),
+    startedAt: timestamp('started_at', { withTimezone: true }).defaultNow().notNull(),
+    latencyMs: integer('latency_ms').notNull(),
+    service: varchar('service', { length: 32 }).notNull(),
+    operation: varchar('operation', { length: 64 }).notNull(),
+    requestScope: jsonb('request_scope')
+      .default(sql`'{"path":{},"query":{},"body":{}}'::jsonb`)
+      .notNull(),
+    statusCode: smallint('status_code'),
+    outcome: varchar('outcome', { length: 32 }).notNull(),
+    errorBody: text('error_body'),
+  },
+  (table) => [
+    index('idx_external_api_calls_started').on(table.startedAt),
+    check('chk_external_api_calls_latency', sql`${table.latencyMs} >= 0`),
+    check(
+      'chk_external_api_calls_status',
+      sql`${table.statusCode} is null or ${table.statusCode} between 100 and 599`,
+    ),
+    check(
+      'chk_external_api_calls_outcome',
+      sql`${table.outcome} in ('success','contract_error','auth_error','client_error','throttled','server_error','timeout','network_error','unknown')`,
+    ),
+  ],
+);
+
 export const systemHealthSnapshots = pgTable(
   'system_health_snapshots',
   {

@@ -42,6 +42,7 @@ export function InstrumentJobProgress({
         );
         return;
       }
+      if (message.type !== 'event') return;
       if (message.event.jobRunId !== initial.id) return;
       setJob((current) =>
         current

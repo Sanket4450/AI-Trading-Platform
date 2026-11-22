@@ -5,6 +5,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { validateEnv } from '@ai-trading/configuration';
 import { SessionAuthGuard } from './common/auth/session-auth.guard.js';
 import { AccountsModule } from './modules/accounts/accounts.module.js';
+import { ApiCallsModule } from './modules/api-calls/api-calls.module.js';
 import { AuditModule } from './modules/audit/audit.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { ConfigurationModule } from './modules/configuration/configuration.module.js';
@@ -42,6 +43,7 @@ import { SystemControlModule } from './modules/system-control/system-control.mod
     AccountsModule,
     InstrumentsModule,
     IssuesModule,
+    ApiCallsModule,
     StrategiesModule,
     ConfigurationModule,
     JobsModule,

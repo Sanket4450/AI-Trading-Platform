@@ -42,10 +42,26 @@ provisional where marked; reconcile it with NSE circulars before relying on it f
 | 16:30    | Mon–Fri      | `quality-scan`              | Scan the last 10 trading days.                                 |
 | 18:00    | Mon–Fri      | `refresh-materialized-view` | Rebuild the daily projection once.                             |
 | 09:00    | Saturday     | `quality-scan` (full)       | Full integrity scan.                                           |
-| 08:00    | 1st of month | `ensure-partitions`         | Create future candle and quote partitions.                     |
+| 08:00    | 1st of month | `ensure-partitions`         | Create future candle and quote partitions; purge call ledger.   |
 
 Every market-data schedule checks the reviewed calendar first. `WORKER_SCHEDULES_ENABLED=false`
 disables all schedules for maintenance.
+
+### Reading the provider call ledger
+
+Each job page lists every outbound request the run made under **External API calls**: operation,
+outcome, status, latency and start time. The eye action opens the exact call with the rebuilt
+request URL, path/query/body values and, for failures only, the provider error payload.
+
+**API calls** in the sidebar is the same table across every run, with service/outcome filters,
+free-text search on operation, service, instrument symbol and job name, and keyset pagination.
+
+- Outcomes are the retry vocabulary: `throttled`, `timeout`, `network_error` and `server_error` are
+  retryable; `auth_error`, `client_error` and `contract_error` need a fix, not a retry.
+- Successful response bodies are never stored. If a call succeeded and the data is wrong, look at
+  the instrument coverage or the raw payload table instead.
+- `ensure-partitions` deletes calls older than 90 days on the 1st of each month, so the oldest
+  rows can be up to ~120 days old.
 
 `instrument_day_coverage` is a rebuildable cache. To clear it and recompute every sync target from
 2022-01-01 to the latest completed session, queue `coverage-rebuild`:
@@ -113,7 +129,7 @@ pnpm build
 pnpm db:verify
 ```
 
-`pnpm db:verify` expects 55 logical tables, the R2 tables and indexes, 51 sync targets with status
+`pnpm db:verify` expects 56 logical tables, the R2 tables and indexes, 51 sync targets with status
 rows and primary mappings, a 2022–2027 calendar, valid tick sizes and zero orders.
 
 Strict coverage is the only completeness verdict. `instrument_day_coverage` stores one row per

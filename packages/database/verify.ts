@@ -123,7 +123,7 @@ try {
   `;
 
   const checks = [
-    { name: '55 logical tables', ok: schema.logical_tables === 55, value: schema.logical_tables },
+    { name: '56 logical tables', ok: schema.logical_tables === 56, value: schema.logical_tables },
     { name: 'materialized view present', ok: schema.matviews >= 1, value: schema.matviews },
     {
       name: 'candle partitions >= 63',

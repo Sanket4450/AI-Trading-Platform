@@ -1,15 +1,24 @@
 import { InjectQueue } from '@nestjs/bullmq';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import type { Queue } from 'bullmq';
-import { isQuantifiedStage, jobTypeOf, QUEUES, queueNameOf, stagesForJob } from '@ai-trading/domain';
+import {
+  isQuantifiedStage,
+  jobTypeOf,
+  QUEUES,
+  queueNameOf,
+  stagesForJob,
+} from '@ai-trading/domain';
 import {
   getAllJobRunEvents,
   getJobRun,
   getJobRunEventsPage,
   getJobRunSummary,
   getLatestJobRunEvent,
+  listJobApiCalls,
   listTrackedJobRuns,
   recordAudit,
+  summarizeExternalApiCalls,
   updateJobRun,
 } from '@ai-trading/database';
 import {
@@ -26,6 +35,8 @@ import { backwardPage, forwardPage, olderPage } from '../../common/pagination/pa
 import type { RequestMeta } from '../../common/http/request-meta.js';
 import type { CursorQueryDto } from '../../common/pagination/pagination.dto.js';
 import type { JobQueryDto } from './dto/job-query.dto.js';
+import type { JobApiCallQueryDto } from './dto/job-api-call-query.dto.js';
+import { createApiCallMapper } from '../api-calls/api-call.mapper.js';
 import { JobEventsPublisher } from './jobs-events.publisher.js';
 
 type RunRow = NonNullable<Awaited<ReturnType<typeof getJobRun>>>;
@@ -194,11 +205,16 @@ function deriveStages(run: RunRow, events: EventRow[]) {
 
 @Injectable()
 export class JobsService {
+  private readonly mapApiCall: ReturnType<typeof createApiCallMapper>;
+
   constructor(
     @InjectQueue(QUEUES.historicalData) private readonly historicalQueue: Queue,
     @InjectQueue(QUEUES.maintenance) private readonly maintenanceQueue: Queue,
     private readonly events: JobEventsPublisher,
-  ) {}
+    config: ConfigService,
+  ) {
+    this.mapApiCall = createApiCallMapper(config);
+  }
 
   async list(query: JobQueryDto) {
     const fingerprint = filterFingerprint({
@@ -278,10 +294,57 @@ export class JobsService {
     });
   }
 
-  async detail(id: string) {
+  /**
+   * One run's outbound calls, newest first. Method and URL are projected from the catalogue so
+   * the browser never needs the endpoint templates.
+   */
+  async listApiCalls(id: string, query: JobApiCallQueryDto) {
+    if (query.after) throw new BadRequestException('Use before for API call history');
     const run = await getJobRun(id);
     if (!run) throw new NotFoundException('Job not found');
 
+    const fingerprint = filterFingerprint({
+      scope: 'job-api-calls',
+      jobRunId: id,
+      outcome: query.outcome ?? null,
+      service: query.service ?? null,
+    });
+    const cursor = readCursor(query.before, fingerprint);
+    const beforeId = cursor ? Number(cursor.key) : undefined;
+    if (beforeId !== undefined && !Number.isInteger(beforeId)) {
+      throw new BadRequestException('Pagination cursor has an invalid call id');
+    }
+    const limit = query.limit ?? PAGINATION_DEFAULT_LIMIT;
+
+    const [result, summary] = await Promise.all([
+      listJobApiCalls({
+        jobRunId: id,
+        limit,
+        beforeId,
+        outcome: query.outcome,
+        service: query.service,
+      }),
+      summarizeExternalApiCalls({ jobRunId: id }),
+    ]);
+    const items = result.items.map((row) => this.mapApiCall(row));
+
+    return {
+      ...olderPage({
+        items,
+        total: result.total,
+        limit,
+        hasExtra: result.hasExtra,
+        fingerprint,
+        keyOf: (item) => String(item.id),
+        idOf: (item) => String(item.id),
+      }),
+      summary,
+    };
+  }
+
+  async detail(id: string) {
+    const run = await getJobRun(id);
+    if (!run) throw new NotFoundException('Job not found');
     const fingerprint = filterFingerprint({ scope: 'job-events', jobRunId: id });
     const [allEvents, latest, eventPage] = await Promise.all([
       getAllJobRunEvents(id),

@@ -23,6 +23,30 @@ export { canonicalJson, hashPayload, sha256Hex } from './hashing.js';
 export { QUEUES, type QueueName } from './queues.js';
 export { roundToTick } from './pricing.js';
 export {
+  EXTERNAL_APIS,
+  EXTERNAL_API_ERROR_BODY_LIMIT,
+  EXTERNAL_API_OUTCOMES,
+  EXTERNAL_API_SCOPE_PARTS,
+  EXTERNAL_API_SERVICES,
+  apiOperationDefinition,
+  buildApiScope,
+  classifyApiOutcome,
+  emptyExternalApiScope,
+  isExternalApiOutcome,
+  isExternalApiService,
+  readExternalApiScope,
+  renderApiPath,
+  renderApiUrl,
+  type AnyExternalApiOperation,
+  type ExternalApiCatalog,
+  type ExternalApiOperation,
+  type ExternalApiOperationDefinition,
+  type ExternalApiOutcome,
+  type ExternalApiScope,
+  type ExternalApiScopePart,
+  type ExternalApiService,
+} from './external-apis.js';
+export {
   BULLMQ_STATUS_MAP,
   JOB_DEFINITIONS,
   JOB_EVENTS_CHANNEL,
@@ -36,6 +60,7 @@ export {
   jobTypeOf,
   queueNameOf,
   stagesForJob,
+  type ApiCallBroadcast,
   type JobBroadcast,
   type JobDefinition,
   type JobEventBroadcast,

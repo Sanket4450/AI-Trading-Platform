@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { PAGINATION_DEFAULT_LIMIT, isQuantifiedStage } from '@ai-trading/domain';
-import type { JobDetail, JobEvent, JobRun, JobStage, Paginated } from '@/lib/types';
+import type { ExternalApiCallPage, JobDetail, JobEvent, JobRun, JobStage, Paginated } from '@/lib/types';
 import { formatDateTime, formatDuration } from '@/lib/format';
 import { label } from '@/lib/labels';
 import { connectJobs } from '@/lib/realtime';
@@ -14,6 +14,7 @@ import { KeyValueGrid } from '@/components/dashboard/key-value-grid';
 import { JsonBlock } from '@/components/dashboard/json-block';
 import { StageRail } from './stage-rail';
 import { EventTimeline } from './event-timeline';
+import { ApiCallsSection } from './api-calls';
 import { progressFromEvent } from '../progress';
 
 const TERMINAL = new Set(['succeeded', 'failed', 'partially_failed', 'cancelled']);
@@ -58,7 +59,13 @@ function durationOf(detail: JobDetail, now: number | null): number | null {
   return Math.max(0, now - Date.parse(detail.run.startedAt));
 }
 
-export function JobLiveDetail({ initial }: { initial: JobDetail }) {
+export function JobLiveDetail({
+  initial,
+  apiCalls,
+}: {
+  initial: JobDetail;
+  apiCalls: ExternalApiCallPage;
+}) {
   const [detail, setDetail] = useState(initial);
   const [now, setNow] = useState<number | null>(null);
   const [cancelling, setCancelling] = useState(false);
@@ -94,6 +101,7 @@ export function JobLiveDetail({ initial }: { initial: JobDetail }) {
         return;
       }
 
+      if (message.type !== 'event') return;
       const event = message.event;
       if (event.jobRunId !== initial.run.id) return;
       setDetail((current) => ({
@@ -197,6 +205,14 @@ export function JobLiveDetail({ initial }: { initial: JobDetail }) {
         description="Fixed stage order from the job catalog. Unreached stages stay visible."
       >
         <StageRail stages={stages} />
+      </SectionCard>
+
+      <SectionCard
+        className="mt-4"
+        title="External API calls"
+        description="Every outbound request this run made, with the exact failure when one did not succeed. The request URL is shown inside each call."
+      >
+        <ApiCallsSection jobRunId={run.id} initial={apiCalls} />
       </SectionCard>
 
       <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
