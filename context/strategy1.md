@@ -1,3 +1,8 @@
+> **Implementation status:** specification for R3. Not implemented in R1/R2.
+> `packages/trading-engine` defines the strategy contract and `packages/strategies` contains an
+> `opening-range-breakout` placeholder that returns no signals. The seed already stores `orb-15m`
+> version 1 with parameter, risk and system configuration bindings.
+
 #### 15-minute Opening Range Breakout
 
 | Rule                | Initial specification                                                                                                      |

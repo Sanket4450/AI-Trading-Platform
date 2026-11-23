@@ -1,3 +1,7 @@
+> **Implementation status:** specification for R4+. Not implemented in R1/R2. The `backtest_*` and
+> `strategy_promotion_reviews` tables exist and are empty; `packages/backtesting` is a placeholder
+> and the worker has no registered backtest processor.
+
 | Order | Implementation                 | Acceptance condition                                                                                                                   |
 | ----- | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
 | 1     | Historical data collection     | Valid, timestamp-consistent data with missing bars and instrument changes handled explicitly                                           |

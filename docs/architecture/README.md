@@ -1,6 +1,8 @@
 # Architecture
 
-The system is a modular monolith with a separate worker process.
+The system is a modular monolith with a separate worker process. This summary describes the target
+architecture; for the delivered R1/R2 surface (and which packages are still placeholders), read
+`context/current-implementation.md`.
 
 - `apps/web` is the only browser-facing surface and calls the API over HTTP.
 - `apps/api` validates commands and coordinates workflows.
@@ -33,6 +35,7 @@ These rules are enforced by `scripts/check-boundaries.mjs`, which runs as part o
 
 The authoritative specifications live in the repository's `context/` folder:
 
+- `current-implementation.md` (as-built R1/R2 snapshot)
 - `high-level-architecture.md`
 - `tech-stack.md`
 - `design-patterns.md`

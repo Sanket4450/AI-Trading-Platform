@@ -103,8 +103,9 @@ seed, repositories, configuration management, API, dashboard, worker jobs and au
 - **Authentication.** Argon2id password hashes, opaque 32-byte session tokens hashed with SHA-256 in
   `user_sessions`, HttpOnly session cookies, revocation and expiry. The web app stores the token in its own
   HttpOnly cookie and forwards it as a Bearer token from server components and the `/api/proxy` route handler.
-- **Offline enforcement.** `assertOfflineMode()` refuses to start the API or worker when `TRADING_MODE` is not
-  `offline`. `SystemControlService.onModuleInit()` also refuses to start when an active account is not offline.
+- **Research-mode enforcement.** `assertResearchMode()` refuses to start the API or worker when
+  `TRADING_MODE` is not `offline` or `research`. `SystemControlService.onModuleInit()` also refuses to start
+  when an active account is outside those modes.
 - **No order routes.** `OrdersModule`, `TradingModule`, `PositionsModule`, `RiskModule`, `BacktestsModule`,
   `ReportsModule` and `NotificationsModule` are no longer imported into the API. The tables remain for later
   releases.
@@ -114,7 +115,8 @@ seed, repositories, configuration management, API, dashboard, worker jobs and au
   strategies, configuration, jobs, audit, settings (including provider state and provider-wide issues) and
   system status. See Swagger at `/api/docs`.
 - **Ingestion writes.** A per-instrument fetch and a materialized-view refresh create `job_runs` and enqueue
-  BullMQ jobs. Quality issues can be acknowledged, resolved or ignored with an audit row.
+  BullMQ jobs. R2 findings are written to the current-state `system_issues` ledger and are cleared by the
+  operation that later succeeds; there is no acknowledge/resolve workflow.
 
 ### Worker
 
@@ -131,14 +133,15 @@ seed, repositories, configuration management, API, dashboard, worker jobs and au
 
 ### Dashboard
 
-- Seven operator routes: `/`, `/accounts`, `/instruments`, `/strategies`, `/jobs`, `/audit`
-  and `/settings`.
+- Operator routes: `/`, `/accounts`, `/accounts/[id]`, `/instruments`, `/instruments/[id]`, the coverage day
+  detail, `/issues`, `/strategies`, `/strategies/[id]`, `/jobs`, `/jobs/[id]`, `/api-calls`, `/audit` and
+  `/settings`. Issue details open in a dialog rather than a dedicated route.
 - Server components read the API through `apps/web/src/lib/api.ts`; browser mutations call the API through
   `apps/web/src/lib/api-browser.ts` and the `/api/proxy/[...path]` route handler, so the token stays HttpOnly
   and each write appears in the browser network tab.
 - `apps/web/src/proxy.ts` protects every route except login and auth callbacks. Next.js 16 replaced the
   `middleware` convention with `proxy`.
-- The dashboard is dark-first, responsive at 390px, and shows the offline mode on every screen.
+- The dashboard is dark-first, responsive at 390px, and shows the active trading mode on every screen.
 
 ### Deviations and follow-ups
 
@@ -177,11 +180,11 @@ pnpm --filter @ai-trading/worker build
 pnpm --filter @ai-trading/web build
 ```
 
-The database verification reports 55 logical tables, 1 materialized view, 63 candle partitions, 15 quote
+The database verification reports 56 logical tables, 1 materialized view, 63 candle partitions, 15 quote
 partitions, zero live orders and a parameters binding for every strategy version. The API smoke test covers
 login, every read route, configuration create/idempotency/diff/bind, settings update and a bounded backfill. The
 worker processes the backfill and records a skipped result when Upstox credentials are empty. The Playwright
-dashboard smoke test passes for all nine routes at 1440px and 390px with no page or server errors.
+suite is a single desktop dashboard smoke test with no page or server errors.
 
 ### Infrastructure layout
 
@@ -218,7 +221,7 @@ R1 lifecycle tables.
 - `0014_job_ledger_v2.sql` rebuilds `job_runs` and `job_run_events` as the current ledger: one row per
   BullMQ job, typed `instrument_id`, structured `error`, six event columns (`stage`, `type`,
   `occurred_at`, `data`) and a `latest_event_id` pointer. The old ledger is discarded by design.
-  The database ends at 55 logical tables.
+  At this point the database has 55 logical tables; `0018_external_api_calls.sql` adds the 56th.
 - `0015_system_issues.sql` drops `data_quality_issues` and creates `system_issues`, a current-state
   ledger with `source`, `kind`, `severity`, provider/instrument scope, a unique `dedupe_key`,
   occurrence counters and a mechanism-owned `payload`. Resolved rows are deleted, not stored.
@@ -242,7 +245,7 @@ R1 lifecycle tables.
 - `packages/adapters` owns the read-only V3 historical, intraday, holidays and timings calls,
   error classification and the rate-limiter interface. It still has no order method.
 - `packages/market-data` owns tuple normalization, IST/UTC conversion, session windows, strict
-  coverage, gap runs, the 22-rule catalog, dedupe keys and catalog status precedence.
+  coverage, gap runs, the 20-rule active catalog, dedupe keys and catalog status precedence.
 - The worker runs one job per instrument, iterates month chunks inside that job, and records one
   `progress` event per chunk on the job timeline. It also runs a Redis-backed three-window provider budget,
   retry/backoff and cooperative cancellation.
@@ -250,14 +253,14 @@ R1 lifecycle tables.
 ### API and dashboard
 
 - The catalog-first surface adds instrument coverage status, per-instrument fetch/cancel/recompute,
-  coverage day detail and issue lifecycle. Jobs expose instrument children and progress; settings expose
-  provider state and provider-wide issues. Every write records an audit row.
+  coverage day detail and the current-state issue ledger. Jobs expose instrument children and progress;
+  settings expose provider state and provider-wide issues. Every mutation records an audit row.
 - A broker-contract test asserts that the API does not import order, position or trading modules, that
   the Upstox adapter has no order method and that the placeholder order controller has no route.
 - Reference sync and corporate-action import require the global `admin` user role.
-- The dashboard adds `/instruments/[id]`, its coverage day detail, `/instruments/issues/[id]`,
-  `/settings/issues/[id]` and the instrument table inside `/jobs/[id]`. It polls only while a visible row
-  is active.
+- The dashboard adds `/instruments/[id]`, its coverage day detail, issue dialogs on the instrument and
+  settings pages, and the instrument table inside `/jobs/[id]`. Job views patch from the Socket.IO event
+  stream and refetch on reconnect instead of polling.
 
 ### Open checks
 
@@ -280,7 +283,7 @@ The external PostgreSQL migration 0008 applied successfully, the R2 seed complet
 reported the R2 tables, 1 materialized view, 63 candle partitions, 15 quote partitions, 51 sync targets
 with status rows and primary mappings, 2191 calendar days and zero orders. The subsequent
 `0010_drop_universes.sql`, `0011_drop_daily_validation.sql` and `0012_drop_ingestion_runs.sql`
-migrations leave 55 logical tables.
+migrations leave 55 logical tables; `0018_external_api_calls.sql` brings the current count to 56.
 
 ### Live read-only checks (2026-10-27)
 
@@ -292,7 +295,7 @@ A live, read-only Upstox smoke test was run with the operator token. No order en
 | Tick transform    | The paise-to-rupee transform produces 0.1000, 0.0500 and 1.0000 as required.                               |
 | Historical order  | January 2022 RELIANCE returned 7,500 minute bars in descending order. Sorting is required.                 |
 | Bar labeling      | After sorting, the first bar is 09:15 and the last is 15:29; 15:30 is excluded.                            |
-| Daily oracle      | 20 daily rows. Minute volume was 1.0583% below daily volume for the month. (Feature removed in 0011.)       |
+| Daily oracle      | 20 daily rows. Minute volume was 1.0583% below daily volume for the month. (Feature removed in 0011.)      |
 | Holidays          | The current-year endpoint returned 22 rows and revealed that the provisional 2026 fixture had wrong dates. |
 | Timings           | NSE on 2026-10-23 was 09:15–15:30 IST; the 2026 Muhurat session is 14:20–15:30 IST.                        |
 

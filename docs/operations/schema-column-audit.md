@@ -1,8 +1,9 @@
 # Schema column audit — R2
 
 **Date:** 2026-11-20
-**Scope:** all 55 logical tables in `packages/database/schema/*.ts` (plus the SQL-only checks in
-`packages/database/migrations/`).
+**Scope:** the 55 logical tables present when this audit was taken in `packages/database/schema/*.ts`
+(plus the SQL-only checks in `packages/database/migrations/`). `0018_external_api_calls.sql` later
+added the append-only call ledger; that new table is not part of this audit.
 **Method:** each column was checked against the Drizzle schema, the repositories, the worker ingestion and
 quality services, the seed, the API DTOs and the web types. A column is called *dead* when no code writes or
 reads it, and *duplicate* when another column in the same row always carries the same value.
@@ -277,7 +278,7 @@ Legend: **—** = no removal recommended.
    - `docs/operations/job-ledger.md`: remove `queue_name` from the ledger description.
 
 4. Verify:
-   - `pnpm db:migrate && pnpm db:verify` (55 tables and the view counts must not change).
+   - `pnpm db:migrate && pnpm db:verify` (the current expectation is 56 tables and one view).
    - `pnpm lint`, plus `pnpm nx run-many -t typecheck test -p database api worker web tests`.
    - No browser verification by policy.
 

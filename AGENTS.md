@@ -116,9 +116,9 @@ pnpm dev                      # builds all packages, then web:3000, api:8000, wo
 
 ## Database and migrations
 
-- Migrations are numbered SQL files in `packages/database/migrations/` (`0000`–`0008`). The runner
+- Migrations are numbered SQL files in `packages/database/migrations/` (`0000`–`0019`). The runner
   records SHA-256 checksums and refuses to run if an applied file changed.
-- **Never edit an applied migration**; add a new numbered file. `0001`–`0007` are hand-written
+- **Never edit an applied migration**; add a new numbered file. `0001`–`0019` are hand-written
   custom SQL, so point future `drizzle-kit generate` runs at a fresh directory or rename the output
   to the next free number.
 - FKs, partial/BRIN indexes, partitions, triggers and the materialized view live in explicit SQL;
@@ -155,7 +155,7 @@ pnpm dev                      # builds all packages, then web:3000, api:8000, wo
 ## Source of truth
 
 - `context/` — authoritative specs (R1/R2 plans, architecture, ORB strategy, risk, execution,
-  backtesting, roadmap).
+  backtesting, roadmap) and `current-implementation.md`, the as-built R1/R2 snapshot.
 - `docs/architecture/` — architecture summary and ADR 0001.
 - `docs/operations/` — runbooks, implementation notes, R2 data-quality rules, catalog status.
 - `README.md` — quick start, URLs and repository policy.

@@ -1,13 +1,38 @@
-| Component             | Technology                                      | Responsibility                                                                                        |
-| --------------------- | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| Frontend              | Next.js + TypeScript                            | Dashboard, strategy configurations, backtesting results, risk settings, trade monitoring and reports  |
-| Backend API           | NestJS + TypeScript                             | Application services, configuration management, authentication and system orchestration               |
-| Background processing | NestJS worker processes                         | Market-data ingestion, strategy evaluation, backtesting and post-market processing                    |
-| Database              | PostgreSQL on Neon                              | Persistent source of truth for configurations, market bars, trades, orders, backtests and performance |
-| ORM and migrations    | Drizzle                                         | Typed database access and version-controlled schema migrations                                        |
-| Cache and job queue   | Redis + BullMQ                                  | Background jobs, temporary market state, distributed locks and job retry management                   |
-| Broker integration    | Upstox APIs                                     | Historical and live market data, order management, order updates and position reconciliation          |
-| Containerization      | Docker + Docker Compose                         | Reproducible local development, integration testing and containerized deployment                      |
-| Production hosting    | Azure Linux VPS                                 | API, frontend and worker deployment with a registered static public IP for trading API access         |
-| Monitoring            | Structured application logs, metrics and alerts | System health, execution failures, risk-limit breaches and strategy performance                       |
-| AI extension          | OpenRouter or other LLM provider, later         | Optional research and reporting only; not required in the initial release                             |
+# Technology stack
+
+**As built:** R1 + R2. Versions below match the workspace manifests at the 2026-11-23 snapshot.
+
+| Component             | Technology                                                   | Responsibility                                                                                        | Status |
+| --------------------- | ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- | ------ |
+| Frontend              | Next.js 16.4, React 19, Tailwind 4, shadcn/Radix             | Research dashboard: accounts, instruments, coverage, issues, jobs, configuration, audit and settings  | Delivered for R1/R2; backtest and trading screens are placeholders |
+| Realtime client       | Socket.IO client                                             | Patches visible job rows, stages, events and API calls from the worker stream                         | Delivered |
+| Backend API           | NestJS 12 + TypeScript 6                                     | Application services, session authentication, catalog queries, configuration and system orchestration | Delivered for R1/R2 |
+| Background processing | NestJS 12 worker + BullMQ 6 + `@nestjs/schedule`             | Historical ingestion, coverage, quality scans, reconciliation and maintenance                         | Delivered for R1/R2; live/backtest/order workers are placeholders |
+| Database              | PostgreSQL 17+ (external `DATABASE_URL`; Neon in production) | Persistent source of truth for configurations, market bars, coverage, jobs, issues and later trades   | Delivered |
+| ORM and migrations    | Drizzle 0.44 + numbered SQL migrations                       | Typed database access and checksum-verified schema migrations                                         | Delivered; 56 logical tables, one materialized view |
+| Cache and job queue   | Redis Stack + BullMQ                                         | Background jobs, provider budget, job-event pub/sub and operational counters                           | Delivered |
+| Broker integration    | Upstox V3 APIs (read-only)                                   | Historical and intraday candles, instrument master, holidays and timings                               | Delivered for research data; order APIs are later |
+| Containerization      | Docker + Docker Compose                                      | Local Redis, integration tests and the optional app container stack                                   | Delivered |
+| Production hosting    | Azure Linux VPS                                              | API, dashboard and worker with a registered static public IP for broker access                        | Planned for R6/R8; `infra/azure` is a placeholder |
+| Monitoring            | Structured logs, health checks, job ledger, API-call ledger  | Detect stale ingestion, failed calls, coverage gaps and unavailable components                         | Partial in R2; metrics and alerting are later |
+| AI extension          | OpenRouter or another LLM provider, later                    | Optional research and reporting only; never required for execution                                    | Not started |
+
+## Tooling
+
+| Tool            | Version / choice                                                |
+| --------------- | --------------------------------------------------------------- |
+| Node.js         | 24                                                              |
+| pnpm            | 11.28.8                                                         |
+| Nx              | 22.7.12                                                         |
+| TypeScript      | 5.9 for web, packages and tests; 6.0 for the Nest apps          |
+| Vitest          | 3 for web, packages and tests; 4 for the Nest apps              |
+| E2E             | Playwright (a single dashboard smoke test today)                |
+| Lint            | Oxlint across every project                                     |
+| Architecture    | `scripts/check-boundaries.mjs` over the Nx project graph        |
+| Package builds  | `tsup` (ESM + CJS + declarations)                               |
+| Auth            | Argon2id + opaque session tokens (no JWT runtime use)           |
+| Credential keys | AES-256-GCM with `CONFIG_ENCRYPTION_KEY`                        |
+
+The TypeScript and Vitest versions are deliberately split: the Nest apps use the newer toolchain
+generated by the Nest CLI, while web, packages and the cross-cutting test project stay on the
+workspace catalog. Check the local package before copying a config between projects.

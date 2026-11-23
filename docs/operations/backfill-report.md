@@ -3,6 +3,9 @@
 Fill this in after the full sync-target backfill. The release question is not "did the backfill finish?"
 It is "can every bar, every gap and every exclusion be explained from stored evidence?"
 
+> Strict coverage is the only completeness verdict. The daily-oracle volume reconciliation was
+> removed in `0011_drop_daily_validation.sql`; a day is `complete`, `partial` or `missing`.
+
 ## Run metadata
 
 | Field               | Value        |
@@ -19,11 +22,11 @@ It is "can every bar, every gap and every exclusion be explained from stored evi
 
 ## Per-instrument summary
 
-| Rank | Symbol   | Expected days | Complete | Partial reconciled | Partial mismatch | Missing | Open critical |
-| ---- | -------- | ------------- | -------- | ------------------ | ---------------- | ------- | ------------- |
-| 1    | NIFTY 50 |               |          |                    |                  |         |               |
-| 2    |          |               |          |                    |                  |         |               |
-| …    |          |               |          |                    |                  |         |               |
+| Rank | Symbol   | Expected days | Complete | Partial | Missing | Open critical |
+| ---- | -------- | ------------- | -------- | ------- | ------- | ------------- |
+| 1    | NIFTY 50 |               |          |         |         |               |
+| 2    |          |               |          |         |         |               |
+| …    |          |               |          |         |         |               |
 
 ## Exception register
 
@@ -44,22 +47,21 @@ It is "can every bar, every gap and every exclusion be explained from stored evi
 
 ## Gates
 
-| Gate                        | Threshold                              | Result |
-| --------------------------- | -------------------------------------- | ------ |
-| Instrument resolution       | 51 / 51                                |        |
-| Catalog order               | 51 / 51 rank match                     |        |
-| Status coverage             | 100% of catalog rows                   |        |
-| Duplicate fetch             | 1 active backfill per instrument       |        |
-| Refresh efficiency          | 0 requests for complete months         |        |
-| Mapping completeness        | 100% primary mappings                  |        |
-| Tick-size validity          | 100%                                   |        |
-| Calendar coverage           | 100% of 2022–2027 dates                |        |
-| Strict completeness         | ≥ 99% complete or partial + reconciled |        |
-| Unexplained critical issues | 0                                      |        |
-| Volume reconciliation       | ≥ 99% of complete/partial days         |        |
-| Duplicate candles           | 0                                      |        |
-| Re-run idempotency          | 0 new rows                             |        |
-| Order safety                | 0 orders, 0 order routes               |        |
+| Gate                        | Threshold                                           | Result |
+| --------------------------- | --------------------------------------------------- | ------ |
+| Instrument resolution       | 51 / 51                                             |        |
+| Catalog order               | 51 / 51 rank match                                  |        |
+| Status coverage             | 100% of catalog rows                                |        |
+| Duplicate fetch             | 1 active backfill per instrument                    |        |
+| Refresh efficiency          | 0 requests for complete months                      |        |
+| Mapping completeness        | 100% primary mappings                               |        |
+| Tick-size validity          | 100%                                                |        |
+| Calendar coverage           | 100% of 2022–2027 dates                             |        |
+| Strict completeness         | ≥ 99% complete, or partial with every gap explained |        |
+| Unexplained critical issues | 0                                                   |        |
+| Duplicate candles           | 0                                                   |        |
+| Re-run idempotency          | 0 new rows                                          |        |
+| Order safety                | 0 orders, 0 order routes                            |        |
 
 ## Waivers
 

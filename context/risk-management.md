@@ -1,3 +1,7 @@
+> **Implementation status:** specification for R5. Not implemented in R1/R2. The risk configuration
+> and `risk_events` table are seeded, but `packages/risk-engine` is an empty placeholder and no
+> signal or order path calls it yet.
+
 | Control                 | Specification                                                                                            |
 | ----------------------- | -------------------------------------------------------------------------------------------------------- |
 | Risk per trade          | 0.5% of current account equity                                                                           |

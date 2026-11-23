@@ -1,3 +1,7 @@
+> **Implementation status:** specification for R5+. Not implemented in R1/R2. The order, fill,
+> position and reconciliation tables exist and are empty, the placeholder order modules expose no
+> routes, and the Upstox adapter has no order, modify or cancel method.
+
 | Phase                | Required behaviour                                                                                            |
 | -------------------- | ------------------------------------------------------------------------------------------------------------- |
 | Signal creation      | Persist the strategy version, configuration, instrument, signal timestamp and intended stop/target            |

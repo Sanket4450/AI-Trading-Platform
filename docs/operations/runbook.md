@@ -92,10 +92,10 @@ pnpm db:verify
 pnpm --filter @ai-trading/tests test:integration
 ```
 
-- The API and worker refuse to start unless `TRADING_MODE=offline`.
+- The API and worker refuse to start unless `TRADING_MODE` is `offline` or `research`.
 - No API route writes to `orders`, `fills`, `positions` or `round_trip_trades`.
 - Provider jobs with empty `UPSTOX_API_KEY` or `UPSTOX_ACCESS_TOKEN` complete as
-  `succeeded` with `result.skipped=true`; this is expected in R1.
+  `succeeded` with `result.skipped=true`; this is expected in R1/R2.
 - A bounded backfill is limited to `DATA_BACKFILL_MAX_DAYS` (31 by default) and cannot start before
   2022-01-01.
 - Rotating a broker credential writes ciphertext only. If `CONFIG_ENCRYPTION_KEY` is missing, the request fails
@@ -103,11 +103,11 @@ pnpm --filter @ai-trading/tests test:integration
 
 ## R1 recovery
 
-| Symptom                          | Action                                                            |
-| -------------------------------- | ----------------------------------------------------------------- |
-| API exits with offline assertion | Set `TRADING_MODE=offline` and restart.                           |
-| Seed refuses to run              | Set `SEED_OPERATOR_EMAIL` and `SEED_OPERATOR_PASSWORD` in `.env`. |
-| Migration checksum mismatch      | Do not edit applied migrations. Add a new numbered SQL migration. |
-| Backfill job says skipped        | Populate Upstox credentials, or leave it skipped for offline R1.  |
-| Worker queue is unavailable      | Check `pnpm docker:up` and `REDIS_URL`.                           |
-| Dashboard redirects to login     | The session expired or the API is down. Check `/api/v1/health`.   |
+| Symptom                                | Action                                                                    |
+| -------------------------------------- | ------------------------------------------------------------------------- |
+| API exits with research-mode assertion | Set `TRADING_MODE=offline` or `research` and restart.                     |
+| Seed refuses to run                    | Set `SEED_OPERATOR_EMAIL` and `SEED_OPERATOR_PASSWORD` in `.env`.         |
+| Migration checksum mismatch            | Do not edit applied migrations. Add a new numbered SQL migration.         |
+| Backfill job says skipped              | Populate Upstox credentials, or leave it skipped for offline/research R2. |
+| Worker queue is unavailable            | Check `pnpm docker:up` and `REDIS_URL`.                                   |
+| Dashboard redirects to login           | The session expired or the API is down. Check `/api/v1/health`.           |

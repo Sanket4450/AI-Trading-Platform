@@ -58,13 +58,14 @@ pnpm dev:stop   # stop stale listeners on 3000/8000
 ## R2 research dashboard
 
 The R2 research cockpit keeps the R1 routes and adds the instrument catalog and its drill-downs:
-`/instruments`, `/instruments/[id]`, the coverage day detail, `/instruments/issues/[id]` and
-`/settings/issues/[id]` for provider-wide findings. Backfill plans are rendered by `/jobs/[id]`. Sign in with the operator created by `pnpm db:seed`.
+`/instruments`, `/instruments/[id]`, the coverage day detail, `/issues`, `/api-calls` and the
+instrument/provider issue dialogs. Backfill and job plans are rendered by `/jobs/[id]`. Sign in with
+the operator created by `pnpm db:seed`.
 The API and worker accept `offline` or `research` and refuse `backtesting`, `paper` and `live`.
 
 R2 adds Upstox V3 historical ingestion, a persisted per-instrument fetch/data status, strict coverage,
-22 quality rules, month-chunked backfills and a Redis-backed provider budget. It still has no order
-route and no broker write method.
+20 active quality rules, month-chunked backfills, a Redis-backed provider budget, a job ledger with
+live updates and an outbound API-call ledger. It still has no order route and no broker write method.
 
 ## Guardrails
 
@@ -80,5 +81,6 @@ See `docs/operations/r2-runbook.md`, `docs/operations/system-issues.md` and
 `docs/operations/catalog-status.md` for the R2 operating model.
 
 See `context/` for the architecture, strategy, risk, execution and backtesting specifications.
-See `context/monorepo-setup-plan.html` for the full setup plan and
+`context/current-implementation.md` is the as-built R1/R2 snapshot. See
+`context/monorepo-setup-plan.html` for the full setup plan and
 `context/development-commands.html` for the searchable command deck.
