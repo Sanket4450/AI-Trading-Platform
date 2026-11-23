@@ -5,8 +5,7 @@ import { backLinkFor } from '@/lib/navigation';
 import { readCursorValue, readLimit } from '@/lib/pagination';
 import { PageMeta } from '@/components/shell/page-meta';
 import { SectionCard } from '@/components/dashboard/section-card';
-import { DetailHeader } from '@/components/dashboard/detail-header';
-import { StatusBadge } from '@/components/dashboard/status-badge';
+import { JobLiveHeader } from '@/features/jobs/components/job-live-header';
 import { JobLiveDetail } from '@/features/jobs/components/job-live-detail';
 
 type JobDetailSearchParams = Promise<{
@@ -60,10 +59,14 @@ export default async function JobDetailPage({
         description="Live progress, stage facts and final outcome for this job run."
       />
 
-      <DetailHeader
+      <JobLiveHeader
+        jobRunId={run.id}
+        jobName={run.jobName}
+        queueName={run.queueName}
+        status={run.status}
+        attempt={run.attempt}
+        maxAttempts={run.maxAttempts}
         back={back}
-        badges={<StatusBadge status={run.status} />}
-        meta={`${label(run.jobName)} · ${label(run.queueName)} · attempt ${run.attempt}/${run.maxAttempts}`}
       />
 
       <SectionCard

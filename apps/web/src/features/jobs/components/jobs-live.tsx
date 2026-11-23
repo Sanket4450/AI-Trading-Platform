@@ -26,6 +26,11 @@ import { progressFromEvent } from '../progress';
 
 const TERMINAL = new Set(['succeeded', 'failed', 'partially_failed', 'cancelled']);
 
+function runDuration(run: JobRunBroadcast): number | null {
+  if (!run.startedAt || !run.finishedAt) return null;
+  return Math.max(0, Date.parse(run.finishedAt) - Date.parse(run.startedAt));
+}
+
 function mergeRun(items: JobRun[], run: JobRunBroadcast): JobRun[] {
   const existing = items.find((item) => item.id === run.id);
   if (!existing) {
@@ -33,10 +38,7 @@ function mergeRun(items: JobRun[], run: JobRunBroadcast): JobRun[] {
       {
         ...run,
         jobType: jobTypeOf(run.jobName) ?? 'ingestion',
-        durationMs:
-          run.startedAt && run.finishedAt
-            ? Math.max(0, Date.parse(run.finishedAt) - Date.parse(run.startedAt))
-            : null,
+        durationMs: runDuration(run),
         payload: {},
         latestEvent: null,
         progress: null,
@@ -44,11 +46,14 @@ function mergeRun(items: JobRun[], run: JobRunBroadcast): JobRun[] {
       ...items,
     ];
   }
+  // A finished broadcast must stop the duration ticking even when no event follows it.
+  const durationMs = run.finishedAt ? runDuration(run) : null;
   return items.map((item) =>
     item.id === run.id
       ? {
           ...item,
           ...run,
+          durationMs,
           payload: item.payload,
           latestEvent: item.latestEvent,
           progress: item.progress,

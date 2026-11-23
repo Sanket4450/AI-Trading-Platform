@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { PAGINATION_MAX_LIMIT, isQuantifiedStage } from '@ai-trading/domain';
 import type {
@@ -94,6 +94,41 @@ function durationOf(detail: JobDetail, now: number | null): number | null {
   return Math.max(0, now - Date.parse(detail.run.startedAt));
 }
 
+function closedDuration(startedAt: string | null, finishedAt: string | null): number | null {
+  if (!startedAt || !finishedAt) return null;
+  return Math.max(0, Date.parse(finishedAt) - Date.parse(startedAt));
+}
+
+/**
+ * Server detail plus every event the socket has already delivered. The refetched run, stages and
+ * progress win; the event list is a union so a resync never drops live rows the first page lacks.
+ */
+function mergeDetail(current: JobDetail, fresh: JobDetail): JobDetail {
+  const eventsById = new Map<number, JobEvent>(current.events.map((event) => [event.id, event]));
+  for (const event of fresh.events) eventsById.set(event.id, event);
+  const events = [...eventsById.values()].sort((a, b) => a.id - b.id);
+
+  // A socket event can land while the refetch is in flight, so never take the server's older tail.
+  const currentLatest = current.run.latestEvent;
+  const freshLatest = fresh.run.latestEvent;
+  const keepCurrentLatest = Boolean(
+    currentLatest && freshLatest && currentLatest.id > freshLatest.id,
+  );
+
+  return {
+    ...fresh,
+    run: keepCurrentLatest
+      ? { ...fresh.run, latestEvent: currentLatest, progress: current.run.progress }
+      : fresh.run,
+    progress: keepCurrentLatest ? current.progress : fresh.progress,
+    events,
+    eventsPage: {
+      ...fresh.eventsPage,
+      total: Math.max(fresh.eventsPage.total, events.length),
+    },
+  };
+}
+
 export function JobLiveDetail({
   initial,
   apiCalls,
@@ -122,7 +157,11 @@ export function JobLiveDetail({
   const [cancelling, setCancelling] = useState(false);
   const [showAll, setShowAll] = useState(false);
   const [loadingAll, setLoadingAll] = useState(false);
+  const timelineRef = useRef<HTMLDivElement>(null);
+  const syncing = useRef(false);
+  const resyncQueued = useRef(false);
   const router = useRouter();
+  const runId = initial.run.id;
 
   useEffect(() => {
     setDetail(initial);
@@ -135,52 +174,92 @@ export function JobLiveDetail({
     return () => clearInterval(timer);
   }, []);
 
-  useEffect(() => {
-    return connectJobs((message) => {
-      if (message.type === 'run') {
-        if (message.run.id !== initial.run.id) return;
-        setDetail((current) => ({
-          ...current,
-          run: {
-            ...current.run,
-            status: message.run.status,
-            attempt: message.run.attempt,
-            result: message.run.result,
-            error: message.run.error,
-            startedAt: message.run.startedAt,
-            finishedAt: message.run.finishedAt,
-          },
-        }));
-        return;
-      }
+  /**
+   * The broadcast carries only the run row, so the stage rail and progress are refetched from the
+   * API the server derives from the full event log. Bursts collapse into one follow-up read.
+   */
+  const resync = useCallback(async () => {
+    if (syncing.current) {
+      resyncQueued.current = true;
+      return;
+    }
+    syncing.current = true;
+    try {
+      do {
+        resyncQueued.current = false;
+        try {
+          const fresh = await apiRequest<JobDetail>(`/jobs/${runId}`);
+          setDetail((current) => mergeDetail(current, fresh));
+        } catch {
+          // Keep the socket-patched view; the next status message retries.
+        }
+      } while (resyncQueued.current);
+    } finally {
+      syncing.current = false;
+    }
+  }, [runId]);
 
-      if (message.type !== 'event') return;
-      const event = message.event;
-      if (event.jobRunId !== initial.run.id) return;
-      setDetail((current) => {
-        if (current.events.some((existing) => existing.id === event.id)) return current;
-        return {
-          ...current,
-          run: {
-            ...current.run,
-            latestEvent: event as JobEvent,
-            progress: progressFromEvent(current.run.jobName, event),
-          },
-          events: [...current.events, event as JobEvent],
-          eventsPage: {
-            ...current.eventsPage,
-            total: current.eventsPage.total + 1,
-          },
-        };
-      });
-    });
-  }, [initial.run.id]);
+  useEffect(() => {
+    return connectJobs(
+      (message) => {
+        if (message.type === 'run') {
+          if (message.run.id !== runId) return;
+          setDetail((current) => ({
+            ...current,
+            run: {
+              ...current.run,
+              status: message.run.status,
+              attempt: message.run.attempt,
+              result: message.run.result,
+              error: message.run.error,
+              startedAt: message.run.startedAt,
+              finishedAt: message.run.finishedAt,
+              durationMs: closedDuration(message.run.startedAt, message.run.finishedAt),
+            },
+          }));
+          void resync();
+          return;
+        }
+
+        if (message.type !== 'event') return;
+        const event = message.event;
+        if (event.jobRunId !== runId) return;
+        setDetail((current) => {
+          if (current.events.some((existing) => existing.id === event.id)) return current;
+          return {
+            ...current,
+            run: {
+              ...current.run,
+              latestEvent: event as JobEvent,
+              progress: progressFromEvent(current.run.jobName, event),
+            },
+            events: [...current.events, event as JobEvent],
+            eventsPage: {
+              ...current.eventsPage,
+              total: current.eventsPage.total + 1,
+            },
+          };
+        });
+      },
+      // A reconnect can have missed the status change that ends the run.
+      () => void resync(),
+    );
+  }, [resync, runId]);
 
   const run = detail.run;
   const active = !TERMINAL.has(run.status);
   const stages = mergeStages(detail);
   const visibleEvents = showAll ? detail.events : detail.events.slice(0, TIMELINE_EVENT_WINDOW);
   const canShowAll = !showAll && detail.eventsPage.total > visibleEvents.length;
+  const showsEveryEvent = showAll || !canShowAll;
+  const eventCount = detail.events.length;
+
+  // Only the full-history view tracks the tail; the windowed view deliberately holds the start.
+  useEffect(() => {
+    if (!showsEveryEvent) return;
+    const node = timelineRef.current;
+    if (node) node.scrollTop = node.scrollHeight;
+  }, [showsEveryEvent, eventCount]);
 
   async function showAllEvents() {
     if (loadingAll) return;
@@ -300,7 +379,7 @@ export function JobLiveDetail({
             Showing {formatNumber(visibleEvents.length)} of {formatNumber(detail.eventsPage.total)}{' '}
             events
           </p>
-          <div className="mt-2 min-h-0 flex-1 overflow-auto">
+          <div ref={timelineRef} className="mt-2 min-h-0 flex-1 overflow-auto">
             <EventTimeline events={visibleEvents} />
           </div>
         </SectionCard>
