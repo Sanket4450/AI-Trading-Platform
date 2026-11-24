@@ -274,7 +274,6 @@ export class IngestionService {
           updated: result.updated,
           rejected: result.rejected,
           durationMs: result.durationMs,
-          httpStatus: result.httpStatus,
         });
       } catch (error) {
         failedChunks += 1;
@@ -403,7 +402,6 @@ export class IngestionService {
     const raw = await createRawProviderPayload({
       providerId: input.providerId,
       endpoint: '/v3/historical-candle/:instrument_key/minutes/1/:to/:from',
-      httpMethod: 'GET',
       requestFingerprint: sha256Hex(
         `${input.providerId}|${input.externalKey}|minutes|1|${input.from}|${input.to}`,
       ),
@@ -414,7 +412,6 @@ export class IngestionService {
         unit: 'minutes',
         interval: 1,
       },
-      httpStatus: 200,
       payload: response,
       payloadBytes: Buffer.byteLength(serialized, 'utf8'),
       payloadSha256: sha256Hex(serialized),
@@ -620,7 +617,6 @@ export class IngestionService {
       updated: write.updated,
       skipped: write.skipped,
       rejected,
-      httpStatus: 200,
       durationMs: Date.now() - started,
     };
   }
@@ -721,7 +717,6 @@ export class IngestionService {
         const raw = await createRawProviderPayload({
           providerId: provider.id,
           endpoint: '/v3/historical-candle/intraday/:instrument_key/minutes/1',
-          httpMethod: 'GET',
           requestFingerprint: sha256Hex(
             `intraday|${mapping.externalKey}|${today}`,
           ),
@@ -730,7 +725,6 @@ export class IngestionService {
             unit: 'minutes',
             interval: 1,
           },
-          httpStatus: 200,
               payload: response,
           payloadBytes: Buffer.byteLength(serialized, 'utf8'),
           payloadSha256: sha256Hex(serialized),

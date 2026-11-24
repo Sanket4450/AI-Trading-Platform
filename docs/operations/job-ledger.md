@@ -68,7 +68,7 @@ Secrets are redacted before insert. Raw provider bodies are never stored here.
 
 ## Job catalog
 
-`packages/domain/jobs.ts` declares the queue, type and ordered stages for all 11
+`packages/domain/jobs.ts` declares the queue, type and ordered stages for all 12
 jobs:
 
 | Job | Stages |
@@ -84,6 +84,12 @@ jobs:
 | `ingestion-reconcile` | `sweep → issues → finalize` |
 | `refresh-materialized-view` | `refresh` |
 | `ensure-partitions` | `ensure` |
+| `strategy-evaluation` | `prepare → evaluate → finalize` |
+
+`strategy-evaluation` is the only `research` job type. It is operator-initiated, never scheduled,
+and runs with concurrency 1 on the `strategy-evaluation` queue so candle reads stay predictable. It
+emits one quantified `evaluate` progress event per trading day with
+`{ index, total, tradingDate, evaluated, entries, exits }`.
 
 Adding a job or a stage means editing the catalog and the database check
 constraint in the same change.
@@ -113,9 +119,13 @@ detail timeline from the stream.
   derived progress. Supports `status`, `search`, `instrumentId` and `limit`.
 - `GET /api/v1/jobs/:id` returns the run, derived stage rail, events and progress.
 - `POST /api/v1/jobs/:id/cancel` marks one run cancelled and removes it from
-  BullMQ when it is still waiting.
+  BullMQ when it is still waiting. For a strategy evaluation it also marks the
+  linked `strategy_evaluation_runs` row cancelled.
 - `/jobs` lists runs with live progress; `/jobs/[id]` shows the stage rail and
   timeline live. The instrument detail page shows the latest fetch run.
+- The `strategy-evaluation` job is created by
+  `POST /strategies/:id/evaluation-runs`; `/strategies/[id]/evaluations/[runId]`
+  links to its ledger and shows per-day progress.
 
 ## Retention
 

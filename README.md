@@ -67,6 +67,11 @@ R2 adds Upstox V3 historical ingestion, a persisted per-instrument fetch/data st
 20 active quality rules, month-chunked backfills, a Redis-backed provider budget, a job ledger with
 live updates and an outbound API-call ledger. It still has no order route and no broker write method.
 
+R3 adds the strategy registry and the 15-minute opening-range-breakout research evaluator. The
+operator runs an evaluation from `/strategies/[id]`, watches the `strategy-evaluation` job ledger,
+and reviews signals and the instrument-day "why no trade" ledger under `/strategies/[id]/evaluations`.
+R3 writes research signals only; it sends no order and writes no fill, position or trade cost.
+
 ## Guardrails
 
 - `TRADING_MODE` defaults to `offline`; the R2 example sets `research`.
@@ -81,6 +86,6 @@ See `docs/operations/r2-runbook.md`, `docs/operations/system-issues.md` and
 `docs/operations/catalog-status.md` for the R2 operating model.
 
 See `context/` for the architecture, strategy, risk, execution and backtesting specifications.
-`context/current-implementation.md` is the as-built R1/R2 snapshot. See
+`context/current-implementation.md` is the as-built R1/R2/R3 snapshot. See
 `context/monorepo-setup-plan.html` for the full setup plan and
 `context/development-commands.html` for the searchable command deck.

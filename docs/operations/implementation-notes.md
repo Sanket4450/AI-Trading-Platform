@@ -317,3 +317,49 @@ Consequences:
   because the calendar and listing window already express that. The table is a rebuildable cache,
   refilled by the `coverage-rebuild` job (`POST /system/coverage/rebuild`) or the nightly
   `coverage-recompute`.
+
+## R3 — strategy registry and opening-range breakout (2026-11-24)
+
+### Delivered
+
+- Session-scoped strategy contract v2 in `packages/trading-engine`; supporting data types, reason
+  codes, runtime statuses and the shared ORB parameter schema/defaults in `packages/domain`.
+- Pure indicator math (five-minute rollup, cumulative VWAP, seeded EMA, median, direction-aware
+  tick rounding) and the deterministic ORB session evaluator in `packages/strategies`.
+- Static registry keyed by `strategies.code`, `code_ref` parsing, deep schema equality and `ajv`
+  parameter validation.
+- Migrations `0020_r3_strategy_evaluation.sql` and `0021_r3_drop_dead_columns.sql`; 58 logical
+  tables and one materialized view.
+- `orb-15m` version 2 (`opening-range-breakout@1.0.0`) with the shared schema and bindings to the
+  existing parameter, risk and system configuration versions. Version 1 remains `validated`.
+- `strategy-evaluation` job, worker processor and module registration, day-batched evaluation,
+  per-day delete/insert idempotency, cancellation between days and progress per day.
+- API create/list/detail/results/signals/cancel routes with admin-only mutation, pinned configs,
+  universe snapshot, active-run `409`, queue rollback and audit actions
+  `strategy.evaluation_run.created` / `.cancelled`.
+- Runtime status on `GET /strategies` and `GET /strategies/:id`, plus the `/strategies/[id]/evaluations`
+  and run-detail dashboard routes.
+
+### Decisions and deviations
+
+- The shared ORB schema includes the seeded `strategy` key and the documented optional parameters so
+  the immutable configuration v1 remains valid without being rewritten.
+- `signal_at` is the bar close; `candle_start` is the bar start.
+- R3 enforces the plan's one-open-position session book even if a config says more. Values above one
+  are not implemented in this release.
+- The evaluator treats any incomplete decision bar as `decision_bar_incomplete` for the day and any
+  missing index decision bar as `index_data_gap`; both are visible skipped results, never filled.
+- Volume history and NIFTY EMA history are loaded from prior complete sessions/day-batched; the
+  worker never holds a year of candles in memory.
+- No browser verification was performed by policy. Verification is lint, typecheck, unit,
+  broker-contract and testcontainers integration tests plus `db:verify`.
+
+### Open checks
+
+1. NIFTY 50 index coverage for the evaluation range. The gate remains open until a reviewed backfill
+   report includes the index; otherwise a real run records `index_*` reasons.
+2. Corporate-action import completeness for the selected universe.
+3. Historical tick-size changes inside a range are not reconstructed.
+4. The below-VWAP rule is only reachable after an earlier decision bar raises cumulative VWAP above
+   a later bar that still closes above the opening-range high.
+5. Costs, slippage, fills, equity curve and metrics remain R4.

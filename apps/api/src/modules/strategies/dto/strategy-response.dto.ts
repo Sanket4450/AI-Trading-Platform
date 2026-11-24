@@ -70,6 +70,32 @@ export class StrategyActivationDto {
   deactivatedAt!: string | null;
 }
 
+export class StrategyRuntimeDto {
+  @ApiProperty({ enum: ['registered', 'unregistered', 'invalid_code_ref', 'implementation_missing', 'schema_mismatch'] })
+  status!: string;
+
+  @ApiProperty()
+  code!: string;
+
+  @ApiProperty({ type: String, nullable: true })
+  codeRef!: string | null;
+
+  @ApiProperty({ type: String, nullable: true })
+  implementation!: string | null;
+
+  @ApiProperty({ type: String, nullable: true })
+  implementationVersion!: string | null;
+
+  @ApiProperty({ type: Boolean, nullable: true })
+  schemaMatches!: boolean | null;
+
+  @ApiProperty({ type: [String] })
+  parameterNames!: string[];
+
+  @ApiProperty({ type: String, nullable: true })
+  error!: string | null;
+}
+
 export class StrategyVersionDto {
   @ApiProperty({ format: 'uuid' })
   id!: string;
@@ -106,6 +132,15 @@ export class StrategyVersionDto {
   @ApiProperty({ type: String, format: 'date-time' })
   createdAt!: string;
 
+  @ApiProperty({
+    enum: ['registered', 'unregistered', 'invalid_code_ref', 'implementation_missing', 'schema_mismatch'],
+    required: false,
+  })
+  runtimeStatus?: string;
+
+  @ApiProperty({ type: String, nullable: true, required: false })
+  runtimeError?: string | null;
+
   @ApiProperty({ type: [StrategyBindingDto], required: false })
   bindings?: StrategyBindingDto[];
 
@@ -140,11 +175,29 @@ export class StrategyDto {
 
   @ApiProperty({ required: false })
   activeActivations?: number;
+
+  @ApiProperty({
+    enum: ['registered', 'unregistered', 'invalid_code_ref', 'implementation_missing', 'schema_mismatch'],
+    required: false,
+  })
+  runtimeStatus?: string;
+
+  @ApiProperty({ type: String, format: 'uuid', nullable: true, required: false })
+  lastEvaluationId?: string | null;
+
+  @ApiProperty({ type: String, nullable: true, required: false })
+  lastEvaluationStatus?: string | null;
+
+  @ApiProperty({ type: String, format: 'date-time', nullable: true, required: false })
+  lastEvaluationAt?: string | null;
 }
 
 export class StrategyDetailDto extends StrategyDto {
   @ApiProperty({ type: [StrategyVersionDto] })
   versions!: StrategyVersionDto[];
+
+  @ApiProperty({ type: StrategyRuntimeDto })
+  runtime!: StrategyRuntimeDto;
 }
 
 export class EffectiveConfigurationDto {

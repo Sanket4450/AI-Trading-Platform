@@ -1,7 +1,9 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   Get,
+  HttpCode,
   Param,
   ParseUUIDPipe,
   Post,
@@ -9,12 +11,16 @@ import {
   Req,
 } from '@nestjs/common';
 import {
+  ApiAcceptedResponse,
+  ApiConflictResponse,
   ApiCreatedResponse,
+  ApiForbiddenResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiParam,
   ApiTags,
+  ApiUnprocessableEntityResponse,
 } from '@nestjs/swagger';
 import type { Request } from 'express';
 import {
@@ -26,7 +32,21 @@ import { SearchOffsetQueryDto } from '../../common/pagination/search-offset-quer
 import { requestMeta } from '../../common/http/request-meta.js';
 import { ApiSessionAuth } from '../../common/swagger/api-session-auth.decorator.js';
 import { CreateStrategyVersionDto } from './dto/create-strategy-version.dto.js';
+import { CreateEvaluationRunDto } from './dto/create-evaluation-run.dto.js';
 import { EffectiveConfigQueryDto } from './dto/effective-config-query.dto.js';
+import {
+  EvaluationResultQueryDto,
+  EvaluationRunQueryDto,
+  RunSignalQueryDto,
+  SignalQueryDto,
+} from './dto/evaluation-query.dto.js';
+import {
+  EvaluationResultListResponseDto,
+  EvaluationRunDetailDto,
+  EvaluationRunListResponseDto,
+  ResearchSignalDetailDto,
+  ResearchSignalListResponseDto,
+} from './dto/evaluation-response.dto.js';
 import {
   EffectiveConfigurationDto,
   StrategyDetailDto,
@@ -36,6 +56,12 @@ import {
 } from './dto/strategy-response.dto.js';
 import { StrategiesService } from './strategies.service.js';
 
+function assertAdmin(user: AuthenticatedUser): void {
+  if (user.role !== 'admin') {
+    throw new ForbiddenException('This operation requires the admin user role');
+  }
+}
+
 @ApiTags('strategies')
 @ApiSessionAuth()
 @Controller('strategies')
@@ -44,7 +70,7 @@ export class StrategiesController {
 
   @Get()
   @ApiOperation({
-    summary: 'List strategies with version and activation counts',
+    summary: 'List strategies with version, activation and runtime status',
   })
   @ApiOkResponse({ type: StrategyListResponseDto })
   list(@Query() query: SearchOffsetQueryDto) {
@@ -60,7 +86,7 @@ export class StrategiesController {
 
   @Get(':id')
   @ApiOperation({
-    summary: 'Return a strategy with versions, bindings and activations',
+    summary: 'Return a strategy with versions, bindings, activations and runtime',
   })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiOkResponse({ type: StrategyDetailDto })
@@ -73,7 +99,7 @@ export class StrategiesController {
   }
 
   @Get(':id/versions')
-  @ApiOperation({ summary: 'List strategy versions' })
+  @ApiOperation({ summary: 'List strategy versions with runtime status' })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiOkResponse({ type: StrategyVersionDto, isArray: true })
   versions(@Param('id', ParseUUIDPipe) id: string) {
@@ -124,5 +150,123 @@ export class StrategiesController {
       user.id,
       requestMeta(request),
     );
+  }
+
+  @Post(':id/evaluation-runs')
+  @HttpCode(202)
+  @ApiOperation({ summary: 'Create and enqueue a research evaluation run (admin only)' })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiAcceptedResponse({ type: EvaluationRunDetailDto })
+  @ApiForbiddenResponse({ type: ErrorResponseDto, description: 'Requires the admin user role' })
+  @ApiNotFoundResponse({ type: ErrorResponseDto, description: 'Strategy or version not found' })
+  @ApiConflictResponse({ type: ErrorResponseDto, description: 'An active run already exists' })
+  @ApiUnprocessableEntityResponse({
+    type: ErrorResponseDto,
+    description: 'Version not runnable, configuration invalid, account or index missing',
+  })
+  createEvaluationRun(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: CreateEvaluationRunDto,
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() request: Request,
+  ) {
+    assertAdmin(user);
+    return this.strategies.createEvaluationRun(id, body, user.id, requestMeta(request));
+  }
+
+  @Get(':id/evaluation-runs')
+  @ApiOperation({ summary: 'List evaluation runs for a strategy' })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiOkResponse({ type: EvaluationRunListResponseDto })
+  @ApiNotFoundResponse({ type: ErrorResponseDto, description: 'Strategy not found' })
+  listEvaluationRuns(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: EvaluationRunQueryDto,
+  ) {
+    return this.strategies.listEvaluationRuns(id, query);
+  }
+
+  @Get(':id/evaluation-runs/:runId')
+  @ApiOperation({ summary: 'Return one evaluation run with pinned inputs and summary' })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiParam({ name: 'runId', format: 'uuid' })
+  @ApiOkResponse({ type: EvaluationRunDetailDto })
+  @ApiNotFoundResponse({ type: ErrorResponseDto, description: 'Run not found under the strategy' })
+  evaluationRunDetail(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('runId', ParseUUIDPipe) runId: string,
+  ) {
+    return this.strategies.evaluationRunDetail(id, runId);
+  }
+
+  @Get(':id/evaluation-runs/:runId/results')
+  @ApiOperation({ summary: 'List per-instrument-day results for one run' })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiParam({ name: 'runId', format: 'uuid' })
+  @ApiOkResponse({ type: EvaluationResultListResponseDto })
+  @ApiNotFoundResponse({ type: ErrorResponseDto, description: 'Run not found under the strategy' })
+  listEvaluationResults(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('runId', ParseUUIDPipe) runId: string,
+    @Query() query: EvaluationResultQueryDto,
+  ) {
+    return this.strategies.listEvaluationResults(id, runId, query);
+  }
+
+  @Get(':id/evaluation-runs/:runId/signals')
+  @ApiOperation({ summary: 'List research signals for one run' })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiParam({ name: 'runId', format: 'uuid' })
+  @ApiOkResponse({ type: ResearchSignalListResponseDto })
+  @ApiNotFoundResponse({ type: ErrorResponseDto, description: 'Run not found under the strategy' })
+  listRunSignals(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('runId', ParseUUIDPipe) runId: string,
+    @Query() query: RunSignalQueryDto,
+  ) {
+    return this.strategies.listRunSignals(id, runId, query);
+  }
+
+  @Post(':id/evaluation-runs/:runId/cancel')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Cooperively cancel an evaluation run (admin only)' })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiParam({ name: 'runId', format: 'uuid' })
+  @ApiOkResponse({ type: EvaluationRunDetailDto })
+  @ApiForbiddenResponse({ type: ErrorResponseDto, description: 'Requires the admin user role' })
+  @ApiNotFoundResponse({ type: ErrorResponseDto, description: 'Run not found under the strategy' })
+  cancelEvaluationRun(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('runId', ParseUUIDPipe) runId: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() request: Request,
+  ) {
+    assertAdmin(user);
+    return this.strategies.cancelEvaluationRun(id, runId, user.id, requestMeta(request));
+  }
+
+  @Get(':id/signals')
+  @ApiOperation({ summary: 'List research signals across runs for a strategy' })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiOkResponse({ type: ResearchSignalListResponseDto })
+  @ApiNotFoundResponse({ type: ErrorResponseDto, description: 'Strategy not found' })
+  listStrategySignals(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: SignalQueryDto,
+  ) {
+    return this.strategies.listStrategySignals(id, query);
+  }
+
+  @Get(':id/signals/:signalId')
+  @ApiOperation({ summary: 'Return one signal with its full evidence object' })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiParam({ name: 'signalId', format: 'uuid' })
+  @ApiOkResponse({ type: ResearchSignalDetailDto })
+  @ApiNotFoundResponse({ type: ErrorResponseDto, description: 'Signal not found under the strategy' })
+  signalDetail(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('signalId', ParseUUIDPipe) signalId: string,
+  ) {
+    return this.strategies.signalDetail(id, signalId);
   }
 }

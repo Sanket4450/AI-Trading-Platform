@@ -21,6 +21,42 @@ export {
   type PaginationMode,
 } from './pagination.js';
 export { canonicalJson, hashPayload, sha256Hex } from './hashing.js';
+export {
+  EVALUATION_REASON_CODES,
+  EVALUATION_RESULT_STATUSES,
+  EVALUATION_RUN_STATUSES,
+  RESEARCH_SIGNAL_TYPES,
+  STRATEGY_RUNTIME_STATUSES,
+  type EvaluationReasonCode,
+  type EvaluationResultStatus,
+  type EvaluationRunStatus,
+  type JsonSchema,
+  type ResearchSignalType,
+  type RiskParameters,
+  type StrategyBreakoutCandidate,
+  type StrategyEvaluation,
+  type StrategyInstrument,
+  type StrategyInstrumentResult,
+  type StrategyResultDiagnostics,
+  type StrategyRuntimeResolution,
+  type StrategyRuntimeStatus,
+  type StrategySignal,
+  type StrategySignalEvidence,
+  type VolumeSlotSample,
+} from './strategy/evaluation.js';
+export {
+  ORB_CODE_REF,
+  ORB_IMPLEMENTATION,
+  ORB_IMPLEMENTATION_VERSION,
+  ORB_PARAMETER_DEFAULTS,
+  ORB_PARAMETER_SCHEMA,
+  ORB_STOP_MODES,
+  ORB_STRATEGY_CODE,
+  resolveOrbParameters,
+  type OrbParameters,
+  type OrbStopMode,
+  type ResolvedOrbParameters,
+} from './strategy/parameters.js';
 export { QUEUES, type QueueName } from './queues.js';
 export { roundToTick } from './pricing.js';
 export {

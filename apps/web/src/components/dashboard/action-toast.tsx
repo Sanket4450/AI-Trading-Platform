@@ -15,6 +15,8 @@ const successFlags: Record<string, string> = {
   ack: 'Quality issue updated and audited.',
   versionCreated: 'Strategy draft version created.',
   credentialSaved: 'Credential encrypted and stored.',
+  evaluationCreated: 'Evaluation queued. The run detail tracks its progress.',
+  evaluationCancelled: 'Evaluation cancelled. Completed days remain readable.',
 };
 
 const toastFlags = ['error', ...Object.keys(successFlags)] as const;

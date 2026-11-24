@@ -35,7 +35,6 @@ export const marketCandles1m = pgTable(
     sourceProviderId: uuid('source_provider_id').notNull(),
     rawPayloadId: uuid('raw_payload_id'),
     isFinal: boolean('is_final').default(true).notNull(),
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [

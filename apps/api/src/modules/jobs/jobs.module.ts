@@ -13,6 +13,7 @@ import { JobsService } from './jobs.service.js';
     BullModule.registerQueue(
       { name: QUEUES.historicalData },
       { name: QUEUES.maintenance },
+      { name: QUEUES.strategyEvaluation },
     ),
   ],
   controllers: [JobsController],

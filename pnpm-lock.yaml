@@ -821,6 +821,9 @@ importers:
       '@ai-trading/trading-engine':
         specifier: workspace:*
         version: link:../trading-engine
+      ajv:
+        specifier: ^8.20.0
+        version: 8.20.0
     devDependencies:
       tsup:
         specifier: 'catalog:'

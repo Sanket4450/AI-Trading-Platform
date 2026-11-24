@@ -10,6 +10,7 @@ import {
   stagesForJob,
 } from '@ai-trading/domain';
 import {
+  cancelEvaluationRunByJobRunId,
   getAllJobRunEvents,
   getInstrument,
   getJobRun,
@@ -208,6 +209,7 @@ export class JobsService {
   constructor(
     @InjectQueue(QUEUES.historicalData) private readonly historicalQueue: Queue,
     @InjectQueue(QUEUES.maintenance) private readonly maintenanceQueue: Queue,
+    @InjectQueue(QUEUES.strategyEvaluation) private readonly strategyQueue: Queue,
     private readonly events: JobEventsPublisher,
     config: ConfigService,
   ) {
@@ -403,14 +405,18 @@ export class JobsService {
       status: 'cancelled',
       finishedAt: new Date(),
     });
+    await cancelEvaluationRunByJobRunId(id);
     if (updated) {
       this.events.publish({ type: 'run', run: broadcastOf(updated) });
     }
 
+    const queueName = queueNameOf(run.jobName);
     const queue =
-      queueNameOf(run.jobName) === QUEUES.maintenance
+      queueName === QUEUES.maintenance
         ? this.maintenanceQueue
-        : this.historicalQueue;
+        : queueName === QUEUES.strategyEvaluation
+          ? this.strategyQueue
+          : this.historicalQueue;
     await queue.remove(id).catch(() => undefined);
 
     await recordAudit({

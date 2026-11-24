@@ -143,8 +143,9 @@ pnpm build
 pnpm db:verify
 ```
 
-`pnpm db:verify` expects 56 logical tables, the R2 tables and indexes, 51 sync targets with status
-rows and primary mappings, a 2022–2027 calendar, valid tick sizes and zero orders.
+`pnpm db:verify` expects 58 logical tables, the R2/R3 tables and indexes, 51 sync targets with status
+rows and primary mappings, a 2022–2027 calendar, valid tick sizes, `orb-15m` version 2 bound and zero
+orders.
 
 Strict coverage is the only completeness verdict. `instrument_day_coverage` stores one row per
 instrument per expected trading day with `expected_bars` and `stored_bars`; missing minutes are

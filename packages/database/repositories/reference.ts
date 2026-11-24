@@ -51,6 +51,7 @@ export async function listInstruments(filters: {
         tickSize: instruments.tickSize,
         freezeQuantity: instruments.freezeQuantity,
         isActive: instruments.isActive,
+        isSyncTarget: instruments.isSyncTarget,
         listedOn: instruments.listedOn,
         delistedOn: instruments.delistedOn,
         mappingCount: sql<number>`(
@@ -217,10 +218,8 @@ export async function findProviderMapping(instrumentId: string, providerId: stri
 export async function createRawProviderPayload(values: {
   providerId: string;
   endpoint: string;
-  httpMethod: string;
   requestFingerprint: string;
   requestParams: Record<string, unknown> | null;
-  httpStatus: number;
   payload: unknown;
   payloadBytes: number;
   payloadSha256: string;
@@ -233,10 +232,8 @@ export async function createRawProviderPayload(values: {
       id: uuidv7(),
       providerId: values.providerId,
       endpoint: values.endpoint,
-      httpMethod: values.httpMethod,
       requestFingerprint: values.requestFingerprint,
       requestParams: values.requestParams,
-      httpStatus: values.httpStatus,
       payload: values.payload as Record<string, unknown> | unknown[],
       payloadBytes: values.payloadBytes,
       payloadSha256: values.payloadSha256,

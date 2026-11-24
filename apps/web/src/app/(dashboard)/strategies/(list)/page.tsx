@@ -108,9 +108,10 @@ export default async function StrategiesPage({
               <TableRow>
                 <TableHead>Code</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Runtime</TableHead>
                 <TableHead>Latest version</TableHead>
                 <TableHead>Versions</TableHead>
-                <TableHead>Activations</TableHead>
+                <TableHead>Last run</TableHead>
                 <TableHead />
               </TableRow>
             </TableHeader>
@@ -125,6 +126,9 @@ export default async function StrategiesPage({
                     <StatusBadge status={strategy.status} />
                   </TableCell>
                   <TableCell>
+                    <StatusBadge status={strategy.runtimeStatus ?? 'unregistered'} />
+                  </TableCell>
+                  <TableCell>
                     {strategy.latestVersion ? (
                       <div className="flex items-center gap-2">
                         <Badge variant="outline">v{strategy.latestVersion}</Badge>
@@ -137,8 +141,18 @@ export default async function StrategiesPage({
                     )}
                   </TableCell>
                   <TableCell>{strategy.versionCount}</TableCell>
-                  <TableCell>{strategy.activeActivations}</TableCell>
+                  <TableCell>
+                    {strategy.lastEvaluationStatus ? (
+                      <StatusBadge status={strategy.lastEvaluationStatus} />
+                    ) : (
+                      <span className="text-muted-foreground text-xs">Never</span>
+                    )}
+                  </TableCell>
                   <TableActions>
+                    <TableActionLink
+                      href={detailHref(`/strategies/${strategy.id}/evaluations`, from)}
+                      label="View evaluations"
+                    />
                     <TableActionLink
                       href={detailHref(`/strategies/${strategy.id}`, from)}
                       label="View strategy"

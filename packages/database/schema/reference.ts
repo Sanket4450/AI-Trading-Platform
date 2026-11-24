@@ -18,7 +18,6 @@ import {
   jsonb,
   numeric,
   pgTable,
-  smallint,
   text,
   timestamp,
   uniqueIndex,
@@ -32,9 +31,6 @@ export const providers = pgTable(
     code: varchar('code', { length: 30 }).notNull(),
     name: varchar('name', { length: 120 }).notNull(),
     kind: varchar('kind', { length: 20 }).notNull(),
-    capabilities: jsonb('capabilities')
-      .default(sql`'{}'::jsonb`)
-      .notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
@@ -199,10 +195,8 @@ export const rawProviderPayloads = pgTable(
     id: uuid('id').primaryKey().defaultRandom(),
     providerId: uuid('provider_id').notNull(),
     endpoint: varchar('endpoint', { length: 160 }).notNull(),
-    httpMethod: varchar('http_method', { length: 10 }).notNull(),
     requestFingerprint: char('request_fingerprint', { length: 64 }).notNull(),
     requestParams: jsonb('request_params'),
-    httpStatus: smallint('http_status').notNull(),
     payload: jsonb('payload').notNull(),
     payloadBytes: integer('payload_bytes').notNull(),
     payloadSha256: char('payload_sha256', { length: 64 }).notNull(),
@@ -219,11 +213,7 @@ export const rawProviderPayloads = pgTable(
       table.requestFingerprint,
       table.payloadSha256,
     ),
-    check('chk_raw_provider_payloads_http_status_1', sql`${table.httpStatus} between 100 and 599`),
-    check(
-      'chk_raw_provider_payloads_retention_class_2',
-      sql`${table.retentionClass} in ('standard', 'extended', 'errors')`,
-    ),
+    check('chk_raw_provider_payloads_retention_class_2', sql`${table.retentionClass} in ('standard', 'extended', 'errors')`),
   ],
 );
 

@@ -1,20 +1,17 @@
 ## Implementation Plan
 
-Task: Find out the columns to be removed
+Task: Write down the end to end plan for R3
 
 ### Description
 
-- Scan each table and identify columns that are no longer needed or redundant.
-  - Either two or more columns can be merged into one.
-  - Either one column is completely unnecessary and can be removed.
-  - Some columns might be needed for historical purposes but are no longer used in the current implementation.
-  - Either column is redundant and the value can be computed from other columns.
-  - A column has not business usecase and can be removed.
+- The end to end plan for R3 includes identifying the columns to be removed from each table, merging or removing redundant columns, and ensuring that the remaining columns are sufficient for the current implementation.
+- In case of any missing columns, we will add them to the tables and ensure that they are properly populated with data.
+- In terms of UI/UX, make sure the design is consistent with the previous releases and that the user experience is intuitive and user-friendly.
 
 ### Context
 
-- 
+- R1 and R2 are fully completed and tested. R3 is the next step in the project.
 
 ### Constraints
 
-- List down each table and the columns that are to be removed.
+- Write down the whole plan within a new markdown file into context

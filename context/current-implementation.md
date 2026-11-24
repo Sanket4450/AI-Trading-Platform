@@ -4,8 +4,8 @@
 earlier plan proposed. The HTML files in `context/` are the original design records; where they
 conflict with this file, the code and this file win.
 
-R1 (foundation) and R2 (research data platform) are delivered. R3–R9 are not implemented beyond
-placeholder packages and reserved tables.
+R1 (foundation), R2 (research data platform) and R3 (strategy registry and ORB) are delivered.
+R4–R9 are not implemented beyond placeholder packages and reserved tables.
 
 ## Release status
 
@@ -13,7 +13,7 @@ placeholder packages and reserved tables.
 | ------- | -------------------------------------------------------- | ----------- |
 | R1      | Foundation, schema, auth, configuration, dashboard, jobs | Delivered   |
 | R2      | Upstox historical ingestion, coverage, catalog, quality  | Delivered   |
-| R3      | Strategy registry and opening-range-breakout             | Not started |
+| R3      | Strategy registry and opening-range-breakout             | Delivered   |
 | R4      | Backtesting and simulated execution                      | Not started |
 | R5      | Live ingestion, signals, risk and order state            | Not started |
 | R6      | Sandbox, production auth, static IP and compliance       | Not started |
@@ -62,7 +62,10 @@ Operator routes in `apps/web/src/app/(dashboard)`:
 - `/api-calls` — provider-wide call ledger with filters and keyset pagination.
 - `/audit` — immutable operator audit trail.
 - `/settings` — runtime settings, provider state, configuration versions and provider-wide issues.
-- `/strategies`, `/strategies/[id]` — strategy versions, parameter bindings and effective config.
+- `/strategies`, `/strategies/[id]` — strategy versions, parameter bindings, effective config and
+  runtime registry status.
+- `/strategies/[id]/evaluations`, `/strategies/[id]/evaluations/[runId]` — research evaluation runs,
+  signal review and the instrument-day explainability ledger.
 - `/login` and `/service-unavailable` are the only unauthenticated pages.
 
 `apps/web/src/proxy.ts` protects every route except login and auth callbacks (Next.js 16 replaced
@@ -82,7 +85,9 @@ Every API route is under `/api/v1`. All routes require a session except `GET /he
   import.
 - `instruments` (catalog) — fetch/data status, status summary, per-instrument issues, coverage
   detail, coverage day, day issues, coverage recompute, fetch preview/launch, fetch cancel.
-- `strategies` — list, summary, detail, versions, effective config, create version.
+- `strategies` — list, summary, detail, versions, effective config, create version, evaluation run
+  create/list/detail/results/signals/cancel, strategy-wide signals and signal detail. Runtime status
+  resolves through `@ai-trading/strategies`.
 - `configuration` — list, summary, detail, diff, create, bind.
 - `jobs` — list, summary, detail, events, api calls, cancel.
 - `issues` — list, summary, detail.
@@ -94,8 +99,8 @@ Every API route is under `/api/v1`. All routes require a session except `GET /he
   notifications, reports, trading calendar, risk events, sessions.
 
 The `admin` user role is required for corporate-action import, instrument-master sync,
-trading-calendar sync, coverage rebuild and ingestion reconcile. Other reads and the instrument
-fetch/cancel commands require a valid session but no specific role.
+trading-calendar sync, coverage rebuild, ingestion reconcile, evaluation-run create and cancel.
+Other reads and the instrument fetch/cancel commands require a valid session but no specific role.
 
 `orders`, `positions`, `trading`, `risk`, `backtests`, `reports`, `notifications` and `market-data`
 have placeholder controllers with no routes, and their Nest modules are not imported into
@@ -118,6 +123,7 @@ Job definitions are the single source of truth in `packages/domain/jobs.ts`.
 | `ingestion-reconcile` | `historical-data` | sweep, issues, finalize |
 | `refresh-materialized-view` | `maintenance` | refresh |
 | `ensure-partitions` | `maintenance` | ensure |
+| `strategy-evaluation` | `strategy-evaluation` | prepare, evaluate, finalize |
 
 Schedules run in `Asia/Kolkata` (`apps/worker/src/schedulers/market.scheduler.ts`):
 
@@ -134,13 +140,14 @@ Schedules run in `Asia/Kolkata` (`apps/worker/src/schedulers/market.scheduler.ts
 | 09:00 | Saturday | full `quality-scan` |
 | 08:00 | 1st of month | `ensure-partitions` and API-call retention purge |
 
-`WORKER_SCHEDULES_ENABLED=false` disables every schedule. Only `historical-data` and `maintenance`
-processors are registered; the remaining worker folders are placeholders.
+`WORKER_SCHEDULES_ENABLED=false` disables every schedule. Only `historical-data`, `maintenance` and
+`strategy-evaluation` processors are registered; the remaining worker folders are placeholders.
+`strategy-evaluation` is operator-initiated and unscheduled, with concurrency 1.
 
 ## Data model
 
-- 56 logical tables and one materialized view (`mv_instrument_daily_stats`).
-- Migrations `0000`–`0019`. `0001`–`0019` are hand-written SQL; the runner records SHA-256
+- 58 logical tables and one materialized view (`mv_instrument_daily_stats`).
+- Migrations `0000`–`0021`. `0001`–`0021` are hand-written SQL; the runner records SHA-256
   checksums and refuses to run an edited applied migration.
 - Candle partitions cover 2022-01 through 2027-03 (63 partitions). Quote partitions cover 2026-01
   through 2027-03 (15 partitions). `ensure_market_partitions()` extends them.
@@ -151,9 +158,12 @@ processors are registered; the remaining worker folders are placeholders.
   and rows older than 90 days are purged by `ensure-partitions`.
 - `system_issues` is a current-state ledger: one active problem per row, cleared by the operation
   that later succeeds. There is no status history.
-- Reserved R3–R8 tables (`backtest_*`, `signals`, `risk_decisions`, `orders`, `order_events`,
-  `fills`, `positions`, `trade_costs`, `round_trip_trades`, reconciliations, promotion reviews)
-  exist and are empty or unused.
+- `strategy_evaluation_runs` and `strategy_evaluation_results` are the R3 research run ledger and
+  per-instrument-day explainability surface. `signals` stores research rows scoped by
+  `evaluation_run_id`; the live scope (`trading_session_id`) remains reserved for R5.
+- Reserved R4–R8 tables (`backtest_*`, `risk_decisions`, `orders`, `order_events`, `fills`,
+  `positions`, `trade_costs`, `round_trip_trades`, reconciliations, promotion reviews) exist and are
+  empty or unused.
 
 ### Migration history
 
@@ -179,11 +189,14 @@ processors are registered; the remaining worker folders are placeholders.
 | `0017_pagination_indexes` | Composite keyset indexes for the operator lists. |
 | `0018_external_api_calls` | Added the outbound provider-call ledger. |
 | `0019_drop_job_runs_group_id` | Dropped the unused `job_runs.group_id`. |
+| `0020_r3_strategy_evaluation` | Added evaluation runs/results, research signal scope and the `strategy-evaluation` job/stage checks. |
+| `0021_r3_drop_dead_columns` | Dropped seven columns with no producer, consumer or planned owner. |
 
 The seed creates the admin operator, one Upstox account, NSE/BSE exchanges, 51 sync targets (the
 NIFTY 50 index and 50 cash equities), primary Upstox mappings, a 2022–2027 reviewed calendar
-fixture, `orb-15m` strategy version 1 with parameter/risk/system configuration versions and their
-bindings, and one `instrument_data_status` row per target.
+fixture, `orb-15m` strategy versions 1 and 2 with parameter/risk/system configuration versions and
+their bindings, and one `instrument_data_status` row per target. Version 2 points at
+`opening-range-breakout@1.0.0`; version 1 remains `validated`.
 
 ## Ingestion and data quality
 
@@ -243,9 +256,10 @@ is never computed on read.
 ## Verification and tests
 
 - `pnpm lint` runs Oxlint across all projects and `scripts/check-boundaries.mjs`.
-- `pnpm db:verify` expects 56 logical tables, one materialized view, at least 63 candle partitions,
+- `pnpm db:verify` expects 58 logical tables, one materialized view, at least 63 candle partitions,
   at least 15 quote partitions, 51 sync targets with status rows and primary mappings, 2191
-  calendar days in 2022–2027, valid tick sizes and zero live orders.
+  calendar days in 2022–2027, valid tick sizes, the evaluation tables/indexes, the seven dropped
+  columns absent, `orb-15m` version 2 bound, exactly one NIFTY 50 index and zero live orders.
 - Integration tests start `postgres:17-alpine` through testcontainers and run migrations plus the
   seed.
 - Broker-contract tests assert that the API does not import order, position or trading modules, that
@@ -260,8 +274,11 @@ is never computed on read.
 - Production Azure hosting, static IP, managed Redis and KMS-backed key rotation are R6/R8 work.
 - Metrics, alerting, retention policy for candles/quotes and the net-equity formula are not
   implemented.
-- R3 has a strategy contract and an ORB placeholder returning `[]`; no signal logic, registry,
-  backtesting or execution exists yet.
+- R3 delivers a session-scoped strategy contract, a static registry, the pure ORB evaluator, the
+  research evaluation job and the evaluation dashboard. R4–R9 remain unimplemented.
+- The R3 real-data gate is open: a real evaluation needs complete NIFTY 50 index coverage for the
+  chosen range. The synthetic testcontainers proof covers the persistence path; a real run records
+  `index_*` reasons when the index is incomplete.
 
 ## Where to read more
 

@@ -1,7 +1,7 @@
 deleteAllCoverage# AGENTS.md — AI Trading System
 
 Modular monolith for NSE cash-equity research, backtesting and (later) controlled live execution.
-Current release is **R2**: research data platform. It cannot place orders.
+Current release is **R3**: strategy registry and opening-range-breakout research evaluation. It cannot place orders.
 
 ## Working agreement (non-negotiable)
 
@@ -116,17 +116,18 @@ pnpm dev                      # builds all packages, then web:3000, api:8000, wo
 
 ## Database and migrations
 
-- Migrations are numbered SQL files in `packages/database/migrations/` (`0000`–`0019`). The runner
+- Migrations are numbered SQL files in `packages/database/migrations/` (`0000`–`0021`). The runner
   records SHA-256 checksums and refuses to run if an applied file changed.
-- **Never edit an applied migration**; add a new numbered file. `0001`–`0019` are hand-written
+- **Never edit an applied migration**; add a new numbered file. `0001`–`0021` are hand-written
   custom SQL, so point future `drizzle-kit generate` runs at a fresh directory or rename the output
   to the next free number.
 - FKs, partial/BRIN indexes, partitions, triggers and the materialized view live in explicit SQL;
   Drizzle schema files cover tables, checks and simple indexes.
 - `pnpm db:seed` builds `@ai-trading/domain` first. Running `tsx seed.ts` directly can fail on stale
   package output.
-- `pnpm db:verify` expects 56 logical tables, 1 materialized view, >=63 candle partitions, >=15
-  quote partitions, 0 live orders, and a parameters binding for every strategy version.
+- `pnpm db:verify` expects 58 logical tables, 1 materialized view, >=63 candle partitions, >=15
+  quote partitions, the R3 evaluation tables/indexes, `orb-15m` version 2 bound, exactly one NIFTY
+  50 index, 0 live orders, and a parameters binding for every strategy version.
 
 ## Framework quirks
 
@@ -141,7 +142,7 @@ pnpm dev                      # builds all packages, then web:3000, api:8000, wo
   web/packages/tests, Vitest 4 for Nest apps. Check the local package before copying config.
 - API/worker contain placeholder modules for orders, positions, risk, trading, backtests, reports,
   notifications and market-data. They are **not imported** into `AppModule`; do not describe them as
-  active API surface or add order routes in R2.
+  active API surface or add order routes in R2/R3.
 
 ## Verification gotchas
 
@@ -155,7 +156,7 @@ pnpm dev                      # builds all packages, then web:3000, api:8000, wo
 ## Source of truth
 
 - `context/` — authoritative specs (R1/R2 plans, architecture, ORB strategy, risk, execution,
-  backtesting, roadmap) and `current-implementation.md`, the as-built R1/R2 snapshot.
+  backtesting, roadmap) and `current-implementation.md`, the as-built R1/R2/R3 snapshot.
 - `docs/architecture/` — architecture summary and ADR 0001.
 - `docs/operations/` — runbooks, implementation notes, R2 data-quality rules, catalog status.
 - `README.md` — quick start, URLs and repository policy.

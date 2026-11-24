@@ -80,10 +80,8 @@ export class ReferenceSyncService {
       const raw = await createRawProviderPayload({
         providerId: provider.id,
         endpoint: '/instruments/NSE.json.gz',
-        httpMethod: 'GET',
         requestFingerprint: sha256Hex('instrument-master|NSE'),
         requestParams: { exchange: 'NSE' },
-        httpStatus: 200,
         payload: master,
         payloadBytes: Buffer.byteLength(serialized, 'utf8'),
         payloadSha256: sha256Hex(serialized),
@@ -252,10 +250,8 @@ export class ReferenceSyncService {
         await createRawProviderPayload({
           providerId: provider.id,
           endpoint: '/v2/market/holidays',
-          httpMethod: 'GET',
           requestFingerprint: sha256Hex('market-holidays|current-year'),
           requestParams: null,
-          httpStatus: 200,
           payload: holidays,
           payloadBytes: Buffer.byteLength(serialized, 'utf8'),
           payloadSha256: sha256Hex(serialized),

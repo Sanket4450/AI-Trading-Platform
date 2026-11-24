@@ -30,6 +30,7 @@
   },
   "dependencies": {
     "@ai-trading/domain": "workspace:*",
-    "@ai-trading/trading-engine": "workspace:*"
+    "@ai-trading/trading-engine": "workspace:*",
+    "ajv": "^8.20.0"
   }
 }

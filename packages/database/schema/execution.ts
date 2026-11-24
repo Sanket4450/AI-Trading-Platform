@@ -29,7 +29,8 @@ export const signals = pgTable(
   {
     id: uuid('id').primaryKey().defaultRandom(),
     strategyVersionId: uuid('strategy_version_id').notNull(),
-    tradingSessionId: uuid('trading_session_id').notNull(),
+    tradingSessionId: uuid('trading_session_id'),
+    evaluationRunId: uuid('evaluation_run_id'),
     accountId: uuid('account_id').notNull(),
     instrumentId: uuid('instrument_id').notNull(),
     configurationVersionId: uuid('configuration_version_id').notNull(),
@@ -53,6 +54,37 @@ export const signals = pgTable(
     index('idx_signals_trading_session_id').on(table.tradingSessionId),
     index('idx_signals_instrument_id').on(table.instrumentId),
     index('idx_signals_signal_at').on(table.signalAt),
+    uniqueIndex('uq_signals_research_decision')
+      .on(
+        table.evaluationRunId,
+        table.strategyVersionId,
+        table.instrumentId,
+        table.candleStart,
+        table.signalType,
+      )
+      .where(sql`${table.evaluationRunId} is not null`),
+    uniqueIndex('uq_signals_live_decision')
+      .on(
+        table.tradingSessionId,
+        table.strategyVersionId,
+        table.instrumentId,
+        table.candleStart,
+        table.signalType,
+      )
+      .where(sql`${table.tradingSessionId} is not null`),
+    index('idx_signals_run_timeline')
+      .on(table.evaluationRunId, table.signalAt)
+      .where(sql`${table.evaluationRunId} is not null`),
+    index('idx_signals_instrument_candle').on(table.instrumentId, table.candleStart),
+    check(
+      'chk_signals_scope',
+      sql`num_nonnulls(${table.tradingSessionId}, ${table.evaluationRunId}) = 1`,
+    ),
+    check(
+      'chk_signals_quantity_whole',
+      sql`${table.quantity} is null or ${table.quantity} = trunc(${table.quantity})`,
+    ),
+    check('chk_signals_evidence_object', sql`jsonb_typeof(${table.evidence}) = 'object'`),
     check('chk_signals_direction_1', sql`${table.direction} in ('long', 'short')`),
     check(
       'chk_signals_signal_type_2',
@@ -86,7 +118,6 @@ export const riskDecisions = pgTable(
     reasons: jsonb('reasons')
       .default(sql`'[]'::jsonb`)
       .notNull(),
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     uniqueIndex('uq_risk_decisions_signal').on(table.signalId),
@@ -113,7 +144,6 @@ export const orders = pgTable(
     brokerOrderId: varchar('broker_order_id', { length: 80 }),
     exchangeOrderId: varchar('exchange_order_id', { length: 80 }),
     clientOrderRef: varchar('client_order_ref', { length: 80 }).notNull(),
-    orderRefId: varchar('order_ref_id', { length: 80 }),
     side: varchar('side', { length: 10 }).notNull(),
     orderType: varchar('order_type', { length: 20 }).notNull(),
     product: varchar('product', { length: 10 }).notNull(),
@@ -482,7 +512,6 @@ export const reconciliations = pgTable(
     status: varchar('status', { length: 20 }).notNull(),
     ordersChecked: integer('orders_checked').default(0).notNull(),
     positionsChecked: integer('positions_checked').default(0).notNull(),
-    rawPayloadId: uuid('raw_payload_id'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [

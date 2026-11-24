@@ -44,7 +44,7 @@ afterAll(async () => {
 });
 
 describe('R2 database lifecycle', () => {
-  it('creates 56 logical tables, the materialized view and the partitions', async () => {
+  it('creates 58 logical tables, the materialized view and the partitions', async () => {
     const [schema] = await sql<{ tables: number; matviews: number }[]>`
       select
         count(*) filter (
@@ -56,7 +56,7 @@ describe('R2 database lifecycle', () => {
       from pg_class c
       where relnamespace = 'public'::regnamespace
     `;
-    expect(schema.tables).toBe(56);
+    expect(schema.tables).toBe(58);
     expect(schema.matviews).toBe(1);
 
     const [partitions] = await sql<{ count: number }[]>`
@@ -96,9 +96,9 @@ describe('R2 database lifecycle', () => {
     expect(counts.instruments).toBe(51);
     expect(counts.mappings).toBe(51);
     expect(counts.sync_targets).toBe(51);
-    expect(counts.strategy_versions).toBe(1);
+    expect(counts.strategy_versions).toBe(2);
     expect(counts.configurations).toBe(3);
-    expect(counts.bindings).toBe(3);
+    expect(counts.bindings).toBe(6);
     expect(counts.permissions).toBe(20);
   });
 

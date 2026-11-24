@@ -197,8 +197,7 @@ export const tradingSessions = pgTable(
   ],
 );
 
-export const riskEvents = pgTable(
-  'risk_events',
+export const riskEvents = pgTable(  'risk_events',
   {
     id: uuid('id').primaryKey().defaultRandom(),
     tradingSessionId: uuid('trading_session_id').notNull(),
@@ -223,5 +222,90 @@ export const riskEvents = pgTable(
       sql`${table.eventType} in ('limit_breach', 'trade_blocked', 'kill_switch', 'stale_data', 'protective_order_failure', 'reconciliation_mismatch', 'manual_override', 'data_quality_block')`,
     ),
     check('chk_risk_events_severity_2', sql`${table.severity} in ('info', 'warning', 'critical')`),
+  ],
+);
+
+/** One operator-initiated research run. Pins every input that could change later. */
+export const strategyEvaluationRuns = pgTable(
+  'strategy_evaluation_runs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    strategyVersionId: uuid('strategy_version_id').notNull(),
+    configurationVersionId: uuid('configuration_version_id').notNull(),
+    riskConfigurationVersionId: uuid('risk_configuration_version_id'),
+    accountId: uuid('account_id').notNull(),
+    fromDate: date('from_date').notNull(),
+    toDate: date('to_date').notNull(),
+    initialCapital: numeric('initial_capital', { precision: 20, scale: 2 }).notNull(),
+    universe: jsonb('universe').notNull(),
+    status: varchar('status', { length: 20 }).default('queued').notNull(),
+    note: text('note'),
+    jobRunId: uuid('job_run_id'),
+    error: jsonb('error'),
+    createdBy: uuid('created_by'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    startedAt: timestamp('started_at', { withTimezone: true }),
+    finishedAt: timestamp('finished_at', { withTimezone: true }),
+  },
+  (table) => [
+    index('idx_evaluation_runs_version_created').on(table.strategyVersionId, table.createdAt),
+    index('idx_evaluation_runs_status').on(table.status),
+    index('idx_evaluation_runs_job').on(table.jobRunId),
+    uniqueIndex('uq_evaluation_runs_active')
+      .on(table.strategyVersionId)
+      .where(sql`${table.status} in ('queued','running')`),
+    check('chk_evaluation_runs_dates', sql`${table.fromDate} <= ${table.toDate}`),
+    check('chk_evaluation_runs_capital', sql`${table.initialCapital} > 0`),
+    check(
+      'chk_evaluation_runs_time',
+      sql`${table.finishedAt} is null or ${table.startedAt} is null or ${table.finishedAt} >= ${table.startedAt}`,
+    ),
+    check(
+      'chk_evaluation_runs_status',
+      sql`${table.status} in ('queued','running','completed','failed','cancelled')`,
+    ),
+    check('chk_evaluation_runs_universe', sql`jsonb_typeof(${table.universe}) = 'object'`),
+    check(
+      'chk_evaluation_runs_error',
+      sql`${table.error} is null or jsonb_typeof(${table.error}) = 'object'`,
+    ),
+  ],
+);
+
+/** One row per run, trading date and instrument: the "why no trade" ledger. */
+export const strategyEvaluationResults = pgTable(
+  'strategy_evaluation_results',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    evaluationRunId: uuid('evaluation_run_id').notNull(),
+    tradingDate: date('trading_date').notNull(),
+    instrumentId: uuid('instrument_id').notNull(),
+    status: varchar('status', { length: 20 }).notNull(),
+    reasonCode: varchar('reason_code', { length: 40 }),
+    diagnostics: jsonb('diagnostics').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('uq_evaluation_result_day').on(
+      table.evaluationRunId,
+      table.tradingDate,
+      table.instrumentId,
+    ),
+    index('idx_evaluation_results_day').on(table.evaluationRunId, table.tradingDate),
+    index('idx_evaluation_results_status').on(table.evaluationRunId, table.status),
+    index('idx_evaluation_results_reason').on(table.evaluationRunId, table.reasonCode),
+    index('idx_evaluation_results_instrument').on(table.instrumentId),
+    check(
+      'chk_evaluation_results_status',
+      sql`${table.status} in ('signal','no_signal','skipped')`,
+    ),
+    check(
+      'chk_evaluation_results_reason',
+      sql`(${table.status} = 'signal' and ${table.reasonCode} is null) or (${table.status} <> 'signal' and ${table.reasonCode} is not null)`,
+    ),
+    check(
+      'chk_evaluation_results_diagnostics',
+      sql`jsonb_typeof(${table.diagnostics}) = 'object'`,
+    ),
   ],
 );

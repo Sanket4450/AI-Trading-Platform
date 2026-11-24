@@ -37,7 +37,7 @@ async function bootstrap() {
   const swagger = new DocumentBuilder()
     .setTitle('AI Trading API')
     .setDescription(
-      'R2 research cockpit: reference data, historical ingestion, coverage, data quality and audit.\n\n' +
+      'R3 research platform: reference data, historical ingestion, coverage, data quality, strategy registry and ORB research evaluation.\n\n' +
         'Authentication uses an opaque session token. Call `POST /api/v1/auth/login`, then either ' +
         'paste the returned `token` into Authorize as a bearer token or reuse the httpOnly session ' +
         'cookie set by the login response. Mutating reference-data operations require the `admin` role.',
@@ -67,7 +67,7 @@ async function bootstrap() {
     .addTag('auth', 'Session login, logout and current-user lookup.')
     .addTag('accounts', 'Broker accounts, permissions, credentials and equity.')
     .addTag('instruments', 'Instrument master, provider mappings and minute candles.')
-    .addTag('strategies', 'Strategies, versions and effective configuration lookup.')
+    .addTag('strategies', 'Strategies, versions, runtime status, research evaluation runs and signals.')
     .addTag('configuration', 'Versioned strategy, risk and system configuration.')
     .addTag('data', 'Reference ingestion, backfills, coverage and catalog.')
     .addTag('jobs', 'Background job runs, fixed stages, live events and progress.')

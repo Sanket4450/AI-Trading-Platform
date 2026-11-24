@@ -70,6 +70,7 @@ export interface Instrument {
   tickSize: string;
   freezeQuantity: string | null;
   isActive: boolean;
+  isSyncTarget: boolean;
   listedOn: string | null;
   delistedOn: string | null;
   mappingCount: number;
@@ -115,6 +116,21 @@ export interface Strategy {
   latestVersionStatus: string | null;
   versionCount: number;
   activeActivations: number;
+  runtimeStatus?: string;
+  lastEvaluationId?: string | null;
+  lastEvaluationStatus?: string | null;
+  lastEvaluationAt?: string | null;
+}
+
+export interface StrategyRuntime {
+  status: string;
+  code: string;
+  codeRef: string | null;
+  implementation: string | null;
+  implementationVersion: string | null;
+  schemaMatches: boolean | null;
+  parameterNames: string[];
+  error: string | null;
 }
 
 export interface StrategyBinding {
@@ -154,10 +170,93 @@ export interface StrategyVersion {
   createdAt: string;
   bindings: StrategyBinding[];
   activations: StrategyActivation[];
+  runtimeStatus?: string;
+  runtimeError?: string | null;
 }
 
 export interface StrategyDetail extends Strategy {
   versions: StrategyVersion[];
+  runtime: StrategyRuntime;
+}
+
+export interface EvaluationRunSummary {
+  instrumentDays: number;
+  instrumentsWithSignals: number;
+  entries: number;
+  exits: number;
+  skippedDays: number;
+  noSignalDays: number;
+}
+
+export interface EvaluationRun {
+  id: string;
+  strategyVersionId: string;
+  version: number;
+  codeRef: string;
+  configurationVersionId: string;
+  riskConfigurationVersionId: string | null;
+  fromDate: string;
+  toDate: string;
+  initialCapital: string;
+  status: string;
+  note: string | null;
+  jobRunId: string | null;
+  error: Record<string, unknown> | null;
+  createdAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+  entries?: number;
+  exits?: number;
+  instrumentDays?: number;
+}
+
+export interface EvaluationRunDetail extends EvaluationRun {
+  strategyId: string;
+  strategyCode: string;
+  strategyName: string;
+  parameterVersion: number;
+  parameterHash: string;
+  riskVersion: number | null;
+  runtime: StrategyRuntime;
+  summary: EvaluationRunSummary;
+}
+
+export interface EvaluationResult {
+  id: string;
+  tradingDate: string;
+  instrumentId: string;
+  symbol: string;
+  name: string;
+  status: string;
+  reasonCode: string | null;
+  diagnostics: Record<string, unknown>;
+  signalCount: number;
+}
+
+export interface ResearchSignal {
+  id: string;
+  evaluationRunId: string | null;
+  strategyVersionId: string;
+  instrumentId: string;
+  symbol: string;
+  name: string;
+  signalAt: string;
+  candleStart: string;
+  direction: string;
+  signalType: string;
+  referencePrice: string;
+  entryPrice: string | null;
+  stopPrice: string | null;
+  targetPrice: string | null;
+  quantity: string | null;
+  evidence?: Record<string, unknown>;
+  status: string;
+}
+
+export interface ResearchSignalDetail extends ResearchSignal {
+  version: number;
+  evidence: Record<string, unknown>;
+  createdAt: string;
 }
 
 export interface ConfigurationVersion {

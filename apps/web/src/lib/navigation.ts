@@ -62,6 +62,7 @@ export function safeReturnPath(value: string | string[] | undefined): string | n
   if (!/^\/[A-Za-z0-9\-._~!$&'()*+,;=:@%/?]*$/.test(value)) return null;
 
   const [pathname = ''] = value.split('?');
+  if (/^\/strategies\/[^/]+\/evaluations$/.test(pathname)) return value;
   return ORIGIN_PATHS.has(pathname) ? value : null;
 }
 

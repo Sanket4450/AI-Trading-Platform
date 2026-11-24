@@ -39,6 +39,9 @@ export class InstrumentDto {
   @ApiProperty()
   isActive!: boolean;
 
+  @ApiProperty()
+  isSyncTarget!: boolean;
+
   @ApiProperty({ type: String, format: 'date', nullable: true })
   listedOn!: string | null;
 

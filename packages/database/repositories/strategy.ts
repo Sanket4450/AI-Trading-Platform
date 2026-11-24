@@ -43,6 +43,16 @@ export async function listStrategies(filters: {
           where v.strategy_id = "strategies"."id"
           order by v.version desc limit 1
         )`,
+        latestCodeRef: sql<string | null>`(
+          select v.code_ref from strategy_versions v
+          where v.strategy_id = "strategies"."id"
+          order by v.version desc limit 1
+        )`,
+        latestParameterSchema: sql<Record<string, unknown> | null>`(
+          select v.parameter_schema from strategy_versions v
+          where v.strategy_id = "strategies"."id"
+          order by v.version desc limit 1
+        )`,
         versionCount: sql<number>`(
           select count(*)::int from strategy_versions v
           where v.strategy_id = "strategies"."id"
@@ -51,6 +61,24 @@ export async function listStrategies(filters: {
           select count(*)::int from strategy_activations a
           join strategy_versions v on v.id = a.strategy_version_id
           where v.strategy_id = "strategies"."id" and a.status = 'active'
+        )`,
+        lastEvaluationId: sql<string | null>`(
+          select r.id from strategy_evaluation_runs r
+          join strategy_versions v on v.id = r.strategy_version_id
+          where v.strategy_id = "strategies"."id"
+          order by r.created_at desc limit 1
+        )`,
+        lastEvaluationStatus: sql<string | null>`(
+          select r.status from strategy_evaluation_runs r
+          join strategy_versions v on v.id = r.strategy_version_id
+          where v.strategy_id = "strategies"."id"
+          order by r.created_at desc limit 1
+        )`,
+        lastEvaluationAt: sql<string | null>`(
+          select r.created_at::text from strategy_evaluation_runs r
+          join strategy_versions v on v.id = r.strategy_version_id
+          where v.strategy_id = "strategies"."id"
+          order by r.created_at desc limit 1
         )`,
       })
       .from(strategies)

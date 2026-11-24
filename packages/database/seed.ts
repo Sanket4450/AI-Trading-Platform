@@ -2,7 +2,7 @@ import './load-env.js';
 import { pathToFileURL } from 'node:url';
 import { hash } from '@node-rs/argon2';
 import { and, eq, sql } from 'drizzle-orm';
-import { hashPayload } from '@ai-trading/domain';
+import { hashPayload, ORB_CODE_REF, ORB_PARAMETER_SCHEMA } from '@ai-trading/domain';
 import { uuidv7 } from 'uuidv7';
 import { closeDatabase, db } from './client.js';
 import * as schema from './schema/index.js';
@@ -55,7 +55,6 @@ async function getProvider(tx: Transaction, code: string, name: string, kind: st
       code,
       name,
       kind,
-      capabilities: code === 'upstox' ? { historical: true, quotes: true, orders: true } : {},
     })
     .returning();
   return created;
@@ -523,6 +522,38 @@ export async function seedDatabase(options: SeedOptions) {
         .returning();
     }
 
+    // R3 implementation provenance. Version 1 stays validated; version 2 points at the
+    // registered pure evaluator and carries the shared parameter schema.
+    let strategyVersion2 = (
+      await tx
+        .select()
+        .from(schema.strategyVersions)
+        .where(
+          and(
+            eq(schema.strategyVersions.strategyId, strategy.id),
+            eq(schema.strategyVersions.version, 2),
+          ),
+        )
+        .limit(1)
+    )[0];
+    if (!strategyVersion2) {
+      [strategyVersion2] = await tx
+        .insert(schema.strategyVersions)
+        .values({
+          id: uuidv7(),
+          strategyId: strategy.id,
+          version: 2,
+          codeRef: ORB_CODE_REF,
+          parameterSchema: ORB_PARAMETER_SCHEMA,
+          status: 'active',
+          changelog:
+            'R3 opening-range-breakout implementation. See context/r3-implementation-plan.md.',
+          releasedAt: now,
+          createdBy: user.id,
+        })
+        .returning();
+    }
+
     const strategyConfig = await getOrCreateConfig(tx, {
       configType: 'strategy',
       scopeKey: 'orb-15m',
@@ -586,31 +617,33 @@ export async function seedDatabase(options: SeedOptions) {
       },
     });
 
-    for (const [role, config] of [
-      ['parameters', strategyConfig],
-      ['risk', riskConfig],
-      ['execution', systemConfig],
-    ] as const) {
-      const binding = await tx
-        .select()
-        .from(schema.strategyConfigBindings)
-        .where(
-          and(
-            eq(schema.strategyConfigBindings.strategyVersionId, strategyVersion.id),
-            eq(schema.strategyConfigBindings.configurationVersionId, config.id),
-            eq(schema.strategyConfigBindings.role, role),
-          ),
-        )
-        .limit(1);
-      if (!binding[0]) {
-        await tx.insert(schema.strategyConfigBindings).values({
-          id: uuidv7(),
-          strategyVersionId: strategyVersion.id,
-          configurationVersionId: config.id,
-          role,
-          boundAt: now,
-          boundBy: user.id,
-        });
+    for (const version of [strategyVersion, strategyVersion2]) {
+      for (const [role, config] of [
+        ['parameters', strategyConfig],
+        ['risk', riskConfig],
+        ['execution', systemConfig],
+      ] as const) {
+        const binding = await tx
+          .select()
+          .from(schema.strategyConfigBindings)
+          .where(
+            and(
+              eq(schema.strategyConfigBindings.strategyVersionId, version.id),
+              eq(schema.strategyConfigBindings.configurationVersionId, config.id),
+              eq(schema.strategyConfigBindings.role, role),
+            ),
+          )
+          .limit(1);
+        if (!binding[0]) {
+          await tx.insert(schema.strategyConfigBindings).values({
+            id: uuidv7(),
+            strategyVersionId: version.id,
+            configurationVersionId: config.id,
+            role,
+            boundAt: now,
+            boundBy: user.id,
+          });
+        }
       }
     }
 

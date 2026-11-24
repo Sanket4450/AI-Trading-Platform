@@ -45,7 +45,7 @@ export interface JobStageDefinition {
 
 export interface JobDefinition {
   queueName: string;
-  jobType: 'ingestion' | 'maintenance';
+  jobType: 'ingestion' | 'maintenance' | 'research';
   stages: JobStageDefinition[];
 }
 
@@ -110,6 +110,11 @@ export const JOB_DEFINITIONS = {
     queueName: QUEUES.maintenance,
     jobType: 'maintenance',
     stages: [stage('ensure')],
+  },
+  'strategy-evaluation': {
+    queueName: QUEUES.strategyEvaluation,
+    jobType: 'research',
+    stages: [stage('prepare'), stage('evaluate', true), stage('finalize')],
   },
 } as const satisfies Record<string, JobDefinition>;
 

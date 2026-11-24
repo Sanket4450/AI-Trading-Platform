@@ -342,3 +342,55 @@ previously flagged future-use and audit-snapshot columns. That scope is implemen
 `0016_drop_redundant_columns.sql` and the matching schema/repository/API/web/worker changes.
 
 The empty reserved tables themselves are retained; only their redundant columns are dropped.
+
+---
+
+# R3 schema audit (2026-11-24)
+
+**Scope:** the 56-table R2 schema after `0019`, plus the R3 additions. Every table was re-audited
+against its producers and consumers before the strategy engine was written.
+
+## New tables
+
+| Table | Purpose |
+| --- | --- |
+| `strategy_evaluation_runs` | One operator-initiated research run. Pins the strategy version, parameter/risk configuration versions, account, dates, capital and universe snapshot. Links to `job_runs` for progress and cancellation. |
+| `strategy_evaluation_results` | One row per run, trading date and instrument. Records `signal`, `no_signal` with a primary reason, or `skipped` with a data-quality reason and bounded diagnostics. |
+
+## `signals` changes
+
+| Change | Why |
+| --- | --- |
+| `trading_session_id` nullable | A historical research run has no live session. |
+| `evaluation_run_id` added | Parent for research signals; `CASCADE` from the run. |
+| Scope check `num_nonnulls(trading_session_id, evaluation_run_id) = 1` | A signal has exactly one parent. |
+| Whole-share check | The strategy sizes whole shares. |
+| Evidence object check | Evidence is always a JSON object. |
+| Research and live decision unique indexes | A retried run or a multi-strategy live session cannot duplicate a decision. |
+| Run timeline and instrument timeline indexes | Run signal view and per-instrument history. |
+
+## Seven removals (`0021_r3_drop_dead_columns.sql`)
+
+| Table.column | Evidence |
+| --- | --- |
+| `providers.capabilities` | Written only by the seed with `{historical,quotes,orders}`; no reader. Adapters hard-code capability and the value falsely advertises order support. |
+| `raw_provider_payloads.http_method` | Always `GET` at every call site. |
+| `raw_provider_payloads.http_status` | Always `200`; only successful payloads are stored, and failures live in `external_api_calls`. |
+| `market_candles_1m.created_at` | Insert stamp equal to `updated_at` at insert; `updated_at` is the freshness field on the largest table. |
+| `risk_decisions.created_at` | Duplicate of `decided_at`. |
+| `orders.order_ref_id` | The R1 design keeps `order_ref_id` in `order_events.payload`; no first-class writer is planned. |
+| `reconciliations.raw_payload_id` | A reconciliation reads five payload families; each snapshot row already carries its own payload id. |
+
+No table was dropped. `domain_events`, `system_health_snapshots`, `notification_events`,
+`report_runs`, `market_quote_snapshots` and the `backtest_*` tables keep their named later owners.
+
+## Kept with a stated owner
+
+- `instruments.freeze_quantity` — R5 order slicing.
+- `instruments.listed_on` / `delisted_on` — coverage window.
+- `instruments.is_sync_target` — the ORB universe.
+- `corporate_actions.price_adjustment_factor` / `volume_adjustment_factor` — R4 inputs.
+- `audit_log.user_agent` — shown in the audit detail instead of being deleted.
+- `signals.status` — R3 writes `created`; R4/R5 may add a research/simulated value.
+- `strategy_evaluation_runs.risk_configuration_version_id` — nullable because R3 requires a risk
+  binding at creation but the column stays nullable for a future run type.

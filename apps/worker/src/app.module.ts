@@ -7,6 +7,7 @@ import { QueuesModule } from './queues/queues.module.js';
 import { SchedulersModule } from './schedulers/schedulers.module.js';
 import { HistoricalDataModule } from './workers/historical-data/historical-data.module.js';
 import { MaintenanceModule } from './workers/maintenance/maintenance.module.js';
+import { StrategyEvaluationModule } from './workers/strategy-evaluation/strategy-evaluation.module.js';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { MaintenanceModule } from './workers/maintenance/maintenance.module.js';
     SchedulersModule,
     HistoricalDataModule,
     MaintenanceModule,
+    StrategyEvaluationModule,
   ],
 })
 export class AppModule {}

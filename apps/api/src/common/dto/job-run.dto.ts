@@ -46,7 +46,7 @@ export class JobRunDto {
   @ApiProperty({ example: 'historical-data' })
   queueName!: string;
 
-  @ApiProperty({ enum: ['ingestion', 'maintenance'] })
+  @ApiProperty({ enum: ['ingestion', 'maintenance', 'research'] })
   jobType!: string;
 
   @ApiProperty({

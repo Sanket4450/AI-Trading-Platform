@@ -1,13 +1,13 @@
 # Deployment order
 
-**Status at 2026-11-23:** R1 and R2 are delivered and operating. R3–R9 are planned. See
+**Status at 2026-11-24:** R1, R2 and R3 are delivered. R4–R9 are planned. See
 `context/current-implementation.md` for the as-built inventory.
 
 | Release | Deliverable                                                                                                 | Trading mode | Status |
 | ------- | ----------------------------------------------------------------------------------------------------------- | ------------ | ------ |
 | R1      | Application foundation, database schema, configuration management and dashboard                             | Offline      | Delivered |
 | R2      | Upstox historical data ingestion and data-quality validation                                                | Research     | Delivered |
-| R3      | Strategy registry and first opening-range-breakout implementation                                           | Research     | Not started; contract and placeholder only |
+| R3      | Strategy registry and first opening-range-breakout implementation                                           | Research     | Delivered |
 | R4      | Shared backtesting and simulated execution engine                                                           | Backtesting  | Not started; tables reserved |
 | R5      | Live data ingestion, signal generation, risk engine and order-state management                              | Paper trading | Not started; tables reserved |
 | R6      | Upstox sandbox integration tests, production authentication, static IP and applicable algo compliance setup | Testing      | Not started; `infra/azure` placeholder |
@@ -44,6 +44,18 @@ R2 is broader than "historical ingestion plus validation". Delivered scope:
 
 R2 still has no order route and no broker write method. The API and worker accept only `offline` or
 `research`.
+
+## What R3 actually delivered
+
+- Session-scoped strategy contract v2, a static registry and `ajv` parameter validation.
+- The 15-minute ORB evaluator: opening range, five-minute rollup, VWAP, NIFTY EMA confirmation,
+  same-slot volume, sizing, stop/target/EOD exits and the one-position/two-entry limits.
+- `strategy_evaluation_runs` and `strategy_evaluation_results`, research signals scoped by
+  `evaluation_run_id`, and migration `0021` dropping seven dead columns.
+- The operator-initiated `strategy-evaluation` job with day-batched evaluation, per-day idempotency,
+  cancellation between days and progress per day.
+- Evaluation APIs and the `/strategies/[id]/evaluations` dashboard routes.
+- R3 writes no order, fill, position or trade-cost row.
 
 ## Gate reminder
 

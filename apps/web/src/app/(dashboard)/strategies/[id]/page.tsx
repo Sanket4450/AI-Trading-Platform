@@ -1,11 +1,11 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { SlidersHorizontal } from 'lucide-react';
-import { apiFetch } from '@/lib/api';
-import type { StrategyDetail } from '@/lib/types';
+import { apiFetch, getSession } from '@/lib/api';
+import type { Instrument, Paginated, StrategyDetail } from '@/lib/types';
 import { formatDate, formatNumber } from '@/lib/format';
 import { label } from '@/lib/labels';
-import { backLinkFor, type DetailSearchParams } from '@/lib/navigation';
+import { backLinkFor, detailHref, type DetailSearchParams } from '@/lib/navigation';
 import { PageMeta } from '@/components/shell/page-meta';
 import { StatCard, StatGrid } from '@/components/dashboard/stat-card';
 import { SectionCard } from '@/components/dashboard/section-card';
@@ -31,6 +31,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { CreateVersionDialog } from './create-version-dialog';
+import { RunEvaluationDialog } from './run-evaluation-dialog';
 
 export default async function StrategyDetailPage({
   params,
@@ -42,9 +43,26 @@ export default async function StrategyDetailPage({
   const { id } = await params;
   const { from: fromParam } = await searchParams;
   const back = backLinkFor(fromParam, '/strategies');
-  const detail = await apiFetch<StrategyDetail>(`/strategies/${id}`);
+  const [detail, session, instrumentPage] = await Promise.all([
+    apiFetch<StrategyDetail>(`/strategies/${id}`),
+    getSession(),
+    apiFetch<Paginated<Instrument>>('/instruments?segment=NSE_EQ&limit=200'),
+  ]);
 
   if (!detail) notFound();
+  const isAdmin = session.user.role === 'admin';
+  const runnableVersions = detail.versions.filter(
+    (version) =>
+      (version.status === 'active' || version.status === 'validated') &&
+      version.runtimeStatus === 'registered',
+  );
+  const runnableInstruments = instrumentPage.items
+    .filter((instrument) => instrument.isSyncTarget && instrument.instrumentType === 'EQ')
+    .map((instrument) => ({
+      id: instrument.id,
+      symbol: instrument.tradingSymbol,
+      name: instrument.name,
+    }));
 
   return (
     <div>
@@ -62,7 +80,31 @@ export default async function StrategyDetailPage({
           </>
         }
         meta={`${detail.versions.length} versions`}
-        actions={<CreateVersionDialog strategyId={detail.id} />}
+        actions={
+          <>
+            <Button asChild variant="outline" size="sm">
+              <Link href={detailHref(`/strategies/${detail.id}/evaluations`, back.href)}>
+                View evaluations
+              </Link>
+            </Button>
+            {isAdmin ? (
+              <RunEvaluationDialog
+                strategyId={detail.id}
+                versions={runnableVersions.map((version) => ({
+                  id: version.id,
+                  version: version.version,
+                  codeRef: version.codeRef,
+                  runtimeStatus: version.runtimeStatus ?? 'unregistered',
+                  parameterHash:
+                    version.bindings.find((binding) => binding.role === 'parameters')?.payloadHash ??
+                    null,
+                }))}
+                instruments={runnableInstruments}
+              />
+            ) : null}
+            <CreateVersionDialog strategyId={detail.id} />
+          </>
+        }
       />
 
       <StatGrid>
@@ -85,6 +127,51 @@ export default async function StrategyDetailPage({
           tone="warning"
         />
       </StatGrid>
+
+      <SectionCard
+        className="mt-4"
+        title="Runtime"
+        description="Registry resolution for the latest version and the parameters it accepts."
+      >
+        <div className="grid gap-4 lg:grid-cols-[1fr_1.2fr]">
+          <KeyValueGrid
+            columns={2}
+            items={[
+              { label: 'Status', value: <StatusBadge status={detail.runtime.status} /> },
+              {
+                label: 'Implementation',
+                value: detail.runtime.implementation
+                  ? `${detail.runtime.implementation}@${detail.runtime.implementationVersion}`
+                  : '—',
+              },
+              { label: 'Code ref', value: detail.runtime.codeRef ?? '—' },
+              {
+                label: 'Schema match',
+                value:
+                  detail.runtime.schemaMatches === null
+                    ? 'Not checked'
+                    : detail.runtime.schemaMatches
+                      ? 'Match'
+                      : 'Mismatch',
+              },
+              {
+                label: 'Error',
+                value: detail.runtime.error ?? 'None',
+              },
+            ]}
+          />
+          <div>
+            <h3 className="mb-2 text-sm font-medium">Supported parameters</h3>
+            <div className="flex flex-wrap gap-1.5">
+              {detail.runtime.parameterNames.map((name) => (
+                <Badge key={name} variant="outline">
+                  {name}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        </div>
+      </SectionCard>
 
       <SectionCard
         className="mt-4"
@@ -114,11 +201,15 @@ export default async function StrategyDetailPage({
               actions={
                 <>
                   <StatusBadge status={version.status} />
+                  <StatusBadge status={version.runtimeStatus ?? 'unregistered'} />
                   <TableRefreshButton />
                 </>
               }
               contentClassName="space-y-5"
             >
+              {version.runtimeError ? (
+                <p className="text-destructive text-sm">{version.runtimeError}</p>
+              ) : null}
               <div>
                 <h3 className="mb-2 text-sm font-medium">Configuration bindings</h3>
                 {version.bindings.length === 0 ? (
