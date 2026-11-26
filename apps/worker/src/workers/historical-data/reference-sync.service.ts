@@ -125,7 +125,7 @@ export class ReferenceSyncService {
             instrumentType,
             tickSize:
               instrumentType === 'INDEX'
-                ? '0.1000'
+                ? '0.0500'
                 : paiseToTickSize(instrument.tick_size, '0.0500'),
             freezeQuantity:
               instrument.freeze_quantity === undefined ||
@@ -140,7 +140,7 @@ export class ReferenceSyncService {
 
       const result = await upsertInstrumentMasterRows(provider.id, rows, {
         safetyCap,
-        indexTickFallback: '0.1000',
+        indexTickFallback: '0.0500',
       });
       this.tracking.completeStage(jobRunId, 'normalize', 'completed', { rows: rows.length });
       this.tracking.enterStage(jobRunId, 'persist');

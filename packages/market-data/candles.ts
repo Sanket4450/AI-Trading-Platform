@@ -12,8 +12,13 @@ function reject(reason: QualityReason, error: string): NormalizationResult {
   return { ok: false, reason, error };
 }
 
+/** Matches numeric(20,4) so the same provider value never looks changed. */
 function decimal(value: number): string {
-  return Number.isFinite(value) ? String(value) : '';
+  return Number.isFinite(value) ? value.toFixed(4) : '';
+}
+
+function sameDecimal(a: string, b: string): boolean {
+  return Number(a) === Number(b);
 }
 
 /**
@@ -149,13 +154,7 @@ export function dedupeCandles(rows: readonly NormalizedCandle[]): DedupeResult {
       kept.set(key, row);
       continue;
     }
-    const identical =
-      existing.open === row.open &&
-      existing.high === row.high &&
-      existing.low === row.low &&
-      existing.close === row.close &&
-      existing.volume === row.volume;
-    if (!identical) {
+    if (!candleEquals(existing, row)) {
       duplicates.push({ timestamp: row.candleStart, kept: existing, dropped: row });
     }
   }
@@ -164,10 +163,10 @@ export function dedupeCandles(rows: readonly NormalizedCandle[]): DedupeResult {
 
 export function candleEquals(a: NormalizedCandle, b: NormalizedCandle): boolean {
   return (
-    a.open === b.open &&
-    a.high === b.high &&
-    a.low === b.low &&
-    a.close === b.close &&
-    a.volume === b.volume
+    sameDecimal(a.open, b.open) &&
+    sameDecimal(a.high, b.high) &&
+    sameDecimal(a.low, b.low) &&
+    sameDecimal(a.close, b.close) &&
+    sameDecimal(a.volume, b.volume)
   );
 }

@@ -282,12 +282,14 @@ export async function writeCandles(
         toInsert.push(row);
         continue;
       }
+      // Numeric comparison keeps a refetch idempotent even if the provider or an
+      // older row formats the same value with a different decimal scale.
       const identical =
-        current.open === row.open &&
-        current.high === row.high &&
-        current.low === row.low &&
-        current.close === row.close &&
-        current.volume === row.volume &&
+        Number(current.open) === Number(row.open) &&
+        Number(current.high) === Number(row.high) &&
+        Number(current.low) === Number(row.low) &&
+        Number(current.close) === Number(row.close) &&
+        Number(current.volume) === Number(row.volume) &&
         current.isFinal === row.isFinal;
       if (identical) {
         skipped += 1;

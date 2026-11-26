@@ -330,6 +330,12 @@ The NSE fixture was corrected against `/v2/market/timings` and the V3 candle cou
 
 Provider 1-minute gaps (70 bars across six days) remain unchanged and are not filled or synthesized.
 
+### Data-quality corrections (2026-11-26)
+
+- Candle decimals are written at the database scale (`numeric(20,4)`) and revision checks compare numerically. A refetch of unchanged bars no longer records `provider_revision`.
+- The NIFTY 50 index tick is `0.0500`, matching the observed price grid. Equity ticks come from the live Upstox master.
+- `tick_size_mismatch` is now one warning per instrument and tick value, not one per trading day. A backfill rechecks the instrument once and clears the previous warning.
+
 ## R3 — strategy registry and opening-range breakout (2026-11-24)
 
 ### Delivered

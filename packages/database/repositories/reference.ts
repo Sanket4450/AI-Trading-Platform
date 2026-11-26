@@ -437,7 +437,7 @@ export async function upsertInstrumentMasterRows(
 
       const tickSize =
         row.instrumentType === 'INDEX'
-          ? row.tickSize || options.indexTickFallback || '0.1000'
+          ? row.tickSize || options.indexTickFallback || '0.0500'
           : row.tickSize;
 
       await tx

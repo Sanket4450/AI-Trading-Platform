@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildSessionWindow,
+  candleEquals,
   computeCoverageVerdict,
   dedupeCandles,
   displayStatus,
@@ -61,8 +62,34 @@ describe('normalization', () => {
     );
     expect(result).toMatchObject({
       ok: true,
-      row: { tradingDate: '2026-09-01', open: '100', isFinal: true },
+      row: { tradingDate: '2026-09-01', open: '100.0000', isFinal: true },
     });
+  });
+
+  it('canonicalizes decimals to the database scale', () => {
+    const result = normalizeCandle(
+      ['2026-09-01T09:15:00+05:30', 100, 101, 99, 100.5, 1000, 0],
+      context,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.row).toMatchObject({
+      open: '100.0000',
+      high: '101.0000',
+      low: '99.0000',
+      close: '100.5000',
+      volume: '1000.0000',
+    });
+    expect(
+      candleEquals(result.row, {
+        ...result.row,
+        open: '100',
+        high: '101',
+        low: '99',
+        close: '100.5',
+        volume: '1000',
+      }),
+    ).toBe(true);
   });
 
   it('rejects a row outside the reviewed session', () => {

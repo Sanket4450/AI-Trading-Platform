@@ -242,7 +242,7 @@ export const nseSpecialSessions: Record<
  * RELIANCE, HDFCBANK and MARUTI are the documented spot checks.
  */
 export const reviewedTickSizes: Record<string, string> = {
-  'NIFTY 50': '0.1000',
+  'NIFTY 50': '0.0500',
   RELIANCE: '0.1000',
   HDFCBANK: '0.0500',
   MARUTI: '1.0000',

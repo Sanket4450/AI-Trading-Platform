@@ -201,6 +201,13 @@ export class IngestionService {
       kinds: ['mapping_missing'],
       instrumentId,
     });
+    // Tick alignment is an instrument property. Recheck it once per backfill
+    // instead of leaving one warning per historical day.
+    await clearSystemIssues({
+      sources: ['validation'],
+      kinds: ['tick_size_mismatch'],
+      instrumentId,
+    });
 
     const chunks = monthChunks(from, to);
     let fetched = 0;
@@ -453,13 +460,7 @@ export class IngestionService {
     for (const tradingDate of sessions.keys()) {
       await clearSystemIssues({
         sources: ['validation'],
-        kinds: [
-          'calendar_mismatch',
-          'invalid_ohlc',
-          'duplicate_bar',
-          'provider_revision',
-          'tick_size_mismatch',
-        ],
+        kinds: ['calendar_mismatch', 'invalid_ohlc', 'duplicate_bar', 'provider_revision'],
         instrumentId: input.instrumentId,
         tradingDate,
       });
@@ -533,11 +534,7 @@ export class IngestionService {
           providerId: input.providerId,
           instrumentId: input.instrumentId,
           source: 'validation',
-          scope: {
-            tradingDate,
-            windowStart: session.open.toISOString(),
-            windowEnd: session.close.toISOString(),
-          },
+          scope: { tickSize },
           payload: {
             tradingDate,
             windowStart: session.open.toISOString(),
