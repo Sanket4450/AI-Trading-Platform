@@ -78,7 +78,6 @@ const accountSelection = {
   displayName: accounts.displayName,
   brokerProviderId: accounts.brokerProviderId,
   brokerUserRef: accounts.brokerUserRef,
-  baseCurrency: accounts.baseCurrency,
   mode: accounts.mode,
   isActive: accounts.isActive,
   openedAt: accounts.openedAt,

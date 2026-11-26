@@ -17,9 +17,6 @@ export class AccountDto {
   @ApiProperty({ type: String, nullable: true })
   brokerUserRef!: string | null;
 
-  @ApiProperty({ example: 'INR' })
-  baseCurrency!: string;
-
   @ApiProperty({
     enum: ['offline', 'research', 'backtesting', 'paper', 'live'],
   })

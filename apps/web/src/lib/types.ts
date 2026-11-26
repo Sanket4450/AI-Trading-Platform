@@ -16,7 +16,6 @@ export interface Account {
   displayName: string;
   brokerProviderId: string;
   brokerUserRef: string | null;
-  baseCurrency: string;
   mode: string;
   isActive: boolean;
   openedAt: string | null;

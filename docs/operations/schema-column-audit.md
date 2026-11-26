@@ -384,6 +384,15 @@ against its producers and consumers before the strategy engine was written.
 No table was dropped. `domain_events`, `system_health_snapshots`, `notification_events`,
 `report_runs`, `market_quote_snapshots` and the `backtest_*` tables keep their named later owners.
 
+## Accounts base currency removal (`0023_drop_accounts_base_currency.sql`)
+
+| Table.column | Evidence |
+| --- | --- |
+| `accounts.base_currency` | Always `INR`; the product covers NSE/BSE cash equity only. It had no reader beyond being echoed in the accounts list and detail views. |
+
+Money formatting keeps the web default of `INR`, and the system configuration payload keeps its
+global `baseCurrency` until the configuration surface is revisited. No table was dropped.
+
 ## Kept with a stated owner
 
 - `instruments.freeze_quantity` — R5 order slicing.

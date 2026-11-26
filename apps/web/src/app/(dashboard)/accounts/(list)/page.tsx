@@ -114,7 +114,6 @@ export default async function AccountsPage({
               <TableRow>
                 <TableHead>Code</TableHead>
                 <TableHead>Mode</TableHead>
-                <TableHead>Currency</TableHead>
                 <TableHead>Permissions</TableHead>
                 <TableHead>Credential expiry</TableHead>
                 <TableHead />
@@ -130,7 +129,6 @@ export default async function AccountsPage({
                   <TableCell>
                     <StatusBadge status={account.mode} />
                   </TableCell>
-                  <TableCell>{account.baseCurrency}</TableCell>
                   <TableCell>{formatNumber(account.permissionCount)}</TableCell>
                   <TableCell className="text-muted-foreground">
                     {formatDateTime(account.credentialExpiry)}

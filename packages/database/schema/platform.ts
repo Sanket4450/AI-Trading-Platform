@@ -71,7 +71,6 @@ export const accounts = pgTable(
     displayName: varchar('display_name', { length: 120 }).notNull(),
     brokerProviderId: uuid('broker_provider_id').notNull(),
     brokerUserRef: varchar('broker_user_ref', { length: 80 }),
-    baseCurrency: char('base_currency', { length: 3 }).notNull(),
     mode: varchar('mode', { length: 20 }).notNull(),
     isActive: boolean('is_active').default(true).notNull(),
     openedAt: date('opened_at'),

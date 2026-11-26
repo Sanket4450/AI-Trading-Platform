@@ -289,7 +289,6 @@ export async function seedDatabase(options: SeedOptions) {
           displayName: accountName,
           brokerProviderId: upstox.id,
           brokerUserRef,
-          baseCurrency: 'INR',
           mode: tradingMode,
           isActive: true,
           openedAt: today,

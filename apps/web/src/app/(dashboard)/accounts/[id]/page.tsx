@@ -122,7 +122,7 @@ export default async function AccountDetailPage({
             <StatusBadge status={account.isActive ? 'active' : 'inactive'} />
           </>
         }
-        meta={`${account.baseCurrency} · UCC ${account.brokerUserRef ?? 'not set'} · opened ${formatDateTime(account.openedAt)}`}
+        meta={`UCC ${account.brokerUserRef ?? 'not set'} · opened ${formatDateTime(account.openedAt)}`}
         actions={
           <RotateCredentialDialog
             accountId={account.id}
@@ -311,7 +311,7 @@ export default async function AccountDetailPage({
                               { label: 'Source', value: label(snapshot.source) },
                               {
                                 label: 'Available cash',
-                                value: formatMoney(snapshot.availableCash, account.baseCurrency),
+                                value: formatMoney(snapshot.availableCash),
                               },
                             ]}
                           />
@@ -423,11 +423,11 @@ export default async function AccountDetailPage({
                           },
                           {
                             label: 'Opening equity',
-                            value: formatMoney(session.openingEquity, account.baseCurrency),
+                            value: formatMoney(session.openingEquity),
                           },
                           {
                             label: 'Closing equity',
-                            value: formatMoney(session.closingEquity, account.baseCurrency),
+                            value: formatMoney(session.closingEquity),
                           },
                           {
                             label: 'Kill switch',
