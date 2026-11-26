@@ -313,6 +313,21 @@ export class TradingCalendarDto {
   @ApiProperty({ type: String, format: 'date-time', nullable: true })
   sessionClose!: string | null;
 
+  @ApiProperty({
+    type: 'array',
+    description:
+      'Intraday suspensions excluded from expected session minutes. Empty for a normal session.',
+    items: {
+      type: 'object',
+      properties: {
+        start: { type: 'string', format: 'date-time' },
+        end: { type: 'string', format: 'date-time' },
+      },
+      required: ['start', 'end'],
+    },
+  })
+  sessionBreaks!: { start: string; end: string }[];
+
   @ApiProperty({ type: String, nullable: true })
   description!: string | null;
 }

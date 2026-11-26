@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, gte, ilike, inArray, lte, or, sql } from 'drizzle-orm';
 import { uuidv7 } from 'uuidv7';
 import { db } from '../client.js';
-import { nseHolidays, nseSpecialSessions } from '../fixtures/nse.js';
+import { buildTradingCalendarFixtureRows } from '../fixtures/calendar.js';
 import {
   corporateActions,
   exchanges,
@@ -176,6 +176,7 @@ export async function listTradingCalendar(filters: {
       isTradingDay: tradingCalendar.isTradingDay,
       sessionOpen: tradingCalendar.sessionOpen,
       sessionClose: tradingCalendar.sessionClose,
+      sessionBreaks: tradingCalendar.sessionBreaks,
       description: tradingCalendar.description,
     })
     .from(tradingCalendar)
@@ -528,33 +529,11 @@ export async function syncTradingCalendarFixture(
   providerId: string,
   years: number[],
 ): Promise<number> {
-  const rows: (typeof tradingCalendar.$inferInsert)[] = [];
-  for (const year of years) {
-    for (let month = 0; month < 12; month += 1) {
-      const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
-      for (let day = 1; day <= daysInMonth; day += 1) {
-        const date = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        // The date is already an IST business date; reading it as IST midnight shifts the
-        // UTC weekday back by one, which would mark Mondays as weekends.
-        const weekday = new Date(`${date}T00:00:00Z`).getUTCDay();
-        const special = nseSpecialSessions[date];
-        const holiday = nseHolidays[date];
-        const isTradingDay = Boolean(special) || (weekday >= 1 && weekday <= 5 && !holiday);
-        const open = special?.open ?? '09:15:00';
-        const close = special?.close ?? '15:30:00';
-        rows.push({
-          id: uuidv7(),
-          exchangeId,
-          tradingDate: date,
-          isTradingDay,
-          sessionOpen: isTradingDay ? new Date(`${date}T${open}+05:30`) : null,
-          sessionClose: isTradingDay ? new Date(`${date}T${close}+05:30`) : null,
-          description: special?.description ?? holiday ?? (isTradingDay ? null : 'Weekend'),
-          sourceProviderId: providerId,
-        });
-      }
-    }
-  }
+  const rows: (typeof tradingCalendar.$inferInsert)[] =
+    buildTradingCalendarFixtureRows({ exchangeId, providerId, years }).map((row) => ({
+      id: uuidv7(),
+      ...row,
+    }));
 
   if (rows.length > 0) {
     await db
@@ -566,6 +545,7 @@ export async function syncTradingCalendarFixture(
           isTradingDay: sql`excluded.is_trading_day`,
           sessionOpen: sql`excluded.session_open`,
           sessionClose: sql`excluded.session_close`,
+          sessionBreaks: sql`excluded.session_breaks`,
           description: sql`excluded.description`,
           sourceProviderId: sql`excluded.source_provider_id`,
           updatedAt: new Date(),
@@ -573,6 +553,38 @@ export async function syncTradingCalendarFixture(
       });
   }
   return rows.length;
+}
+
+/**
+ * A calendar sync can turn a date into a holiday. Coverage rows and the
+ * coverage-owned findings for those dates are projections of the calendar, so
+ * they are removed rather than left as stale evidence.
+ */
+export async function pruneNonTradingProjections(): Promise<{
+  coverageRows: number;
+  issues: number;
+}> {
+  const coverage = await db.execute<{ instrument_id: string }>(sql`
+    delete from instrument_day_coverage c
+    using trading_calendar tc, instruments i
+    where c.instrument_id = i.id
+      and i.exchange_id = tc.exchange_id
+      and c.trading_date = tc.trading_date
+      and not tc.is_trading_day
+    returning c.instrument_id
+  `);
+  const issues = await db.execute<{ id: string }>(sql`
+    delete from system_issues si
+    using trading_calendar tc, instruments i
+    where si.instrument_id = i.id
+      and i.exchange_id = tc.exchange_id
+      and si.source = 'validation'
+      and si.kind in ('missing_bar', 'gap', 'coverage_shortfall', 'partial_bar')
+      and si.payload->>'tradingDate' = tc.trading_date::text
+      and not tc.is_trading_day
+    returning si.id
+  `);
+  return { coverageRows: coverage.length, issues: issues.length };
 }
 
 // ---------------------------------------------------------------------------

@@ -130,6 +130,7 @@ export class IngestionService {
         isTradingDay: row.is_trading_day,
         sessionOpen: row.session_open ? new Date(row.session_open) : null,
         sessionClose: row.session_close ? new Date(row.session_close) : null,
+        sessionBreaks: row.session_breaks ?? [],
         description: row.description,
       };
       const session = buildSessionWindow(calendarRow);
@@ -693,6 +694,7 @@ export class IngestionService {
       sessionClose: calendar.session_close
         ? new Date(calendar.session_close)
         : null,
+      sessionBreaks: calendar.session_breaks ?? [],
     });
     const targets = await getSyncTargetInstruments();
     let instruments = 0;

@@ -1,17 +1,59 @@
-import type { CalendarSessionRow, GapRun, SessionWindow } from './types.js';
+import type { CalendarSessionRow, GapRun, SessionBreak, SessionWindow } from './types.js';
 import { addMinutes } from './time.js';
 
 const MINUTE_MS = 60_000;
 
+/** Break windows are reviewed calendar data, so a malformed one fails closed. */
+function resolveBreaks(
+  rows: CalendarSessionRow['sessionBreaks'],
+  open: Date,
+  close: Date,
+): SessionBreak[] {
+  const breaks = (rows ?? [])
+    .map((value) => {
+      const start = value.start instanceof Date ? value.start : new Date(value.start);
+      const end = value.end instanceof Date ? value.end : new Date(value.end);
+      if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+        throw new Error('Session break has an invalid timestamp');
+      }
+      if (start < open || end > close || start >= end) {
+        throw new Error('Session break must sit inside the session and end after it starts');
+      }
+      if ((end.getTime() - start.getTime()) % MINUTE_MS !== 0) {
+        throw new Error('Session break must be minute aligned');
+      }
+      return { start, end };
+    })
+    .sort((a, b) => a.start.getTime() - b.start.getTime());
+
+  for (let index = 1; index < breaks.length; index += 1) {
+    if (breaks[index]!.start < breaks[index - 1]!.end) {
+      throw new Error('Session breaks must not overlap');
+    }
+  }
+  return breaks;
+}
+
+function inBreak(instant: Date, breaks: readonly SessionBreak[]): boolean {
+  return breaks.some((value) => instant >= value.start && instant < value.end);
+}
+
 /**
  * A reviewed calendar row becomes a session window. Expected bars are the
- * exact session minutes, so a 60-minute Muhurat session expects 60 bars.
+ * exact session minutes, so a 60-minute Muhurat session expects 60 bars and an
+ * intraday break is excluded from the count.
  */
 export function buildSessionWindow(row: CalendarSessionRow): SessionWindow | null {
   if (!row.isTradingDay || !row.sessionOpen || !row.sessionClose) return null;
-  const expectedMinutes = Math.round(
+  const breaks = resolveBreaks(row.sessionBreaks, row.sessionOpen, row.sessionClose);
+  const outerMinutes = Math.round(
     (row.sessionClose.getTime() - row.sessionOpen.getTime()) / MINUTE_MS,
   );
+  const breakMinutes = breaks.reduce(
+    (total, value) => total + (value.end.getTime() - value.start.getTime()) / MINUTE_MS,
+    0,
+  );
+  const expectedMinutes = outerMinutes - breakMinutes;
   if (expectedMinutes <= 0) return null;
   const isSpecial =
     expectedMinutes !== 375 ||
@@ -23,6 +65,7 @@ export function buildSessionWindow(row: CalendarSessionRow): SessionWindow | nul
     tradingDate: row.tradingDate,
     open: row.sessionOpen,
     close: row.sessionClose,
+    breaks,
     expectedMinutes,
     isSpecial,
   };
@@ -31,13 +74,14 @@ export function buildSessionWindow(row: CalendarSessionRow): SessionWindow | nul
 export function expectedMinutes(session: SessionWindow): Date[] {
   const minutes: Date[] = [];
   for (let cursor = session.open; cursor < session.close; cursor = addMinutes(cursor, 1)) {
-    minutes.push(cursor);
+    if (!inBreak(cursor, session.breaks)) minutes.push(cursor);
   }
   return minutes;
 }
 
 export function isWithinSession(instant: Date, session: SessionWindow): boolean {
-  return instant >= session.open && instant < session.close;
+  if (instant < session.open || instant >= session.close) return false;
+  return !inBreak(instant, session.breaks);
 }
 
 export function diffMinutes(expected: readonly Date[], observed: readonly Date[]): Date[] {

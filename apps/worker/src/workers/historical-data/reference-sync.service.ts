@@ -18,6 +18,7 @@ import {
   getSyncTargetInstruments,
   isR2Instrument,
   paiseToTickSize,
+  pruneNonTradingProjections,
   syncTradingCalendarFixture,
   updateJobRun,
   upsertInstrumentMasterRows,
@@ -26,6 +27,7 @@ import {
 import { JobTrackingService } from '../../observability/job-tracking.service.js';
 import { ExternalApiRecorder } from '../../observability/external-api-recorder.js';
 import { recordIssue } from './issue-recorder.js';
+import { QualityService } from './quality.service.js';
 
 @Injectable()
 export class ReferenceSyncService {
@@ -35,6 +37,7 @@ export class ReferenceSyncService {
     private readonly config: ConfigService,
     private readonly tracking: JobTrackingService,
     private readonly recorder: ExternalApiRecorder,
+    private readonly quality: QualityService,
   ) {}
 
   private client(jobRunId: string): UpstoxClient {
@@ -229,15 +232,26 @@ export class ReferenceSyncService {
       provider.id,
       years,
     );
+    // Calendar changes invalidate coverage projections for dates that stopped
+    // trading; rebuild their status counters before reporting the sync.
+    const pruned = await pruneNonTradingProjections();
+    const targets = await getSyncTargetInstruments();
+    for (const target of targets) {
+      await this.quality.recomputeInstrumentStatus(target.instrumentId);
+    }
     this.tracking.completeStage(jobRunId, 'fixture', 'completed', {
       rows,
       years: years.length,
+      ...pruned,
+      statusesRefreshed: targets.length,
     });
     this.tracking.enterStage(jobRunId, 'reconcile');
     const result: Record<string, unknown> = {
       rows,
       years,
       source: 'nse-reviewed-fixture',
+      pruned,
+      statusesRefreshed: targets.length,
       reconciled: false,
       mismatches: 0,
     };

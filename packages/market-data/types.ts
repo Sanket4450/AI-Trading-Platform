@@ -52,12 +52,19 @@ export type QualityReason =
   | 'non_trading_day'
   | 'duplicate_timestamp';
 
+export interface SessionBreak {
+  start: Date;
+  end: Date;
+}
+
 export interface SessionWindow {
   exchangeId: string;
   exchangeCode: string;
   tradingDate: string;
   open: Date;
   close: Date;
+  /** Intraday suspensions excluded from expected minutes, such as the DR-site break. */
+  breaks: readonly SessionBreak[];
   expectedMinutes: number;
   isSpecial: boolean;
 }
@@ -69,6 +76,7 @@ export interface CalendarSessionRow {
   isTradingDay: boolean;
   sessionOpen: Date | null;
   sessionClose: Date | null;
+  sessionBreaks?: readonly { start: Date | string; end: Date | string }[] | null;
   description?: string | null;
 }
 

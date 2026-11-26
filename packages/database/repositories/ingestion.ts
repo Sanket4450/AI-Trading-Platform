@@ -522,10 +522,11 @@ export async function getTradingSessionsForRange(from: string, to: string) {
     is_trading_day: boolean;
     session_open: string | null;
     session_close: string | null;
+    session_breaks: { start: string; end: string }[] | null;
     description: string | null;
   }>(sql`
     select tc.trading_date::text, tc.is_trading_day,
-           tc.session_open::text, tc.session_close::text, tc.description
+           tc.session_open::text, tc.session_close::text, tc.session_breaks, tc.description
     from trading_calendar tc
     join exchanges e on e.id = tc.exchange_id
     where e.code = 'NSE' and tc.trading_date between ${from} and ${to}
@@ -546,10 +547,12 @@ export async function getTradingCalendarRow(date: string) {
     is_trading_day: boolean;
     session_open: string | null;
     session_close: string | null;
+    session_breaks: { start: string; end: string }[] | null;
     description: string | null;
   }>(sql`
     select tc.exchange_id, e.code as exchange_code, tc.trading_date::text,
-           tc.is_trading_day, tc.session_open::text, tc.session_close::text, tc.description
+           tc.is_trading_day, tc.session_open::text, tc.session_close::text,
+           tc.session_breaks, tc.description
     from trading_calendar tc
     join exchanges e on e.id = tc.exchange_id
     where e.code = 'NSE' and tc.trading_date = ${date}

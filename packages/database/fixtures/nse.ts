@@ -129,6 +129,7 @@ export const nseHolidays: Record<string, string> = {
   '2023-11-14': 'Diwali Balipratipada',
   '2023-11-27': 'Guru Nanak Jayanti',
   '2023-12-25': 'Christmas',
+  '2024-01-22': 'Special Holiday (Ram Mandir Inauguration)',
   '2024-01-26': 'Republic Day',
   '2024-03-08': 'Mahashivratri',
   '2024-03-25': 'Holi',
@@ -136,11 +137,13 @@ export const nseHolidays: Record<string, string> = {
   '2024-04-11': 'Eid-Ul-Fitr',
   '2024-04-17': 'Ram Navami',
   '2024-05-01': 'Maharashtra Day',
+  '2024-05-20': 'General Parliamentary Elections',
   '2024-06-17': 'Bakri Eid',
   '2024-07-17': 'Muharram',
   '2024-08-15': 'Independence Day',
   '2024-10-02': 'Mahatma Gandhi Jayanti',
   '2024-11-15': 'Guru Nanak Jayanti',
+  '2024-11-20': 'Maharashtra Assembly Elections',
   '2024-12-25': 'Christmas',
   '2025-02-26': 'Mahashivratri',
   '2025-03-14': 'Holi',
@@ -182,28 +185,44 @@ export const nseHolidays: Record<string, string> = {
 };
 
 /**
- * Provisional Muhurat sessions. The exact window is reviewed with NSE
- * circulars before the full backfill; these rows keep the session math honest
- * instead of treating a one-hour session as a 375-minute day.
+ * Special sessions beyond the normal 09:15-15:30 day. Windows marked as live
+ * Upstox timings were verified with /v2/market/timings. A break records an
+ * intraday suspension so those minutes are not expected bars.
  */
 export const nseSpecialSessions: Record<
   string,
-  { open: string; close: string; description: string }
+  {
+    open: string;
+    close: string;
+    description: string;
+    breaks?: { start: string; end: string }[];
+  }
 > = {
   '2022-10-24': {
     open: '18:15:00',
     close: '19:15:00',
     description: 'Diwali Laxmi Pujan (Muhurat, provisional)',
   },
-  '2024-11-01': {
+  '2023-11-12': {
     open: '18:15:00',
     close: '19:15:00',
-    description: 'Diwali Laxmi Pujan (Muhurat, provisional)',
+    description: 'Diwali Laxmi Pujan (Muhurat, live Upstox timings)',
+  },
+  '2024-05-18': {
+    open: '09:15:00',
+    close: '12:30:00',
+    breaks: [{ start: '10:00:00', end: '11:30:00' }],
+    description: 'Special Live Trading Session (DR site, live Upstox timings)',
+  },
+  '2024-11-01': {
+    open: '18:00:00',
+    close: '19:00:00',
+    description: 'Diwali Laxmi Pujan (Muhurat, live Upstox timings)',
   },
   '2025-10-21': {
-    open: '18:15:00',
-    close: '19:15:00',
-    description: 'Diwali Laxmi Pujan (Muhurat, provisional)',
+    open: '13:45:00',
+    close: '14:45:00',
+    description: 'Diwali Laxmi Pujan (Muhurat, live Upstox timings)',
   },
   '2026-02-01': {
     open: '09:15:00',

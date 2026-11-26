@@ -6,12 +6,11 @@ import { hashPayload, ORB_CODE_REF, ORB_PARAMETER_SCHEMA } from '@ai-trading/dom
 import { uuidv7 } from 'uuidv7';
 import { closeDatabase, db } from './client.js';
 import * as schema from './schema/index.js';
+import { buildTradingCalendarFixtureRows } from './fixtures/calendar.js';
 import {
   NIFTY_50_INDEX,
   defaultEquityTickSize,
   nifty50Constituents,
-  nseHolidays,
-  nseSpecialSessions,
   orbLiquidSymbols,
   reviewedTickSizes,
 } from './fixtures/nse.js';
@@ -35,10 +34,6 @@ function istDate(value: Date = new Date()): string {
     month: '2-digit',
     day: '2-digit',
   }).format(value);
-}
-
-function istInstant(date: string, time: string): Date {
-  return new Date(`${date}T${time}+05:30`);
 }
 
 async function getProvider(tx: Transaction, code: string, name: string, kind: string) {
@@ -332,33 +327,12 @@ export async function seedDatabase(options: SeedOptions) {
 
     // Reviewed calendar fixture for 2022–2027. Special sessions carry their
     // exact window; a provisional row never silently becomes reviewed.
-    const calendarRows: (typeof schema.tradingCalendar.$inferInsert)[] = [];
-    for (let year = 2022; year <= 2027; year += 1) {
-      for (let month = 0; month < 12; month += 1) {
-        const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
-        for (let day = 1; day <= daysInMonth; day += 1) {
-          const date = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-          // The date is already an IST business date; reading it as IST midnight shifts the
-          // UTC weekday back by one, which would mark Mondays as weekends.
-          const weekday = new Date(`${date}T00:00:00Z`).getUTCDay();
-          const special = nseSpecialSessions[date];
-          const holiday = nseHolidays[date];
-          const isTradingDay = Boolean(special) || (weekday >= 1 && weekday <= 5 && !holiday);
-          const open = special?.open ?? '09:15:00';
-          const close = special?.close ?? '15:30:00';
-          calendarRows.push({
-            id: uuidv7(),
-            exchangeId: nse.id,
-            tradingDate: date,
-            isTradingDay,
-            sessionOpen: isTradingDay ? istInstant(date, open) : null,
-            sessionClose: isTradingDay ? istInstant(date, close) : null,
-            description: special?.description ?? holiday ?? (isTradingDay ? null : 'Weekend'),
-            sourceProviderId: upstox.id,
-          });
-        }
-      }
-    }
+    const calendarRows: (typeof schema.tradingCalendar.$inferInsert)[] =
+      buildTradingCalendarFixtureRows({
+        exchangeId: nse.id,
+        providerId: upstox.id,
+        years: [2022, 2023, 2024, 2025, 2026, 2027],
+      }).map((row) => ({ id: uuidv7(), ...row }));
 
     await tx
       .insert(schema.tradingCalendar)
@@ -369,6 +343,7 @@ export async function seedDatabase(options: SeedOptions) {
           isTradingDay: sql`excluded.is_trading_day`,
           sessionOpen: sql`excluded.session_open`,
           sessionClose: sql`excluded.session_close`,
+          sessionBreaks: sql`excluded.session_breaks`,
           description: sql`excluded.description`,
           sourceProviderId: sql`excluded.source_provider_id`,
           updatedAt: new Date(),

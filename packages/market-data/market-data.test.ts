@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildSessionWindow,
   computeCoverageVerdict,
   dedupeCandles,
   displayStatus,
+  expectedMinutes,
   fetchStatusFromRun,
   gapRuns,
+  isWithinSession,
   monthChunks,
   normalizeCandle,
   parseCandleTimestamp,
@@ -19,6 +22,7 @@ const session: SessionWindow = {
   tradingDate: '2026-09-01',
   open: new Date('2026-09-01T03:45:00.000Z'),
   close: new Date('2026-09-01T10:00:00.000Z'),
+  breaks: [],
   expectedMinutes: 375,
   isSpecial: false,
 };
@@ -143,6 +147,57 @@ describe('coverage', () => {
     const verdict = computeCoverageVerdict({ session, observed });
     expect(verdict.status).toBe('complete');
     expect(verdict.missingBarCount).toBe(0);
+  });
+});
+
+describe('session windows with breaks', () => {
+  const drSession = buildSessionWindow({
+    exchangeId: 'exchange',
+    exchangeCode: 'NSE',
+    tradingDate: '2024-05-18',
+    isTradingDay: true,
+    sessionOpen: new Date('2024-05-18T03:45:00.000Z'),
+    sessionClose: new Date('2024-05-18T07:00:00.000Z'),
+    sessionBreaks: [
+      { start: '2024-05-18T04:30:00.000Z', end: '2024-05-18T06:00:00.000Z' },
+    ],
+  });
+
+  it('subtracts the break from expected minutes', () => {
+    expect(drSession).not.toBeNull();
+    expect(drSession!.expectedMinutes).toBe(105);
+    expect(drSession!.isSpecial).toBe(true);
+    expect(expectedMinutes(drSession!)).toHaveLength(105);
+  });
+
+  it('excludes break minutes but keeps the minutes on either edge', () => {
+    const minutes = expectedMinutes(drSession!).map((value) => value.toISOString());
+    expect(minutes).toContain('2024-05-18T04:29:00.000Z');
+    expect(minutes).not.toContain('2024-05-18T04:30:00.000Z');
+    expect(minutes).not.toContain('2024-05-18T05:59:00.000Z');
+    expect(minutes).toContain('2024-05-18T06:00:00.000Z');
+    expect(minutes.at(-1)).toBe('2024-05-18T06:59:00.000Z');
+  });
+
+  it('rejects candles inside the break as outside the session', () => {
+    expect(isWithinSession(new Date('2024-05-18T03:45:00.000Z'), drSession!)).toBe(true);
+    expect(isWithinSession(new Date('2024-05-18T04:30:00.000Z'), drSession!)).toBe(false);
+    expect(isWithinSession(new Date('2024-05-18T06:00:00.000Z'), drSession!)).toBe(true);
+  });
+
+  it('fails closed on a break outside the session', () => {
+    expect(() =>
+      buildSessionWindow({
+        exchangeId: 'exchange',
+        tradingDate: '2024-05-18',
+        isTradingDay: true,
+        sessionOpen: new Date('2024-05-18T03:45:00.000Z'),
+        sessionClose: new Date('2024-05-18T07:00:00.000Z'),
+        sessionBreaks: [
+          { start: '2024-05-18T04:00:00.000Z', end: '2024-05-18T07:30:00.000Z' },
+        ],
+      }),
+    ).toThrow(/inside the session/);
   });
 });
 

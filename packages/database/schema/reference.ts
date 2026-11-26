@@ -124,6 +124,10 @@ export const tradingCalendar = pgTable(
     isTradingDay: boolean('is_trading_day').default(true).notNull(),
     sessionOpen: timestamp('session_open', { withTimezone: true }),
     sessionClose: timestamp('session_close', { withTimezone: true }),
+    sessionBreaks: jsonb('session_breaks')
+      .$type<{ start: string; end: string }[]>()
+      .default(sql`'[]'::jsonb`)
+      .notNull(),
     description: varchar('description', { length: 200 }),
     sourceProviderId: uuid('source_provider_id'),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
@@ -133,6 +137,10 @@ export const tradingCalendar = pgTable(
     uniqueIndex('uq_trading_calendar_exchange_date').on(table.exchangeId, table.tradingDate),
     index('idx_trading_calendar_trading_date').on(table.tradingDate),
     check('chk_trading_calendar_session_open_1', sql`${table.sessionClose} > ${table.sessionOpen}`),
+    check(
+      'chk_trading_calendar_session_breaks_2',
+      sql`jsonb_typeof(${table.sessionBreaks}) = 'array'`,
+    ),
   ],
 );
 
