@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, ilike, inArray, lte, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, ilike, inArray, lte, ne, or, sql } from 'drizzle-orm';
 import { uuidv7 } from 'uuidv7';
 import { db } from '../client.js';
 import { buildTradingCalendarFixtureRows } from '../fixtures/calendar.js';
@@ -453,6 +453,21 @@ export async function upsertInstrumentMasterRows(
           updatedAt: new Date(),
         })
         .where(eq(instruments.id, instrumentId));
+
+      // A provider can change an instrument key (for example after an ISIN
+      // change). Retire the old primary before attaching the new key so the
+      // instrument never keeps two primary mappings.
+      await tx
+        .update(instrumentProviderMappings)
+        .set({ isPrimary: false, validTo: new Date(), updatedAt: new Date() })
+        .where(
+          and(
+            eq(instrumentProviderMappings.instrumentId, instrumentId),
+            eq(instrumentProviderMappings.providerId, providerId),
+            eq(instrumentProviderMappings.isPrimary, true),
+            ne(instrumentProviderMappings.externalKey, row.externalKey),
+          ),
+        );
 
       const existingMapping = await tx
         .select()
