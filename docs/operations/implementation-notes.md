@@ -324,9 +324,10 @@ The NSE fixture was corrected against `/v2/market/timings` and the V3 candle cou
 
 - `2024-01-22`, `2024-05-20` and `2024-11-20` are NSE closures and no longer expect bars.
 - The `2024-11-01` Muhurat session is `18:00-19:00` IST and `2025-10-21` is `13:45-14:45` IST.
-- `2023-11-12` (Sunday, `18:15-19:15`) and `2024-05-18` (Saturday, `09:15-10:00` and `11:30-12:30`) are special sessions.
-- `trading_calendar.session_breaks` records the `2024-05-18` `10:00-11:30` suspension, so break minutes are not expected bars.
+- Special sessions added: `2023-11-12` (Sunday Muhurat), `2024-01-20` (Saturday, `09:15-15:30`), `2024-03-02` (Saturday, `09:15-10:00` and `11:30-12:30`), `2024-05-18` (Saturday DR), and `2025-02-01` (Saturday Budget Day, `09:15-15:30`).
+- `trading_calendar.session_breaks` records the `2024-03-02` and `2024-05-18` `10:00-11:30` suspensions, so break minutes are not expected bars.
 - `calendar-sync` now prunes coverage rows and coverage-owned issues for dates that stop being trading days, then refreshes instrument statuses.
+- `calendar-sync` audits non-trading dates in the last `CALENDAR_RECONCILE_LOOKBACK_DAYS` (default 90) using `/v2/market/timings` plus a RELIANCE candle probe. A provider session with candles raises a critical `calendar_mismatch` audit issue; the reviewed fixture is not changed automatically.
 
 Provider 1-minute gaps (70 bars across six days) remain unchanged and are not filled or synthesized.
 

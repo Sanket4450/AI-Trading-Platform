@@ -37,6 +37,25 @@ describe('NSE calendar fixture', () => {
     expect(row('2023-11-12').sessionClose?.toISOString()).toBe('2023-11-12T13:45:00.000Z');
   });
 
+  it('adds the weekend special sessions', () => {
+    expect(row('2024-01-20').isTradingDay).toBe(true);
+    expect(row('2024-01-20').sessionOpen?.toISOString()).toBe('2024-01-20T03:45:00.000Z');
+    expect(row('2024-01-20').sessionClose?.toISOString()).toBe('2024-01-20T10:00:00.000Z');
+    expect(row('2024-01-20').sessionBreaks).toEqual([]);
+
+    expect(row('2024-03-02').isTradingDay).toBe(true);
+    expect(row('2024-03-02').sessionOpen?.toISOString()).toBe('2024-03-02T03:45:00.000Z');
+    expect(row('2024-03-02').sessionClose?.toISOString()).toBe('2024-03-02T07:00:00.000Z');
+    expect(row('2024-03-02').sessionBreaks).toEqual([
+      { start: '2024-03-02T04:30:00.000Z', end: '2024-03-02T06:00:00.000Z' },
+    ]);
+
+    expect(row('2025-02-01').isTradingDay).toBe(true);
+    expect(row('2025-02-01').sessionOpen?.toISOString()).toBe('2025-02-01T03:45:00.000Z');
+    expect(row('2025-02-01').sessionClose?.toISOString()).toBe('2025-02-01T10:00:00.000Z');
+    expect(row('2025-02-01').sessionBreaks).toEqual([]);
+  });
+
   it('records the 2024-05-18 DR session as an outer window with a break', () => {
     expect(row('2024-05-18').isTradingDay).toBe(true);
     expect(row('2024-05-18').sessionOpen?.toISOString()).toBe('2024-05-18T03:45:00.000Z');

@@ -208,6 +208,17 @@ export const nseSpecialSessions: Record<
     close: '19:15:00',
     description: 'Diwali Laxmi Pujan (Muhurat, live Upstox timings)',
   },
+  '2024-01-20': {
+    open: '09:15:00',
+    close: '15:30:00',
+    description: 'Special Trading Session (live Upstox timings)',
+  },
+  '2024-03-02': {
+    open: '09:15:00',
+    close: '12:30:00',
+    breaks: [{ start: '10:00:00', end: '11:30:00' }],
+    description: 'Special Live Trading Session (DR site, live Upstox timings)',
+  },
   '2024-05-18': {
     open: '09:15:00',
     close: '12:30:00',
@@ -218,6 +229,11 @@ export const nseSpecialSessions: Record<
     open: '18:00:00',
     close: '19:00:00',
     description: 'Diwali Laxmi Pujan (Muhurat, live Upstox timings)',
+  },
+  '2025-02-01': {
+    open: '09:15:00',
+    close: '15:30:00',
+    description: 'Budget Day Session (live Upstox timings)',
   },
   '2025-10-21': {
     open: '13:45:00',

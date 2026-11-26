@@ -6,8 +6,9 @@ import {
   type UpstoxInstrument,
 } from '@ai-trading/adapters';
 import { sha256Hex } from '@ai-trading/domain';
-import { istToday } from '@ai-trading/market-data';
+import { addDays, eachDate, istToday, issueDedupeKey } from '@ai-trading/market-data';
 import {
+  clearSystemIssue,
   clearSystemIssues,
   createInstrumentStatusRows,
   createRawProviderPayload,
@@ -15,6 +16,7 @@ import {
   findProviderByCode,
   getLatestCompletedSession,
   getTradingCalendarRow,
+  getTradingSessionsForRange,
   getSyncTargetInstruments,
   isR2Instrument,
   paiseToTickSize,
@@ -295,6 +297,12 @@ export class ReferenceSyncService {
             result.mismatches = Number(result.mismatches ?? 0) + 1;
           }
         }
+        const calendarAudit = await this.reconcileSpecialSessions(
+          client,
+          provider.id,
+          targets,
+        );
+        result.calendarAudit = calendarAudit;
         result.reconciled = true;
         result.mismatches = Number(result.mismatches ?? 0) + mismatches;
       } catch (error) {
@@ -309,6 +317,7 @@ export class ReferenceSyncService {
     this.tracking.completeStage(jobRunId, 'reconcile', 'completed', {
       mismatches: Number(result.mismatches ?? 0),
       reconciled: result.reconciled === true,
+      calendarAudit: result.calendarAudit,
     });
     this.tracking.enterStage(jobRunId, 'finalize');
     await updateJobRun(jobRunId, {
@@ -364,6 +373,130 @@ export class ReferenceSyncService {
       }
     }
     return mismatches;
+  }
+
+  /**
+   * Flags provider sessions that the calendar still treats as non-trading.
+   * The fixture is reviewed data, so the audit raises evidence instead of
+   * silently turning the day into a trading day.
+   */
+  private async reconcileSpecialSessions(
+    client: UpstoxClient,
+    providerId: string,
+    targets: Awaited<ReturnType<typeof getSyncTargetInstruments>>,
+  ): Promise<{
+    from: string;
+    to: string;
+    checked: number;
+    timingDates: number;
+    raised: number;
+    probeErrors: number;
+  }> {
+    const configured = Number(
+      this.config.get<string>('CALENDAR_RECONCILE_LOOKBACK_DAYS', '90'),
+    );
+    const lookbackDays =
+      Number.isFinite(configured) && configured >= 0
+        ? Math.min(Math.floor(configured), 365)
+        : 90;
+    const to = istToday();
+    const from = addDays(to, -lookbackDays);
+    const probe =
+      targets.find((target) => target.symbol === 'RELIANCE') ?? targets[0];
+    if (lookbackDays === 0 || !probe) {
+      return { from, to, checked: 0, timingDates: 0, raised: 0, probeErrors: 0 };
+    }
+    const externalKey = probe.externalKey;
+    if (!externalKey) {
+      return { from, to, checked: 0, timingDates: 0, raised: 0, probeErrors: 0 };
+    }
+
+    const rows = await getTradingSessionsForRange(from, to);
+    const nonTrading = rows.filter((row) => !row.is_trading_day);
+    const findings: {
+      tradingDate: string;
+      sessionOpen: string;
+      sessionClose: string;
+      bars: number;
+      firstBar: string | null;
+      lastBar: string | null;
+    }[] = [];
+    let timingDates = 0;
+    let probeErrors = 0;
+
+    for (const row of nonTrading) {
+      try {
+        const timings = await client.fetchMarketTimings(row.trading_date);
+        const nse = timings.find((timing) => timing.exchange === 'NSE');
+        if (!nse) continue;
+        timingDates += 1;
+        const response = await client.fetchHistoricalCandles({
+          instrumentKey: externalKey,
+          from: row.trading_date,
+          to: row.trading_date,
+          unit: 'minutes',
+          interval: 1,
+          instrumentId: probe.instrumentId,
+        });
+        const candles = response.data.candles;
+        if (candles.length === 0) continue;
+        findings.push({
+          tradingDate: row.trading_date,
+          sessionOpen: new Date(nse.start_time).toISOString(),
+          sessionClose: new Date(nse.end_time).toISOString(),
+          bars: candles.length,
+          firstBar: candles.at(-1)?.[0] ?? null,
+          lastBar: candles[0]?.[0] ?? null,
+        });
+      } catch (error) {
+        probeErrors += 1;
+        this.logger.warn(
+          `Calendar audit failed for ${row.trading_date}: ${String(error)}`,
+        );
+      }
+    }
+
+    // Clear only this audit's own findings so the holiday and today-timing
+    // checks, which share DQ-005, keep their separate evidence.
+    for (const date of eachDate(from, to)) {
+      await clearSystemIssue(
+        issueDedupeKey({
+          source: 'reconciliation',
+          kind: 'calendar_mismatch',
+          providerId,
+          instrumentId: null,
+          scope: { ruleId: 'DQ-005', tradingDate: date, check: 'special-session-audit' },
+        }),
+      );
+    }
+    for (const finding of findings) {
+      await recordIssue({
+        ruleId: 'DQ-005',
+        severity: 'critical',
+        source: 'reconciliation',
+        providerId,
+        instrumentId: null,
+        scope: {
+          tradingDate: finding.tradingDate,
+          check: 'special-session-audit',
+        },
+        payload: {
+          ...finding,
+          reason: 'provider session on a non-trading day',
+          probeInstrumentId: probe.instrumentId,
+          evidence: 'market-timings',
+        },
+      });
+    }
+
+    return {
+      from,
+      to,
+      checked: nonTrading.length,
+      timingDates,
+      raised: findings.length,
+      probeErrors,
+    };
   }
 
   private async recordCalendarMismatch(
