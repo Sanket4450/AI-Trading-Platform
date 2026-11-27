@@ -305,6 +305,16 @@ export async function countInstrumentCriticalIssues(instrumentId: string) {
   return row?.count ?? 0;
 }
 
+/** One ledger row by its writer-owned identity, used to carry repair evidence forward. */
+export async function getSystemIssueByDedupeKey(dedupeKey: string) {
+  const [row] = await db
+    .select()
+    .from(systemIssues)
+    .where(eq(systemIssues.dedupeKey, dedupeKey))
+    .limit(1);
+  return row ?? null;
+}
+
 /** Removes the exact row a successful operation previously raised. */
 export async function clearSystemIssue(dedupeKey: string) {
   await db.delete(systemIssues).where(eq(systemIssues.dedupeKey, dedupeKey));

@@ -383,6 +383,32 @@ Provider 1-minute gaps (70 bars across six days) remain unchanged and are not fi
 - No browser verification was performed by policy. Verification is lint, typecheck, unit,
   broker-contract and testcontainers integration tests plus `db:verify`.
 
+### Provider-gap policy (2026-11-27)
+
+Provider holes are treated as evidence, never as missing values to fill.
+
+- **Repair before interpreting.** `historical-finalize` force-refetches every short
+  `(instrument, date)` pair in its window, index first. A full-history sweep runs monthly
+  (`45 8 1 * *`) and from `POST /system/gaps/repair`. `GAP_SWEEP_MAX_TARGETS` (5000) bounds one run.
+- **Classify the residue.** A refetch that leaves the day short raises `provider_gap` (DQ-027) with
+  `attempts`, `identicalRefetch`, `consecutiveIdentical` and `classification`. Three consecutive
+  identical refetches mark it `provider_omission`; a successful refetch clears the row.
+- **Gate on the bars the strategy reads.** R3 now loads the day's final candles before deciding
+  eligibility. An index hole before `entryWindowEnd` skips the day with
+  `index_insufficient_coverage`; a hole after it is tolerated. An equity hole before
+  `entryWindowEnd` skips that instrument with `coverage_partial`; a later hole keeps the day
+  eligible but marks the instrument in `unverifiableExitInstruments`, so the evaluator withholds
+  any qualifying entry with `exit_window_incomplete`. The diagnostics record
+  `toleratedGapMinutes`.
+- **No synthesis.** A missing minute is never filled, interpolated or proxied. The run reports
+  `coverage.instrumentDays`, `coverage.skipped`, `coverage.evaluablePct` and
+  `coverage.skippedByReason` on the job result. The release gate is at least 99% evaluable
+  instrument-days with every skipped row carrying a reason; a run below the gate is reviewed, not
+  failed automatically, because the first in-range days are legitimately `warmup`.
+- **Equity decisions stay conservative.** A provided 5-minute bar is not used to rebuild a missing
+  1-minute bar. A short decision bar keeps the instrument-day skipped; a late hole withholds the
+  entry rather than assuming an exit path.
+
 ### Open checks
 
 1. NIFTY 50 index coverage for the evaluation range. The gate remains open until a reviewed backfill

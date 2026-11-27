@@ -48,6 +48,7 @@ A partially failed or failed run deletes nothing.
 | `partial_bar` | validation | info | The current session's final bar is not final. |
 | `missing_bar` | validation | warning | An expected session minute is absent. |
 | `gap` | validation | warning / critical | Consecutive missing minutes; critical inside protected windows. |
+| `provider_gap` | ingestion | warning / critical | A forced refetch returned the same short day after repeated attempts; recorded as a provider omission, not a fetch failure. |
 | `coverage_shortfall` | validation | critical | A scheduled trading day has zero bars. |
 | `stale_coverage` | reconciliation | info | A coverage verdict is older than the latest candle for the same instrument-day. |
 | `stale_ingestion` | reconciliation | warning | No successful ingestion within the freshness window. |

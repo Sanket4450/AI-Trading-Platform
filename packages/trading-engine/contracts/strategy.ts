@@ -37,6 +37,12 @@ export interface StrategySessionContext {
   readonly risk: RiskParameters;
   readonly codeRef: string;
   readonly parameterHash: string | null;
+  /**
+   * Instruments whose exit window contains a session minute the provider never
+   * delivered. A qualifying entry is withheld for these because the stop/target
+   * path cannot be verified. Empty or absent means every exit window is intact.
+   */
+  readonly unverifiableExitInstruments?: readonly string[];
   /** Optional strict-coverage evidence supplied by the worker preflight. */
   readonly coverage?: {
     readonly expectedBars: number | null;

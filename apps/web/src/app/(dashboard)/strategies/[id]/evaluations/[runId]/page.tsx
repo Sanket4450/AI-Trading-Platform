@@ -449,6 +449,7 @@ export default async function EvaluationRunPage({
                 { value: 'coverage_missing', label: 'Coverage missing' },
                 { value: 'index_insufficient_coverage', label: 'Index coverage' },
                 { value: 'opening_range_incomplete', label: 'Opening range' },
+                { value: 'exit_window_incomplete', label: 'Exit window incomplete' },
                 { value: 'special_session', label: 'Special session' },
               ]}
             />

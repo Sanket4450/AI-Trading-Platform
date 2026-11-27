@@ -213,8 +213,8 @@ their bindings, and one `instrument_data_status` row per target. Version 2 point
 - A successful HTTP fetch is never treated as complete. Only strict coverage (`complete`,
   `partial`, `missing`) can claim completeness, and a missing minute is never filled with a flat
   bar.
-- The active quality catalog has 20 rule definitions in `packages/market-data/quality.ts`:
-  `DQ-001`–`DQ-011`, `DQ-015`, `DQ-017`, `DQ-019`–`DQ-021`, and `DQ-023`–`DQ-026`. IDs `012`,
+- The active quality catalog has 21 rule definitions in `packages/market-data/quality.ts`:
+  `DQ-001`–`DQ-011`, `DQ-015`, `DQ-017`, `DQ-019`–`DQ-021`, and `DQ-023`–`DQ-027`. IDs `012`,
   `013`, `014`, `016`, `018` and `022` are retired gaps; the earlier "22-rule" description is
   stale.
 - Findings are written to `system_issues` and cleared when the operation succeeds. A critical
@@ -279,6 +279,11 @@ is never computed on read.
 - The R3 real-data gate is open: a real evaluation needs complete NIFTY 50 index coverage for the
   chosen range. The synthetic testcontainers proof covers the persistence path; a real run records
   `index_*` reasons when the index is incomplete.
+- Provider gaps are repaired, classified and excluded, never filled. `historical-finalize` sweeps
+  short days (monthly full-history sweep plus `POST /system/gaps/repair`); repeated identical
+  refetches raise `provider_gap`. R3 gates on the bars it reads: a hole inside the decision window
+  skips the instrument-day, a hole only in the exit window withholds the entry with
+  `exit_window_incomplete`, and a short index decision window skips the day.
 
 ## Where to read more
 

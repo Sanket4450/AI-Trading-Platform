@@ -205,6 +205,19 @@ describe('ORB session evaluator', () => {
     expect(evaluation.results[0]?.reasonCode).toBe('warmup');
   });
 
+  it('withholds an entry when the exit window is unobserved', () => {
+    const plan = breakoutPlan({ id: 'aaa', symbol: 'AAA' });
+    const context = buildContext({ plans: [plan] });
+    const evaluation = evaluateOrbSession({
+      ...context,
+      unverifiableExitInstruments: ['aaa'],
+    });
+
+    expect(evaluation.signals).toEqual([]);
+    expect(evaluation.results[0]?.status).toBe('no_signal');
+    expect(evaluation.results[0]?.reasonCode).toBe('exit_window_incomplete');
+  });
+
   it('is deterministic for identical inputs', () => {
     const plan = breakoutPlan({
       id: 'aaa',

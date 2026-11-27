@@ -94,6 +94,25 @@ export class SystemControlController {
     return this.system.rebuildCoverage(user.id, requestMeta(request));
   }
 
+  @Post('gaps/repair')
+  @ApiOperation({
+    summary: 'Queue a full-history provider-gap sweep (admin only)',
+    description:
+      'Force-refetches every instrument-day whose stored bars fall short of the session. A refetch that heals the day clears the gap; an identical refetch is recorded as a provider omission after three consecutive attempts. The same sweep runs on the first of each month at 08:45 IST.',
+  })
+  @ApiCreatedResponse({ type: JobRunDto })
+  @ApiForbiddenResponse({
+    type: ErrorResponseDto,
+    description: 'Requires the admin user role',
+  })
+  repairGaps(
+    @CurrentUser() user: AuthenticatedUser,
+    @Req() request: Request,
+  ) {
+    assertAdmin(user);
+    return this.system.repairGaps(user.id, requestMeta(request));
+  }
+
   @Post('ingestion/reconcile')
   @ApiOperation({
     summary: 'Queue an ingestion reconciliation sweep (admin only)',

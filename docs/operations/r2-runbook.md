@@ -111,6 +111,26 @@ The catalog is the entry point.
 The first full run is roughly 2,958 monthly requests for 51 instruments. The provider budget, not
 network latency, dominates: at 1,600 requests per 30 minutes the floor is about 45 minutes.
 
+## Provider gaps
+
+A short instrument-day is not automatically a permanent hole. The finalize job force-refetches every
+short pair in its lookback window; a full-history sweep runs on the first of each month at 08:45 IST
+and can be queued from `POST /system/gaps/repair` (admin). The sweep behaves as follows:
+
+1. Every stored `(instrument, date)` with `stored_bars < expected_bars` is force-refetched, index
+   first.
+2. A refetch that heals the day clears the gap and recomputes coverage.
+3. An identical refetch that leaves the day short raises a `provider_gap` issue with
+   `{ attempts, identicalRefetch, consecutiveIdentical, classification }`.
+4. After `GAP_REPAIR_PERMANENT_ATTEMPTS` (default 3) consecutive identical refetches it is
+   `provider_omission` and the issue becomes `critical`: a refetch will not heal it, so a
+   preflight that requires the day must treat it as blocked until the day is explicitly excluded.
+5. Missing minutes are never filled or interpolated. R3/R4 skip an affected instrument-day, or the
+   whole day when the index decision window is short, and record the reason.
+
+The sweep is bounded by `GAP_SWEEP_MAX_TARGETS` (default 5000). If the result reports
+`truncatedAt`, run it again after the queue drains.
+
 ## Resume and recovery
 
 - **Worker killed mid-backfill**: run `ingestion-reconcile` from the scheduler or trigger a

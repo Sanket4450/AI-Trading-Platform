@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Play } from 'lucide-react';
 import { apiRequest } from '@/lib/api-browser';
 import { apiErrorMessage } from '@/lib/api-error';
@@ -9,6 +9,7 @@ import { useFormMutation } from '@/lib/use-form-mutation';
 import { FormDialog } from '@/components/dashboard/form-dialog';
 import { FormField } from '@/components/dashboard/form-field';
 import { FormSelect } from '@/components/dashboard/form-select';
+import { MultiSelectField } from '@/components/dashboard/multi-select-field';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -51,6 +52,17 @@ export function RunEvaluationDialog({
   const [selectedVersionId, setSelectedVersionId] = useState(versions[0]?.id ?? '');
   const selectedVersion =
     versions.find((version) => version.id === selectedVersionId) ?? versions[0] ?? null;
+  const instrumentOptions = useMemo(
+    () =>
+      [...instruments]
+        .sort((left, right) => left.symbol.localeCompare(right.symbol))
+        .map((instrument) => ({
+          value: instrument.id,
+          label: instrument.symbol,
+          description: instrument.name,
+        })),
+    [instruments],
+  );
   const action = useFormMutation<EvaluationRun>((formData) => {
     const strategyVersionId = formString(formData, 'strategyVersionId');
     const fromDate = formString(formData, 'fromDate');
@@ -159,25 +171,16 @@ export function RunEvaluationDialog({
       <FormField label="Note" htmlFor="note" hint="Optional operator context, shown on the run.">
         <Textarea id="note" name="note" rows={2} placeholder="Why is this run being made?" />
       </FormField>
-      {instruments.length > 0 ? (
-        <FormField
-          label="Instruments"
-          htmlFor="instrumentIds"
-          hint="Leave every box unchecked to evaluate all sync-target equities."
-        >
-          <div
+      {instrumentOptions.length > 0 ? (
+        <FormField label="Instruments" htmlFor="instrumentIds">
+          <MultiSelectField
             id="instrumentIds"
-            className="border-border/70 bg-background/40 grid max-h-40 gap-1 overflow-y-auto rounded-lg border p-2 sm:grid-cols-2"
-          >
-            {instruments.map((instrument) => (
-              <label key={instrument.id} className="flex items-center gap-2 text-xs">
-                <input type="checkbox" name="instrumentIds" value={instrument.id} />
-                <span className="truncate">
-                  {instrument.symbol} · {instrument.name}
-                </span>
-              </label>
-            ))}
-          </div>
+            name="instrumentIds"
+            options={instrumentOptions}
+            placeholder="All sync-target equities"
+            searchPlaceholder="Search symbol or name…"
+            emptyMessage="No sync-target equity matches."
+          />
         </FormField>
       ) : null}
       <p className="text-muted-foreground text-xs">

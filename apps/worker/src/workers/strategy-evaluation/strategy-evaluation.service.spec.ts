@@ -82,6 +82,26 @@ function tracker() {
   };
 }
 
+/** A normal 09:15-15:30 IST session; `missing` holds UTC minute starts to drop. */
+function candlesFor(instrumentId: string, missing: string[] = []) {
+  const start = Date.UTC(2026, 8, 1, 3, 45);
+  const rows = [];
+  for (let index = 0; index < 375; index += 1) {
+    const candleStart = new Date(start + index * 60_000);
+    if (missing.includes(candleStart.toISOString())) continue;
+    rows.push({
+      instrumentId,
+      candleStart,
+      open: '100.0000',
+      high: '100.5000',
+      low: '99.5000',
+      close: '100.0000',
+      volume: '1000.0000',
+    });
+  }
+  return rows;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   db.getEvaluationRun.mockResolvedValue(run);
@@ -141,7 +161,9 @@ beforeEach(() => {
     { instrumentId: equityId, tradingDate: '2026-09-01', expectedBars: 375, storedBars: 375 },
   ]);
   db.getCorporateActionsInRange.mockResolvedValue([]);
-  db.getFinalCandlesForDay.mockResolvedValue([]);
+  db.getFinalCandlesForDay.mockImplementation(async (ids) =>
+    (ids as string[]).flatMap((id) => candlesFor(id)),
+  );
   db.getIndexCandlesForDates.mockResolvedValue([]);
   db.getFiveMinuteSlotVolume.mockResolvedValue([]);
   db.replaceEvaluationDay.mockResolvedValue({ results: 1, signals: 0 });
@@ -184,6 +206,72 @@ describe('strategy evaluation worker', () => {
       'completed',
       expect.objectContaining({ days: 1 }),
     );
+  });
+
+  it('skips an instrument only when the missing minute is inside the decision window', async () => {
+    db.getCoverageInRange.mockResolvedValue([
+      { instrumentId: indexId, tradingDate: '2026-09-01', expectedBars: 375, storedBars: 375 },
+      { instrumentId: equityId, tradingDate: '2026-09-01', expectedBars: 375, storedBars: 374 },
+    ]);
+    db.getFinalCandlesForDay.mockImplementation(async (ids) =>
+      (ids as string[]).flatMap((id) =>
+        candlesFor(id, id === equityId ? ['2026-09-01T04:00:00.000Z'] : []),
+      ),
+    );
+
+    const service = new StrategyEvaluationService(tracker() as unknown as JobTrackingService);
+    await service.run('strategy-evaluation', { jobRunId, evaluationRunId: runId });
+
+    const day = db.replaceEvaluationDay.mock.calls[0]![0] as {
+      results: { reasonCode: string }[];
+    };
+    expect(day.results[0]?.reasonCode).toBe('coverage_partial');
+  });
+
+  it('skips the whole day when the index decision window is short', async () => {
+    db.getCoverageInRange.mockResolvedValue([
+      { instrumentId: indexId, tradingDate: '2026-09-01', expectedBars: 375, storedBars: 374 },
+      { instrumentId: equityId, tradingDate: '2026-09-01', expectedBars: 375, storedBars: 375 },
+    ]);
+    db.getFinalCandlesForDay.mockImplementation(async (ids) =>
+      (ids as string[]).flatMap((id) =>
+        candlesFor(id, id === indexId ? ['2026-09-01T04:00:00.000Z'] : []),
+      ),
+    );
+
+    const service = new StrategyEvaluationService(tracker() as unknown as JobTrackingService);
+    await service.run('strategy-evaluation', { jobRunId, evaluationRunId: runId });
+
+    const day = db.replaceEvaluationDay.mock.calls[0]![0] as {
+      results: { reasonCode: string }[];
+    };
+    expect(day.results[0]?.reasonCode).toBe('index_insufficient_coverage');
+  });
+
+  it('evaluates a day whose only hole is in the exit window and records it', async () => {
+    const lateGap = [
+      '2026-09-01T08:50:00.000Z',
+      '2026-09-01T08:51:00.000Z',
+      '2026-09-01T08:52:00.000Z',
+      '2026-09-01T08:53:00.000Z',
+      '2026-09-01T08:54:00.000Z',
+    ];
+    db.getCoverageInRange.mockResolvedValue([
+      { instrumentId: indexId, tradingDate: '2026-09-01', expectedBars: 375, storedBars: 375 },
+      { instrumentId: equityId, tradingDate: '2026-09-01', expectedBars: 375, storedBars: 370 },
+    ]);
+    db.getFinalCandlesForDay.mockImplementation(async (ids) =>
+      (ids as string[]).flatMap((id) => candlesFor(id, id === equityId ? lateGap : [])),
+    );
+
+    const service = new StrategyEvaluationService(tracker() as unknown as JobTrackingService);
+    await service.run('strategy-evaluation', { jobRunId, evaluationRunId: runId });
+
+    const day = db.replaceEvaluationDay.mock.calls[0]![0] as {
+      results: { status: string; reasonCode: string; diagnostics: { toleratedGapMinutes?: number } }[];
+    };
+    expect(day.results[0]?.reasonCode).toBe('warmup');
+    expect(day.results[0]?.diagnostics.toleratedGapMinutes).toBe(lateGap.length);
   });
 
   it('marks the run cancelled between days without persisting the next day', async () => {

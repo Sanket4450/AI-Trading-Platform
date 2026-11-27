@@ -9,6 +9,7 @@ import {
   fetchStatusFromRun,
   gapRuns,
   isWithinSession,
+  missingMinutes,
   monthChunks,
   normalizeCandle,
   parseCandleTimestamp,
@@ -151,6 +152,19 @@ describe('gaps', () => {
     expect(runs).toHaveLength(2);
     expect(runs[0]!.minutes).toBe(2);
     expect(runs[1]!.minutes).toBe(1);
+  });
+
+  it('returns every unobserved session minute for window-based gating', () => {
+    const observed = Array.from({ length: 375 }, (_, index) => {
+      const value = new Date('2026-09-01T03:45:00.000Z');
+      value.setUTCMinutes(value.getUTCMinutes() + index);
+      return value;
+    }).filter((value) => value.getUTCHours() !== 8);
+
+    const missing = missingMinutes(session, observed);
+    expect(missing.length).toBe(60);
+    expect(missing[0]!.toISOString()).toBe('2026-09-01T08:00:00.000Z');
+    expect(missing.at(-1)!.toISOString()).toBe('2026-09-01T08:59:00.000Z');
   });
 });
 

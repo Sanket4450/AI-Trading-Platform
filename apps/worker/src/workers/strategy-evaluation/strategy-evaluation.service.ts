@@ -18,8 +18,10 @@ import {
 import {
   addDays,
   isNormalSession,
+  istInstant,
   istTime,
 } from '@ai-trading/trading-engine';
+import { missingMinutes } from '@ai-trading/market-data';
 import {
   deleteEvaluationRunArtifacts,
   getCorporateActionsInRange,
@@ -146,19 +148,23 @@ export class StrategyEvaluationService {
       const priorDays = await getPriorTradingDaysBefore(context.run.fromDate, 60);
       const history = [...priorDays].reverse().concat(days);
       let completedDays = 0;
+      let evaluated = 0;
       let entries = 0;
       let exits = 0;
+      const skippedByReason: Record<string, number> = {};
 
       for (const [index, day] of days.entries()) {
         currentDay = day.tradingDate;
         if (await this.isCancelled(jobRunId)) {
           await this.finish(jobRunId, evaluationRunId, 'cancelled', {
             daysCompleted: completedDays,
+            evaluated,
             entries,
             exits,
+            skippedByReason,
             cancelledAt: currentDay,
           });
-          return { cancelled: true, days: completedDays, entries, exits };
+          return { cancelled: true, days: completedDays, evaluated, entries, exits };
         }
 
         const dayHistoryIndex = history.findIndex(
@@ -167,8 +173,12 @@ export class StrategyEvaluationService {
         const previousDays = history.slice(0, dayHistoryIndex).slice(-60);
         const daySummary = await this.evaluateDay(context, day, previousDays);
         completedDays += 1;
+        evaluated += daySummary.evaluated;
         entries += daySummary.entries;
         exits += daySummary.exits;
+        for (const [reason, count] of Object.entries(daySummary.skippedByReason)) {
+          skippedByReason[reason] = (skippedByReason[reason] ?? 0) + count;
+        }
 
         this.tracking.progress(jobRunId, 'evaluate', {
           index: index + 1,
@@ -180,23 +190,39 @@ export class StrategyEvaluationService {
         });
       }
 
+      const skipped = Object.values(skippedByReason).reduce(
+        (total, count) => total + count,
+        0,
+      );
+      const coverage = {
+        instrumentDays: evaluated,
+        skipped,
+        evaluablePct:
+          evaluated === 0
+            ? 0
+            : Number((((evaluated - skipped) / evaluated) * 100).toFixed(2)),
+        skippedByReason,
+      };
       this.tracking.completeStage(jobRunId, 'evaluate', 'completed', {
         days: completedDays,
         entries,
         exits,
+        coverage,
       });
       this.tracking.enterStage(jobRunId, 'finalize');
       await this.finish(jobRunId, evaluationRunId, 'completed', {
         days: completedDays,
         entries,
         exits,
+        coverage,
       });
       this.tracking.completeStage(jobRunId, 'finalize', 'completed', {
         days: completedDays,
         entries,
         exits,
+        coverage,
       });
-      return { days: completedDays, entries, exits };
+      return { days: completedDays, evaluated, entries, exits, coverage };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger.error(`Evaluation ${evaluationRunId} failed: ${message}`);
@@ -361,7 +387,7 @@ export class StrategyEvaluationService {
     const indexExpected = indexCoverage?.expectedBars ?? null;
     const indexStored = indexCoverage?.storedBars ?? null;
 
-    if (!indexCoverage || indexStored === null || indexExpected === null || indexStored !== indexExpected) {
+    if (!indexCoverage || indexStored === null || indexExpected === null || indexStored === 0) {
       return this.persistSkippedDay(
         context,
         tradingDate,
@@ -379,10 +405,8 @@ export class StrategyEvaluationService {
     }
 
     const skips: PreflightSkip[] = [];
-    const eligible: StrategyInstrument[] = [];
     for (const instrument of context.instruments) {
-      const row = coverageByInstrument.get(instrument.id);
-      if (!row) {
+      if (!coverageByInstrument.has(instrument.id)) {
         skips.push({
           instrumentId: instrument.id,
           reason: 'coverage_missing',
@@ -393,9 +417,73 @@ export class StrategyEvaluationService {
             indexStoredBars: indexStored,
           },
         });
+      }
+    }
+
+    // Load bars before the coverage verdict: a short day only skips an instrument
+    // when the missing minute intersects a bar the strategy reads.
+    const covered = context.instruments.filter((instrument) =>
+      coverageByInstrument.has(instrument.id),
+    );
+    const candles = await getFinalCandlesForDay(
+      [...covered.map((instrument) => instrument.id), context.indexInstrument.id],
+      tradingDate,
+    );
+    const barsByInstrument = new Map<string, Bar[]>();
+    const indexBars: Bar[] = [];
+    for (const row of candles) {
+      const bar = toBar(row);
+      if (row.instrumentId === context.indexInstrument.id) {
+        indexBars.push({ ...bar, instrument: context.indexInstrument.symbol });
         continue;
       }
-      if (row.storedBars !== row.expectedBars) {
+      const list = barsByInstrument.get(row.instrumentId) ?? [];
+      list.push(bar);
+      barsByInstrument.set(row.instrumentId, list);
+    }
+
+    const session = {
+      open: day.sessionOpen,
+      close: day.sessionClose,
+      breaks: [] as { start: Date; end: Date }[],
+    };
+    const entryEnd = istInstant(tradingDate, context.parameters.entryWindowEnd);
+    const indexRequiredMissing = missingMinutes(
+      session,
+      indexBars.map((bar) => bar.timestamp),
+    ).filter((minute) => minute.getTime() < entryEnd.getTime());
+
+    if (indexRequiredMissing.length > 0) {
+      return this.persistSkippedDay(
+        context,
+        tradingDate,
+        instrumentIds,
+        'index_insufficient_coverage',
+        {
+          expectedBars: null,
+          storedBars: null,
+          indexExpectedBars: indexExpected,
+          indexStoredBars: indexStored,
+        },
+        sessionOpenText,
+        sessionCloseText,
+        `Index decision window is missing ${indexRequiredMissing.length} minute(s).`,
+      );
+    }
+
+    const eligible: StrategyInstrument[] = [];
+    const unverifiableExit: string[] = [];
+    const toleratedGapMinutes = new Map<string, number>();
+    for (const instrument of covered) {
+      const row = coverageByInstrument.get(instrument.id)!;
+      const missing = missingMinutes(
+        session,
+        (barsByInstrument.get(instrument.id) ?? []).map((bar) => bar.timestamp),
+      );
+      const requiredMissing = missing.filter(
+        (minute) => minute.getTime() < entryEnd.getTime(),
+      );
+      if (requiredMissing.length > 0) {
         skips.push({
           instrumentId: instrument.id,
           reason: 'coverage_partial',
@@ -407,6 +495,12 @@ export class StrategyEvaluationService {
           },
         });
         continue;
+      }
+      if (missing.length > 0) {
+        // The decision window is intact but the exit window is not. The evaluator
+        // withholds any entry so a stop/target path is never assumed.
+        unverifiableExit.push(instrument.id);
+        toleratedGapMinutes.set(instrument.id, missing.length);
       }
       eligible.push(instrument);
     }
@@ -433,20 +527,6 @@ export class StrategyEvaluationService {
           },
         });
       }
-    }
-
-    const candles = await getFinalCandlesForDay([...eligible.map((i) => i.id), context.indexInstrument.id], tradingDate);
-    const barsByInstrument = new Map<string, Bar[]>();
-    const indexBars: Bar[] = [];
-    for (const row of candles) {
-      const bar = toBar(row);
-      if (row.instrumentId === context.indexInstrument.id) {
-        indexBars.push({ ...bar, instrument: context.indexInstrument.symbol });
-        continue;
-      }
-      const list = barsByInstrument.get(row.instrumentId) ?? [];
-      list.push(bar);
-      barsByInstrument.set(row.instrumentId, list);
     }
 
     const priorDates = priorDays.map((item) => item.tradingDate).slice(-60);
@@ -481,6 +561,7 @@ export class StrategyEvaluationService {
       risk: context.risk,
       codeRef: context.run.codeRef,
       parameterHash: context.run.parameterHash,
+      unverifiableExitInstruments: unverifiableExit,
       coverage: {
         expectedBars: null,
         storedBars: null,
@@ -497,6 +578,7 @@ export class StrategyEvaluationService {
       indexExpectedBars: indexExpected,
       indexStoredBars: indexStored,
       coverageByInstrument,
+      toleratedGapMinutes,
     });
   }
 
@@ -555,6 +637,7 @@ export class StrategyEvaluationService {
       indexExpectedBars: number | null;
       indexStoredBars: number | null;
       coverageByInstrument: Map<string, { expectedBars: number; storedBars: number }>;
+      toleratedGapMinutes: Map<string, number>;
     },
   ) {
     const results: EvaluationDayResultInput[] = [];
@@ -608,6 +691,9 @@ export class StrategyEvaluationService {
         reasonCode: evaluated.reasonCode,
         diagnostics: {
           ...evaluated.diagnostics,
+          ...(input.toleratedGapMinutes.has(instrument.id)
+            ? { toleratedGapMinutes: input.toleratedGapMinutes.get(instrument.id) }
+            : {}),
           coverage: {
             expectedBars: row?.expectedBars ?? null,
             storedBars: row?.storedBars ?? null,
@@ -647,7 +733,17 @@ export class StrategyEvaluationService {
     });
 
     const entries = signals.filter((signal) => signal.signalType === 'entry').length;
-    return { evaluated: results.length, entries, exits: signals.length - entries };
+    const skippedByReason: Record<string, number> = {};
+    for (const row of results) {
+      if (row.status !== 'skipped' || !row.reasonCode) continue;
+      skippedByReason[row.reasonCode] = (skippedByReason[row.reasonCode] ?? 0) + 1;
+    }
+    return {
+      evaluated: results.length,
+      entries,
+      exits: signals.length - entries,
+      skippedByReason,
+    };
   }
 
   private async persistSkippedDay(
@@ -658,6 +754,7 @@ export class StrategyEvaluationService {
     coverage: PreflightSkip['coverage'],
     sessionOpen: string | null,
     sessionClose: string | null,
+    note?: string,
   ) {
     const results: EvaluationDayResultInput[] = instrumentIds.map((instrumentId) => ({
       instrumentId,
@@ -670,10 +767,16 @@ export class StrategyEvaluationService {
         sessionOpen,
         sessionClose,
         coverage,
+        ...(note ? { note } : {}),
       }),
     }));
     await replaceEvaluationDay({ runId: context.run.id, tradingDate, results, signals: [] });
-    return { evaluated: results.length, entries: 0, exits: 0 };
+    return {
+      evaluated: results.length,
+      entries: 0,
+      exits: 0,
+      skippedByReason: { [reason]: results.length },
+    };
   }
 
   private async isCancelled(jobRunId: string) {

@@ -71,7 +71,9 @@ export function buildSessionWindow(row: CalendarSessionRow): SessionWindow | nul
   };
 }
 
-export function expectedMinutes(session: SessionWindow): Date[] {
+export function expectedMinutes(
+  session: Pick<SessionWindow, 'open' | 'close' | 'breaks'>,
+): Date[] {
   const minutes: Date[] = [];
   for (let cursor = session.open; cursor < session.close; cursor = addMinutes(cursor, 1)) {
     if (!inBreak(cursor, session.breaks)) minutes.push(cursor);
@@ -87,6 +89,18 @@ export function isWithinSession(instant: Date, session: SessionWindow): boolean 
 export function diffMinutes(expected: readonly Date[], observed: readonly Date[]): Date[] {
   const seen = new Set(observed.map((value) => value.getTime()));
   return expected.filter((value) => !seen.has(value.getTime()));
+}
+
+/**
+ * Every expected session minute without an observed bar. Callers decide whether
+ * a hole matters: a missing decision bar blocks a day, a missing exit-window
+ * minute only blocks it when a position is open.
+ */
+export function missingMinutes(
+  session: Pick<SessionWindow, 'open' | 'close' | 'breaks'>,
+  observed: readonly Date[],
+): Date[] {
+  return diffMinutes(expectedMinutes(session), observed);
 }
 
 /** Consecutive missing minutes collapse into runs; a run is not a bar count. */

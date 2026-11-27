@@ -1,7 +1,29 @@
 import { upsertSystemIssue } from '@ai-trading/database';
-import { qualityRule, systemIssue } from '@ai-trading/market-data';
+import {
+  issueDedupeKey,
+  qualityRule,
+  systemIssue,
+} from '@ai-trading/market-data';
 
 export type IssueSource = 'ingestion' | 'validation' | 'reconciliation' | 'manual';
+
+/** The identity a finding will occupy, so a writer can read its own prior evidence. */
+export function issueKey(values: {
+  ruleId: string;
+  source: IssueSource;
+  providerId: string | null;
+  instrumentId: string | null;
+  scope: Record<string, unknown>;
+}): string {
+  const rule = qualityRule(values.ruleId);
+  return issueDedupeKey({
+    source: values.source,
+    kind: rule.issueType,
+    providerId: values.providerId,
+    instrumentId: values.instrumentId,
+    scope: { ruleId: rule.ruleId, ...values.scope },
+  });
+}
 
 /**
  * Writes one finding into the current-state ledger. The rule id is kept in the

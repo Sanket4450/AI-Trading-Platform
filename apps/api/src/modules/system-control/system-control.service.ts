@@ -168,6 +168,50 @@ export class SystemControlService implements OnModuleInit, OnModuleDestroy {
     return jobRun;
   }
 
+  /**
+   * Full-history provider-gap sweep. A force refetch either heals a transient
+   * omission or records the identical response as evidence of a provider gap.
+   */
+  async repairGaps(actorUserId: string, meta: RequestMeta) {
+    const jobRun = await createJobRun({
+      jobName: 'historical-finalize',
+      status: 'queued',
+      payload: { source: 'operator', scope: 'full' },
+      maxAttempts: 1,
+    });
+    try {
+      await this.historicalQueue.add(
+        'historical-finalize',
+        { jobRunId: jobRun.id, source: 'operator', scope: 'full' },
+        {
+          jobId: jobRun.id,
+          priority: 5,
+          attempts: 1,
+          removeOnComplete: 200,
+          removeOnFail: 500,
+        },
+      );
+    } catch {
+      await deleteJobRun(jobRun.id);
+      throw new ServiceUnavailableException(
+        'The background queue is unavailable',
+      );
+    }
+    await recordAudit({
+      actorUserId,
+      accountId: null,
+      action: 'data.gap_repair_queued',
+      entityType: 'job_run',
+      entityId: jobRun.id,
+      beforeState: null,
+      afterState: { jobName: 'historical-finalize', scope: 'full' },
+      requestId: meta.requestId,
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+    });
+    return jobRun;
+  }
+
   async reconcileIngestion(actorUserId: string, meta: RequestMeta) {
     const jobRun = await createJobRun({
       jobName: 'ingestion-reconcile',

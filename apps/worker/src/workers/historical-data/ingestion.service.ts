@@ -33,9 +33,11 @@ import {
   deleteAllCoverage,
   findProviderByCode,
   findProviderMapping,
+  getCoverageInRange,
   getIncompleteSessionTargets,
   getInstrumentTickSize,
   getJobRun,
+  getSystemIssueByDedupeKey,
   getLatestBackfillJobForInstrument,
   getLatestCompletedSession,
   getTradingCalendarRow,
@@ -50,7 +52,7 @@ import {
 } from '@ai-trading/database';
 import { JobTrackingService } from '../../observability/job-tracking.service.js';
 import { ExternalApiRecorder } from '../../observability/external-api-recorder.js';
-import { recordIssue } from './issue-recorder.js';
+import { issueKey, recordIssue } from './issue-recorder.js';
 import { QualityService } from './quality.service.js';
 import { RedisRateLimiter } from './rate-limit.service.js';
 import { StaleJobSweeper } from './stale-job.sweeper.js';
@@ -796,7 +798,7 @@ export class IngestionService {
     return result;
   }
 
-  async historicalFinalize(jobRunId: string) {
+  async historicalFinalize(jobRunId: string, payload: Record<string, unknown> = {}) {
     await updateJobRun(jobRunId, {
       status: 'running',
       startedAt: new Date(),
@@ -826,8 +828,19 @@ export class IngestionService {
       });
       return result;
     }
-    const from = await this.finalizeWindowStart(latest);
-    const gaps = await getIncompleteSessionTargets(from, latest);
+
+    const fullSweep = payload.scope === 'full' || payload.full === true;
+    const sweepLimit = this.config.get<number>('GAP_SWEEP_MAX_TARGETS', 5000);
+    const from = fullSweep
+      ? typeof payload.from === 'string'
+        ? payload.from
+        : HISTORY_START
+      : await this.finalizeWindowStart(latest);
+    const gaps = await getIncompleteSessionTargets(from, latest, {
+      includeMissingRows: !fullSweep,
+      ...(fullSweep ? { limit: sweepLimit } : {}),
+    });
+    const possiblyTruncated = fullSweep && gaps.length >= sweepLimit;
     const targets = new Map<string, { symbol: string; dates: string[] }>();
     for (const gap of gaps) {
       const entry = targets.get(gap.instrument_id) ?? {
@@ -837,15 +850,22 @@ export class IngestionService {
       entry.dates.push(gap.trading_date);
       targets.set(gap.instrument_id, entry);
     }
+    const permanentAfter = this.config.get<number>('GAP_REPAIR_PERMANENT_ATTEMPTS', 3);
     let instruments = 0;
     let rowsWritten = 0;
+    let attempted = 0;
     let repaired = 0;
+    let unrepaired = 0;
+    let permanent = 0;
     let failed = 0;
+    let processed = 0;
     this.tracking.completeStage(jobRunId, 'prepare', 'completed', {
       instruments: targets.size,
       gaps: gaps.length,
       from,
       to: latest,
+      scope: fullSweep ? 'full' : 'recent',
+      ...(possiblyTruncated ? { truncatedAt: sweepLimit } : {}),
     });
     this.tracking.enterStage(jobRunId, 'repair');
     for (const [instrumentId, entry] of targets) {
@@ -854,6 +874,7 @@ export class IngestionService {
       let instrumentRepairs = 0;
       for (const [index, date] of entry.dates.entries()) {
         try {
+          const before = (await getCoverageInRange([instrumentId], date, date))[0];
           const result = await this.runChunk({
             jobRunId,
             providerId: provider.id,
@@ -866,17 +887,62 @@ export class IngestionService {
             mode: 'force',
           });
           rowsWritten += result.written;
-          await this.quality.recomputeCoverage(instrumentId, date, date);
-          repaired += 1;
+          attempted += 1;
           instrumentRepairs += 1;
-          this.tracking.progress(jobRunId, 'repair', {
-            index: repaired,
-            total: gaps.length,
-            instrumentId,
-            symbol: entry.symbol,
-            tradingDate: date,
-            written: result.written,
-          });
+          await this.quality.recomputeCoverage(instrumentId, date, date);
+          const after = (await getCoverageInRange([instrumentId], date, date))[0];
+
+          if (after && after.storedBars < after.expectedBars) {
+            unrepaired += 1;
+            const identical = before?.storedBars === after.storedBars;
+            const key = issueKey({
+              ruleId: 'DQ-027',
+              source: 'ingestion',
+              providerId: provider.id,
+              instrumentId,
+              scope: { tradingDate: date },
+            });
+            const prior = await getSystemIssueByDedupeKey(key);
+            const priorRepair = (prior?.payload as {
+              repair?: { consecutiveIdentical?: number };
+            } | null)?.repair;
+            const consecutiveIdentical = identical
+              ? (priorRepair?.consecutiveIdentical ?? 0) + 1
+              : 0;
+            const isPermanent = consecutiveIdentical >= permanentAfter;
+            if (isPermanent) permanent += 1;
+            await this.issue({
+              ruleId: 'DQ-027',
+              severity: isPermanent ? 'critical' : 'warning',
+              providerId: provider.id,
+              instrumentId,
+              source: 'ingestion',
+              scope: { tradingDate: date },
+              payload: {
+                tradingDate: date,
+                from: date,
+                to: date,
+                expectedBars: after.expectedBars,
+                storedBars: after.storedBars,
+                missingBars: after.expectedBars - after.storedBars,
+                repair: {
+                  attempts: (prior?.occurrenceCount ?? 0) + 1,
+                  identicalRefetch: identical,
+                  consecutiveIdentical,
+                  classification: isPermanent ? 'provider_omission' : 'retry',
+                  lastCheckedAt: new Date().toISOString(),
+                },
+              },
+            });
+          } else {
+            repaired += 1;
+            await clearSystemIssues({
+              sources: ['ingestion'],
+              kinds: ['provider_gap'],
+              instrumentId,
+              tradingDate: date,
+            });
+          }
         } catch (error) {
           failed += 1;
           const classification = classifyUpstoxError(error);
@@ -910,6 +976,16 @@ export class IngestionService {
             code: classification.kind,
             retryable: classification.retryable,
           });
+        } finally {
+          processed += 1;
+          this.tracking.progress(jobRunId, 'repair', {
+            index: processed,
+            total: gaps.length,
+            instrumentId,
+            symbol: entry.symbol,
+            tradingDate: date,
+            written: rowsWritten,
+          });
         }
       }
       if (instrumentRepairs > 0) {
@@ -918,7 +994,10 @@ export class IngestionService {
       }
     }
     this.tracking.completeStage(jobRunId, 'repair', 'completed', {
+      attempted,
       repaired,
+      unrepaired,
+      permanent,
       failed,
       total: gaps.length,
       rowsWritten,
@@ -926,12 +1005,17 @@ export class IngestionService {
     this.tracking.enterStage(jobRunId, 'refresh');
     await refreshDailyStats();
     const result = {
+      scope: fullSweep ? 'full' : 'recent',
       from,
       to: latest,
       instruments,
+      attempted,
       repaired,
+      unrepaired,
+      permanent,
       failed,
-      partial: failed > 0,
+      partial: failed > 0 || unrepaired > 0,
+      ...(possiblyTruncated ? { truncatedAt: sweepLimit } : {}),
       rowsWritten,
     };
     await updateJobRun(jobRunId, {

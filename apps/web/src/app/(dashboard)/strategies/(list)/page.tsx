@@ -150,10 +150,6 @@ export default async function StrategiesPage({
                   </TableCell>
                   <TableActions>
                     <TableActionLink
-                      href={detailHref(`/strategies/${strategy.id}/evaluations`, from)}
-                      label="View evaluations"
-                    />
-                    <TableActionLink
                       href={detailHref(`/strategies/${strategy.id}`, from)}
                       label="View strategy"
                     />

@@ -45,6 +45,7 @@ export const EVALUATION_REASON_CODES = [
   'opening_range_incomplete',
   'warmup',
   'decision_bar_incomplete',
+  'exit_window_incomplete',
   'coverage_missing',
   'coverage_partial',
   'index_missing',
@@ -162,6 +163,8 @@ export interface StrategyResultDiagnostics {
   /** Bounded to at most 10 decision bars per instrument-day. */
   readonly candidates: readonly StrategyBreakoutCandidate[];
   readonly portfolio: { entries: number; openPositions: number };
+  /** Unobserved minutes outside the decision window; they only gate exits. */
+  readonly toleratedGapMinutes?: number;
   readonly note?: string;
 }
 

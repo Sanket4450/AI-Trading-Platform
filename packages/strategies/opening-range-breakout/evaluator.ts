@@ -703,6 +703,7 @@ export function evaluateOrbSession(context: StrategySessionContext): StrategyEva
   const instruments = [...context.instruments].sort((a, b) =>
     a.symbol.localeCompare(b.symbol),
   );
+  const unverifiableExit = new Set(context.unverifiableExitInstruments ?? []);
   const signals: StrategySignal[] = [];
 
   if (!isNormalSession(context.session.open, context.session.close)) {
@@ -837,6 +838,12 @@ export function evaluateOrbSession(context: StrategySessionContext): StrategyEva
       if (!analysis || analysis.skippedReason) continue;
       const candidate = analysis.candidateByStart.get(slot.getTime());
       if (!candidate) continue;
+      if (unverifiableExit.has(instrument.id)) {
+        // A position opened here could run into the unobserved exit window, so the
+        // entry is withheld rather than evaluated against an incomplete bar path.
+        block(instrument.id, 'exit_window_incomplete');
+        continue;
+      }
       if ((entriesByInstrument.get(instrument.id) ?? 0) >= maxEntriesPerStock) {
         block(instrument.id, 'already_traded');
         continue;

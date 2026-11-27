@@ -18,7 +18,7 @@ export class HistoricalDataService {
       case 'historical-backfill':
         return this.ingestion.runInstrumentBackfill(payload);
       case 'historical-finalize':
-        return this.ingestion.historicalFinalize(String(payload.jobRunId));
+        return this.ingestion.historicalFinalize(String(payload.jobRunId), payload);
       case 'intraday-sync':
         return this.ingestion.intradaySync(String(payload.jobRunId));
       case 'instrument-sync':

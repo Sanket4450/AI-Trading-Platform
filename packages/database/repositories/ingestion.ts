@@ -541,7 +541,16 @@ export async function getTradingSessionsForRange(from: string, to: string) {
  * fewer bars than expected. The listing window is respected so days before an
  * instrument listed are not treated as gaps.
  */
-export async function getIncompleteSessionTargets(from: string, to: string) {
+export async function getIncompleteSessionTargets(
+  from: string,
+  to: string,
+  options: { includeMissingRows?: boolean; limit?: number } = {},
+) {
+  const includeMissingRows = options.includeMissingRows ?? true;
+  const shortDay = includeMissingRows
+    ? sql`(c.instrument_id is null or c.stored_bars < c.expected_bars)`
+    : sql`c.stored_bars < c.expected_bars`;
+  const limit = options.limit ? sql`limit ${options.limit}` : sql``;
   return db.execute<{
     instrument_id: string;
     trading_symbol: string;
@@ -569,8 +578,9 @@ export async function getIncompleteSessionTargets(from: string, to: string) {
     where e.code = 'NSE'
       and tc.is_trading_day
       and tc.trading_date between ${from} and ${to}
-      and (c.instrument_id is null or c.stored_bars < c.expected_bars)
-    order by tc.trading_date, target.trading_symbol
+      and ${shortDay}
+    order by (target.trading_symbol = 'NIFTY 50') desc, tc.trading_date, target.trading_symbol
+    ${limit}
   `);
 }
 

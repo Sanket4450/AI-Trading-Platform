@@ -47,6 +47,7 @@ export {
   expectedMinutes,
   gapRuns,
   isWithinSession,
+  missingMinutes,
 } from './sessions.js';
 
 export {

@@ -53,6 +53,7 @@ const LABEL_OVERRIDES: Record<string, string> = {
   opening_range_incomplete: 'Opening range incomplete',
   warmup: 'Warm-up',
   decision_bar_incomplete: 'Decision bar incomplete',
+  exit_window_incomplete: 'Exit window incomplete',
   coverage_missing: 'Coverage missing',
   coverage_partial: 'Coverage partial',
   index_missing: 'Index missing',

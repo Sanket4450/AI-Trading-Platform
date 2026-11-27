@@ -114,6 +114,22 @@ export class MarketScheduler {
     });
   }
 
+  /**
+   * Full-history gap sweep. It force-refetches every stored short day once so a
+   * transient omission is healed and an identical refetch becomes evidence of a
+   * provider omission, instead of sitting unclassified forever.
+   */
+  @Cron('45 8 1 * *', { timeZone: 'Asia/Kolkata' })
+  async monthlyGapRepair(): Promise<void> {
+    if (!this.enabled) return;
+    await this.enqueue(
+      this.historicalQueue,
+      'historical-finalize',
+      { source: 'schedule', scope: 'full' },
+      1,
+    );
+  }
+
   @Cron('0 8 1 * *', { timeZone: 'Asia/Kolkata' })
   async monthlyPartitionMaintenance(): Promise<void> {
     if (!this.enabled) return;

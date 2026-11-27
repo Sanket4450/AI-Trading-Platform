@@ -164,6 +164,15 @@ export const QUALITY_RULES: readonly QualityRule[] = [
     description: 'A provider fetch failed; the window remains uncovered until it is retried.',
     blocksPreflightWhenCritical: false,
   },
+  {
+    ruleId: 'DQ-027',
+    issueType: 'provider_gap',
+    dimension: 'completeness',
+    defaultSeverity: 'warning',
+    description:
+      'A forced refetch returned the same short day; the hole is a provider omission, not a transient failure.',
+    blocksPreflightWhenCritical: true,
+  },
 ] as const;
 
 export const QUALITY_RULE_BY_ID = new Map(QUALITY_RULES.map((rule) => [rule.ruleId, rule]));
