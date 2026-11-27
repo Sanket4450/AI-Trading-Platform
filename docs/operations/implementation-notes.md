@@ -331,6 +331,16 @@ The NSE fixture was corrected against `/v2/market/timings` and the V3 candle cou
 
 Provider 1-minute gaps (70 bars across six days) remain unchanged and are not filled or synthesized.
 
+### Finalize catch-up (2026-11-27)
+
+`historical-finalize` repairs gaps instead of only the newest session:
+
+- It reads the last `FINALIZE_LOOKBACK_SESSIONS` (`10`) trading sessions from the calendar and asks `getIncompleteSessionTargets` for the `(instrument, date)` pairs whose coverage row is missing or short.
+- Only those pairs are force-refetched, so a session missed while the worker was down is repaired on the next scheduled run without re-downloading healthy instruments.
+- Per-pair failures are recorded as `DQ-026` and counted in `result.failed` with `result.partial=true`; the job still succeeds and the pair stays a gap, so the next run retries it.
+- The unused `catchUp` payload flag and the single-date `finalizeDates` helper were removed; there is no manual catch-up endpoint.
+- First run repaired `2026-11-23`, which no scheduled run had finalized: `333` gaps across `50` instruments in the `2026-11-12`–`2026-11-26` window, `0` failures, `124,875` rows written.
+
 ### Data-quality corrections (2026-11-26)
 
 - Candle decimals are written at the database scale (`numeric(20,4)`) and revision checks compare numerically. A refetch of unchanged bars no longer records `provider_revision`.

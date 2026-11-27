@@ -8,6 +8,7 @@ import {
 } from '@ai-trading/adapters';
 import { sha256Hex } from '@ai-trading/domain';
 import {
+  addDays,
   buildSessionWindow,
   dedupeCandles,
   fetchStatusFromRun,
@@ -32,6 +33,7 @@ import {
   deleteAllCoverage,
   findProviderByCode,
   findProviderMapping,
+  getIncompleteSessionTargets,
   getInstrumentTickSize,
   getJobRun,
   getLatestBackfillJobForInstrument,
@@ -64,6 +66,12 @@ interface ChunkInput {
   chunkCount: number;
   mode: 'missing_only' | 'force';
 }
+
+/**
+ * Number of trading sessions `historical-finalize` looks back over. It repairs
+ * sessions missed while the scheduler was down, not just the newest session.
+ */
+const FINALIZE_LOOKBACK_SESSIONS = 10;
 
 @Injectable()
 export class IngestionService {
@@ -788,7 +796,7 @@ export class IngestionService {
     return result;
   }
 
-  async historicalFinalize(jobRunId: string, payload: Record<string, unknown>) {
+  async historicalFinalize(jobRunId: string) {
     await updateJobRun(jobRunId, {
       status: 'running',
       startedAt: new Date(),
@@ -818,50 +826,59 @@ export class IngestionService {
       });
       return result;
     }
-    const dates = await this.finalizeDates(latest, Boolean(payload.catchUp));
-    const targets = await getSyncTargetInstruments();
+    const from = await this.finalizeWindowStart(latest);
+    const gaps = await getIncompleteSessionTargets(from, latest);
+    const targets = new Map<string, { symbol: string; dates: string[] }>();
+    for (const gap of gaps) {
+      const entry = targets.get(gap.instrument_id) ?? {
+        symbol: gap.trading_symbol,
+        dates: [],
+      };
+      entry.dates.push(gap.trading_date);
+      targets.set(gap.instrument_id, entry);
+    }
     let instruments = 0;
     let rowsWritten = 0;
-    let repairs = 0;
-    const totalRepairs = targets.length * dates.length;
+    let repaired = 0;
+    let failed = 0;
     this.tracking.completeStage(jobRunId, 'prepare', 'completed', {
-      instruments: targets.length,
-      dates: dates.length,
+      instruments: targets.size,
+      gaps: gaps.length,
+      from,
+      to: latest,
     });
     this.tracking.enterStage(jobRunId, 'repair');
-    for (const target of targets) {
-      const mapping = await findProviderMapping(
-        target.instrumentId,
-        provider.id,
-      );
+    for (const [instrumentId, entry] of targets) {
+      const mapping = await findProviderMapping(instrumentId, provider.id);
       if (!mapping) continue;
-      for (const date of dates) {
+      let instrumentRepairs = 0;
+      for (const [index, date] of entry.dates.entries()) {
         try {
           const result = await this.runChunk({
             jobRunId,
             providerId: provider.id,
-            instrumentId: target.instrumentId,
+            instrumentId,
             externalKey: mapping.externalKey,
             from: date,
             to: date,
-            chunkIndex: dates.indexOf(date),
-            chunkCount: dates.length,
+            chunkIndex: index,
+            chunkCount: entry.dates.length,
             mode: 'force',
           });
           rowsWritten += result.written;
-          await this.quality.recomputeCoverage(target.instrumentId, date, date);
-          await this.quality.recomputeInstrumentStatus(target.instrumentId);
-          instruments += 1;
-          repairs += 1;
+          await this.quality.recomputeCoverage(instrumentId, date, date);
+          repaired += 1;
+          instrumentRepairs += 1;
           this.tracking.progress(jobRunId, 'repair', {
-            index: repairs,
-            total: totalRepairs,
-            instrumentId: target.instrumentId,
-            symbol: target.symbol,
+            index: repaired,
+            total: gaps.length,
+            instrumentId,
+            symbol: entry.symbol,
             tradingDate: date,
             written: result.written,
           });
         } catch (error) {
+          failed += 1;
           const classification = classifyUpstoxError(error);
           const fatal = ['reference', 'auth', 'permission', 'contract'].includes(
             classification.kind,
@@ -870,7 +887,7 @@ export class IngestionService {
             ruleId: 'DQ-026',
             severity: fatal ? 'critical' : 'warning',
             providerId: provider.id,
-            instrumentId: target.instrumentId,
+            instrumentId,
             source: 'ingestion',
             scope: { from: date, to: date },
             payload: {
@@ -887,23 +904,36 @@ export class IngestionService {
             },
           });
           this.tracking.warning(jobRunId, 'repair', {
-            instrumentId: target.instrumentId,
-            symbol: target.symbol,
+            instrumentId,
+            symbol: entry.symbol,
             tradingDate: date,
             code: classification.kind,
             retryable: classification.retryable,
           });
         }
       }
+      if (instrumentRepairs > 0) {
+        await this.quality.recomputeInstrumentStatus(instrumentId);
+        instruments += 1;
+      }
     }
     this.tracking.completeStage(jobRunId, 'repair', 'completed', {
-      completed: repairs,
-      total: totalRepairs,
+      repaired,
+      failed,
+      total: gaps.length,
       rowsWritten,
     });
     this.tracking.enterStage(jobRunId, 'refresh');
     await refreshDailyStats();
-    const result = { instruments, rowsWritten, dates };
+    const result = {
+      from,
+      to: latest,
+      instruments,
+      repaired,
+      failed,
+      partial: failed > 0,
+      rowsWritten,
+    };
     await updateJobRun(jobRunId, {
       status: 'succeeded',
       finishedAt: new Date(),
@@ -913,22 +943,15 @@ export class IngestionService {
     return result;
   }
 
-  private async finalizeDates(
-    latest: string,
-    catchUp: boolean,
-  ): Promise<string[]> {
-    const from = new Date(`${latest}T00:00:00Z`);
-    from.setUTCDate(from.getUTCDate() - 14);
+  /** First trading session inside the finalize lookback window. */
+  private async finalizeWindowStart(latest: string): Promise<string> {
+    const calendarDays = FINALIZE_LOOKBACK_SESSIONS * 2 + 7;
     const rows = await getTradingSessionsForRange(
-      from.toISOString().slice(0, 10),
+      addDays(latest, -calendarDays),
       latest,
     );
-    const tradingDates = rows
-      .filter((row) => row.is_trading_day)
-      .map((row) => row.trading_date)
-      .filter((date) => date <= latest);
-    if (!catchUp) return tradingDates.slice(-1);
-    return tradingDates.slice(-10);
+    const sessions = rows.filter((row) => row.is_trading_day);
+    return sessions.slice(-FINALIZE_LOOKBACK_SESSIONS)[0]?.trading_date ?? latest;
   }
 
   async coverageRecompute(jobRunId: string, payload: Record<string, unknown>) {

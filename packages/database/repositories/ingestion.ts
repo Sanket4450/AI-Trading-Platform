@@ -536,6 +536,44 @@ export async function getTradingSessionsForRange(from: string, to: string) {
   `);
 }
 
+/**
+ * Trading sessions in the range where a sync target has no coverage row or
+ * fewer bars than expected. The listing window is respected so days before an
+ * instrument listed are not treated as gaps.
+ */
+export async function getIncompleteSessionTargets(from: string, to: string) {
+  return db.execute<{
+    instrument_id: string;
+    trading_symbol: string;
+    trading_date: string;
+  }>(sql`
+    select target.instrument_id, target.trading_symbol, tc.trading_date::text
+    from trading_calendar tc
+    join exchanges e on e.id = tc.exchange_id
+    cross join lateral (
+      select i.id as instrument_id, i.trading_symbol
+      from instruments i
+      where i.is_sync_target
+        and (i.listed_on is null or i.listed_on <= tc.trading_date)
+        and (i.delisted_on is null or i.delisted_on >= tc.trading_date)
+        and exists (
+          select 1
+          from instrument_provider_mappings m
+          where m.instrument_id = i.id
+            and m.is_primary
+        )
+    ) target
+    left join instrument_day_coverage c
+      on c.instrument_id = target.instrument_id
+     and c.trading_date = tc.trading_date
+    where e.code = 'NSE'
+      and tc.is_trading_day
+      and tc.trading_date between ${from} and ${to}
+      and (c.instrument_id is null or c.stored_bars < c.expected_bars)
+    order by tc.trading_date, target.trading_symbol
+  `);
+}
+
 export async function getNseExchange() {
   const rows = await db.select().from(exchanges).where(eq(exchanges.code, 'NSE')).limit(1);
   return rows[0] ?? null;
