@@ -3,7 +3,16 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useTransition, type ComponentProps, type ReactNode } from 'react';
-import { Eye, Pencil, RefreshCw, RotateCcw, Trash2, X, type LucideIcon } from 'lucide-react';
+import {
+  Eye,
+  LoaderCircle,
+  Pencil,
+  RefreshCw,
+  RotateCcw,
+  Trash2,
+  X,
+  type LucideIcon,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { InfoTooltip } from '@/components/ui/info-tooltip';
 import { SubmitButton } from '@/components/dashboard/submit-button';
@@ -52,6 +61,7 @@ type TableActionButtonProps = ComponentProps<typeof Button> & {
   label: string;
   tooltip?: string;
   tone?: TableActionTone;
+  pending?: boolean;
 };
 
 /** Icon-only row action used as a dialog trigger or a one-off control. */
@@ -60,7 +70,9 @@ export function TableActionButton({
   label,
   tooltip,
   tone = 'view',
+  pending = false,
   className,
+  disabled,
   ...props
 }: TableActionButtonProps) {
   const Icon = actionIcons[icon];
@@ -72,10 +84,16 @@ export function TableActionButton({
         variant="ghost"
         size="icon-sm"
         aria-label={label}
+        aria-busy={pending}
+        disabled={pending || disabled}
         className={cn('size-7', toneClasses[tone], className)}
         {...props}
       >
-        <Icon className="size-4" />
+        {pending ? (
+          <LoaderCircle className="size-4 animate-spin" />
+        ) : (
+          <Icon className="size-4" />
+        )}
       </Button>
     </InfoTooltip>
   );

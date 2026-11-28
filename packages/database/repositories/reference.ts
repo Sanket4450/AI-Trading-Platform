@@ -662,6 +662,14 @@ export async function listInstrumentCatalog(filters: {
           order by j.created_at desc
           limit 1
         )`,
+        activeRecomputeJobId: sql<string | null>`(
+          select j.id from job_runs j
+          where j.instrument_id = "instruments"."id"
+            and j.job_name = 'coverage-recompute'
+            and j.status in ('queued', 'running')
+          order by j.created_at desc
+          limit 1
+        )`,
         mappingCount: sql<number>`(
           select count(*)::int from instrument_provider_mappings m
           where m.instrument_id = "instruments"."id" and m.is_primary
@@ -715,6 +723,14 @@ export async function getInstrumentStatusDetail(instrumentId: string) {
         select j.id from job_runs j
         where j.instrument_id = "instruments"."id"
           and j.job_name = 'historical-backfill'
+          and j.status in ('queued', 'running')
+        order by j.created_at desc
+        limit 1
+      )`,
+      activeRecomputeJobId: sql<string | null>`(
+        select j.id from job_runs j
+        where j.instrument_id = "instruments"."id"
+          and j.job_name = 'coverage-recompute'
           and j.status in ('queued', 'running')
         order by j.created_at desc
         limit 1

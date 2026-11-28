@@ -9,6 +9,7 @@ import { TableSummary } from '@/components/dashboard/table-summary';
 import { StatusBadge } from '@/components/dashboard/status-badge';
 import { EmptyState } from '@/components/dashboard/empty-state';
 import { AutoRefresh } from '@/components/dashboard/auto-refresh';
+import { LiveJobRefresh } from '@/components/dashboard/live-job-refresh';
 import { TableRefreshButton } from '@/components/dashboard/table-actions';
 import { PageSizeSelect } from '@/components/dashboard/page-size-select';
 import { Pagination } from '@/components/dashboard/pagination';
@@ -66,13 +67,17 @@ export default async function InstrumentsPage({ searchParams }: { searchParams: 
   const rows = data.items;
 
   const active = rows.some(
-    (row) => Boolean(row.activeJobId) || row.dataStatus === 'pending',
+    (row) =>
+      Boolean(row.activeJobId) ||
+      Boolean(row.activeRecomputeJobId) ||
+      row.dataStatus === 'pending',
   );
   const hasFilters = Boolean(params.dataStatus || params.search);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
       <AutoRefresh active={active} />
+      <LiveJobRefresh />
 
       <TableCard
         summary={

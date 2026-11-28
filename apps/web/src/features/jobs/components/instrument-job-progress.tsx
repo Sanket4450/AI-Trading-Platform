@@ -24,6 +24,10 @@ export function InstrumentJobProgress({
   const [job, setJob] = useState(initial);
 
   useEffect(() => {
+    setJob(initial);
+  }, [initial]);
+
+  useEffect(() => {
     if (!initial) return;
     return connectJobs((message) => {
       if (message.type === 'run') {

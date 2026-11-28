@@ -558,6 +558,8 @@ export interface InstrumentCoverageRow {
   computedAt: string | null;
   /** Live queued/running historical-backfill job, or null when nothing is in flight. */
   activeJobId: string | null;
+  /** Live queued/running coverage-recompute job, or null when nothing is in flight. */
+  activeRecomputeJobId: string | null;
   mappingCount: number;
 }
 

@@ -15,6 +15,7 @@ import { label } from '@/lib/labels';
 import { displayStatus, statusTone } from '@/lib/status';
 import { backLinkFor } from '@/lib/navigation';
 import { PageMeta } from '@/components/shell/page-meta';
+import { LiveJobRefresh } from '@/components/dashboard/live-job-refresh';
 import { StatCard, StatGrid } from '@/components/dashboard/stat-card';
 import { SectionCard } from '@/components/dashboard/section-card';
 import { DetailHeader } from '@/components/dashboard/detail-header';
@@ -115,6 +116,7 @@ export default async function InstrumentDetailPage({
         title={`${detail.symbol} · Instrument`}
         description="Coverage, download history, mappings and open issues for this instrument."
       />
+      <LiveJobRefresh instrumentId={detail.instrumentId} />
 
       <DetailHeader
         back={back}

@@ -122,7 +122,9 @@ detail timeline from the stream.
   BullMQ when it is still waiting. For a strategy evaluation it also marks the
   linked `strategy_evaluation_runs` row cancelled.
 - `/jobs` lists runs with live progress; `/jobs/[id]` shows the stage rail and
-  timeline live. The instrument detail page shows the latest fetch run.
+  timeline live. The instrument detail page shows the latest run live, and the
+  catalog and instrument detail re-render on run transitions so action buttons
+  follow the queue instead of the projection.
 - The `strategy-evaluation` job is created by
   `POST /strategies/:id/evaluation-runs`; `/strategies/[id]/evaluations/[runId]`
   links to its ledger and shows per-day progress.

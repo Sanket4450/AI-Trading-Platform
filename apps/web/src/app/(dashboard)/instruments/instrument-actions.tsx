@@ -1,5 +1,7 @@
 'use client';
 
+import { useState } from 'react';
+import { LoaderCircle } from 'lucide-react';
 import type { InstrumentCoverageDetail, InstrumentCoverageRow } from '@/lib/types';
 import {
   coverageCancelCopy,
@@ -26,9 +28,29 @@ export function InstrumentRowActions({
 }) {
   const fetchInstruments = useFetchInstruments();
   const cancelInstrument = useCancelInstrument();
+  const [fetchPending, setFetchPending] = useState(false);
+  const [cancelPending, setCancelPending] = useState(false);
   const fetchCopy = coverageFetchCopy(row);
   const cancelCopy = coverageCancelCopy(row.symbol);
   const fetching = Boolean(row.activeJobId);
+
+  const runFetch = async (formData: FormData) => {
+    setFetchPending(true);
+    try {
+      await fetchInstruments(formData);
+    } finally {
+      setFetchPending(false);
+    }
+  };
+
+  const runCancel = async (formData: FormData) => {
+    setCancelPending(true);
+    try {
+      await cancelInstrument(formData);
+    } finally {
+      setCancelPending(false);
+    }
+  };
 
   return (
     <TableActions>
@@ -41,13 +63,14 @@ export function InstrumentRowActions({
               tone="destructive"
               label={cancelCopy.label}
               tooltip={cancelCopy.tooltip}
+              pending={cancelPending}
             />
           }
           title={cancelCopy.title}
           description={cancelCopy.description}
           confirmLabel={cancelCopy.label}
           tone="destructive"
-          action={cancelInstrument}
+          action={runCancel}
           hiddenFields={{ instrumentId: row.instrumentId, returnTo }}
         />
       ) : null}
@@ -59,12 +82,13 @@ export function InstrumentRowActions({
               tone="refresh"
               label={fetchCopy.label}
               tooltip={fetchCopy.tooltip}
+              pending={fetchPending}
             />
           }
           title={fetchCopy.title}
           description={fetchCopy.description}
           confirmLabel={fetchCopy.label}
-          action={fetchInstruments}
+          action={runFetch}
           hiddenFields={{
             instrumentIds: row.instrumentId,
             mode: 'missing_only',
@@ -86,39 +110,89 @@ export function InstrumentDetailActions({
   const fetchInstruments = useFetchInstruments();
   const cancelInstrument = useCancelInstrument();
   const recomputeStatus = useRecomputeStatus();
+  const [fetchPending, setFetchPending] = useState(false);
+  const [cancelPending, setCancelPending] = useState(false);
+  const [recomputePending, setRecomputePending] = useState(false);
   const fetching = Boolean(detail.activeJobId);
+  const recomputing = Boolean(detail.activeRecomputeJobId);
   const fetchCopy = coverageFetchCopy(detail);
   const cancelCopy = coverageCancelCopy(detail.symbol);
   const recomputeCopy = coverageRecomputeCopy(detail.symbol);
 
+  const runFetch = async (formData: FormData) => {
+    setFetchPending(true);
+    try {
+      await fetchInstruments(formData);
+    } finally {
+      setFetchPending(false);
+    }
+  };
+
+  const runCancel = async (formData: FormData) => {
+    setCancelPending(true);
+    try {
+      await cancelInstrument(formData);
+    } finally {
+      setCancelPending(false);
+    }
+  };
+
+  const runRecompute = async (formData: FormData) => {
+    setRecomputePending(true);
+    try {
+      await recomputeStatus(formData);
+    } finally {
+      setRecomputePending(false);
+    }
+  };
+
   return (
     <>
-      <ConfirmDialog
-        trigger={
-          <Button type="button" size="sm" variant="outline">
-            Recompute
-          </Button>
-        }
-        title={recomputeCopy.title}
-        description={recomputeCopy.description}
-        confirmLabel={recomputeCopy.label}
-        action={recomputeStatus}
-        hiddenFields={{ instrumentId: detail.instrumentId, returnTo }}
-      />
-      {fetching ? (
+      {recomputing || recomputePending ? (
+        <Button type="button" size="sm" variant="outline" disabled aria-busy>
+          <LoaderCircle className="size-3.5 animate-spin" />
+          Recomputing…
+        </Button>
+      ) : (
         <ConfirmDialog
           trigger={
             <Button type="button" size="sm" variant="outline">
-              Cancel fetch
+              Recompute
+            </Button>
+          }
+          title={recomputeCopy.title}
+          description={recomputeCopy.description}
+          confirmLabel={recomputeCopy.label}
+          action={runRecompute}
+          hiddenFields={{ instrumentId: detail.instrumentId, returnTo }}
+        />
+      )}
+      {fetching ? (
+        <ConfirmDialog
+          trigger={
+            <Button type="button" size="sm" variant="outline" disabled={cancelPending}>
+              {cancelPending ? (
+                <>
+                  <LoaderCircle className="size-3.5 animate-spin" />
+                  Cancelling…
+                </>
+              ) : (
+                'Cancel fetch'
+              )}
             </Button>
           }
           title={cancelCopy.title}
           description={cancelCopy.description}
           confirmLabel={cancelCopy.label}
           tone="destructive"
-          action={cancelInstrument}
+          action={runCancel}
           hiddenFields={{ instrumentId: detail.instrumentId, returnTo }}
         />
+      ) : fetchPending ? (
+        <Button type="button" size="sm" disabled aria-busy>
+          <LoaderCircle className="size-3.5 animate-spin" />
+          Queueing fetch…
+        </Button>
       ) : fetchCopy ? (
         <ConfirmDialog
           trigger={
@@ -129,7 +203,7 @@ export function InstrumentDetailActions({
           title={fetchCopy.title}
           description={fetchCopy.description}
           confirmLabel={fetchCopy.label}
-          action={fetchInstruments}
+          action={runFetch}
           hiddenFields={{
             instrumentIds: detail.instrumentId,
             mode: 'missing_only',

@@ -113,6 +113,15 @@ export class InstrumentCoverageRowDto {
   })
   activeJobId!: string | null;
 
+  @ApiProperty({
+    type: String,
+    format: 'uuid',
+    nullable: true,
+    description:
+      'Queued or running coverage-recompute job for this instrument, or null when nothing is in flight.',
+  })
+  activeRecomputeJobId!: string | null;
+
   @ApiProperty()
   mappingCount!: number;
 }
@@ -206,6 +215,15 @@ export class InstrumentCoverageDetailDto {
       'Queued or running historical-backfill job for this instrument, or null when nothing is in flight.',
   })
   activeJobId!: string | null;
+
+  @ApiProperty({
+    type: String,
+    format: 'uuid',
+    nullable: true,
+    description:
+      'Queued or running coverage-recompute job for this instrument, or null when nothing is in flight.',
+  })
+  activeRecomputeJobId!: string | null;
 
   @ApiProperty()
   mappingCount!: number;

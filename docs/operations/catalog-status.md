@@ -21,7 +21,9 @@ Fetch status is derived from the latest `historical-backfill` run for the instru
 `coverage-recompute` or other instrument-scoped jobs. The projection is marked `queued` when the
 request is enqueued and `fetching` when the worker starts, so a long fetch is visible while it runs.
 The catalog row also carries `activeJobId`, the queued or running backfill job id, so row actions
-follow live queue state instead of the projection.
+follow live queue state instead of the projection. `activeRecomputeJobId` does the same for a
+`coverage-recompute` run, so the detail page disables Recompute while its status refresh is in
+flight.
 
 ### Data status
 
