@@ -95,6 +95,9 @@ export class InstrumentCoverageRowDto {
   @ApiProperty({ type: Number, nullable: true })
   openCriticalIssues!: number | null;
 
+  @ApiProperty({ type: Number, nullable: true })
+  openWarningIssues!: number | null;
+
   @ApiProperty({ type: String, format: 'date-time', nullable: true })
   lastSuccessAt!: string | null;
 
@@ -185,6 +188,9 @@ export class InstrumentCoverageDetailDto {
 
   @ApiProperty({ type: Number, nullable: true })
   openCriticalIssues!: number | null;
+
+  @ApiProperty({ type: Number, nullable: true })
+  openWarningIssues!: number | null;
 
   @ApiProperty({ type: String, format: 'date-time', nullable: true })
   lastSuccessAt!: string | null;

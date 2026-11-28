@@ -11,7 +11,7 @@ const styles: Record<string, string> = {
   active: 'border-success/30 bg-success/10 text-success',
   open: 'border-warning/30 bg-warning/10 text-warning-strong',
   partial: 'border-warning/30 bg-warning/10 text-warning-strong',
-  partial_mismatch: 'border-destructive/30 bg-destructive/10 text-destructive',
+  partial_mismatch: 'border-warning/30 bg-warning/10 text-warning-strong',
   needs_review: 'border-destructive/30 bg-destructive/10 text-destructive',
   degraded: 'border-warning/30 bg-warning/10 text-warning-strong',
   running: 'border-info/30 bg-info/10 text-info',

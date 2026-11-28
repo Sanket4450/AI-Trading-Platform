@@ -553,6 +553,7 @@ export interface InstrumentCoverageRow {
   partialDays: number | null;
   missingDays: number | null;
   openCriticalIssues: number | null;
+  openWarningIssues: number | null;
   lastSuccessAt: string | null;
   computedAt: string | null;
   /** Live queued/running historical-backfill job, or null when nothing is in flight. */

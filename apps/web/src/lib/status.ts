@@ -39,8 +39,8 @@ export function statusTone(status: string): string {
     case 'Stopped':
     case 'Needs review':
     case 'Missing':
-    case 'Gaps · mismatch':
       return 'border-destructive/30 bg-destructive/10 text-destructive';
+    case 'Gaps · mismatch':
     case 'Stale':
       return 'border-warning/30 bg-warning/10 text-warning-strong';
     default:

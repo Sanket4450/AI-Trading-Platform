@@ -648,6 +648,10 @@ export async function listInstrumentCatalog(filters: {
         partialDays: instrumentDataStatus.partialDays,
         missingDays: instrumentDataStatus.missingDays,
         openCriticalIssues: instrumentDataStatus.openCriticalIssues,
+        openWarningIssues: sql<number>`(
+          select count(*)::int from system_issues si
+          where si.instrument_id = "instruments"."id" and si.severity = 'warning'
+        )`,
         lastSuccessAt: instrumentDataStatus.lastSuccessAt,
         computedAt: instrumentDataStatus.computedAt,
         activeJobId: sql<string | null>`(
@@ -701,6 +705,10 @@ export async function getInstrumentStatusDetail(instrumentId: string) {
       partialDays: instrumentDataStatus.partialDays,
       missingDays: instrumentDataStatus.missingDays,
       openCriticalIssues: instrumentDataStatus.openCriticalIssues,
+      openWarningIssues: sql<number>`(
+        select count(*)::int from system_issues si
+        where si.instrument_id = "instruments"."id" and si.severity = 'warning'
+      )`,
       lastSuccessAt: instrumentDataStatus.lastSuccessAt,
       computedAt: instrumentDataStatus.computedAt,
       activeJobId: sql<string | null>`(

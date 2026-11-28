@@ -185,8 +185,11 @@ export default async function InstrumentsPage({ searchParams }: { searchParams: 
                       </span>
                     </TableCell>
                     <TableCell>
-                      {row.openCriticalIssues ? (
-                        <StatusBadge status="critical" />
+                      {row.openCriticalIssues || row.openWarningIssues ? (
+                        <div className="flex flex-wrap gap-1">
+                          {row.openCriticalIssues ? <StatusBadge status="critical" /> : null}
+                          {row.openWarningIssues ? <StatusBadge status="warning" /> : null}
+                        </div>
                       ) : (
                         <span className="text-muted-foreground text-xs">None</span>
                       )}
